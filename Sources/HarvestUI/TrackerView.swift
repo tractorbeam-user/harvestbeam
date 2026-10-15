@@ -24,6 +24,7 @@ struct TrackerView: View {
     @State private var selection: TaskKey?
     /// Search is two steps: pick a project, then one of its tasks.
     @State private var pickedProject: Int?
+    @State private var isAddingEntry = false
     @State private var selectedDay = LocalDate()
     @State private var gridWidth: CGFloat = 0
     @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.task.rawValue
@@ -303,6 +304,10 @@ struct TrackerView: View {
     /// Search lives at the bottom, next to refresh, Open Harvest and settings.
     private func bottomBar(_ flat: [TrackableTask]) -> some View {
         HStack(spacing: 4) {
+            FooterButton(systemImage: "plus", help: "New time entry (⌘N)") { isAddingEntry = true }
+                .keyboardShortcut("n", modifiers: .command)
+                .popover(isPresented: $isAddingEntry, arrowEdge: .top) { NewEntryEditor(day: selectedDay) }
+                .padding(.trailing, 2)
             searchField(flat)
                 .padding(.trailing, 6)
 

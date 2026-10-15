@@ -147,9 +147,11 @@ private struct DayEntriesList: View {
                     Text(day == LocalDate() ? "Nothing tracked yet today" : "No time tracked")
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                    Button("New Entry", systemImage: "plus") { isAdding = true }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
+                    Button { isAdding = true } label: {
+                        Label("New Entry", systemImage: "plus")
+                    }
+                    .buttonStyle(SoftPillButtonStyle())
+                        .popover(isPresented: $isAdding, arrowEdge: .bottom) { NewEntryEditor(day: day) }
                 }
                 .frame(maxWidth: .infinity, minHeight: 56)
                 .padding(.vertical, 14)
@@ -167,7 +169,6 @@ private struct DayEntriesList: View {
         .background(RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous).fill(Color.tileBackground))
         .overlay(RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
         .clipShape(RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous))
-        .sheet(isPresented: $isAdding) { NewEntryEditor(day: day) }
     }
 }
 
@@ -275,5 +276,26 @@ private struct EntryRow: View {
         }
         .font(.system(size: 12, weight: .bold))
         .frame(width: 32, height: 32)
+    }
+}
+
+/// Soft orange pill, matching the play buttons on tiles: tinted at rest,
+/// solid on hover.
+struct SoftPillButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(isHovered ? AnyShapeStyle(.white) : AnyShapeStyle(.harvestOrange))
+            .padding(.horizontal, 12)
+            .frame(height: 26)
+            .background(Capsule().fill(Color.harvestOrange.opacity(isHovered ? 1 : 0.13)))
+            .contentShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+            #if os(macOS)
+            .onHover { isHovered = $0 }
+            #endif
     }
 }
