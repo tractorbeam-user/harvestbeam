@@ -11,6 +11,9 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let tracker: TimeTracker
     private var statusItem: NSStatusItem!
+    /// Harvest-style play/pause square, its own item just left of `statusItem`
+    /// so a click on it always starts or pauses.
+    private var controlItem: NSStatusItem!
     private var panel: TrackerPanel!
     private var hotKey: HotKey?
     private var ticker: Timer?
@@ -35,6 +38,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.imagePosition = .imageLeading
             button.setAccessibilityTitle("Harvest Bar")
         }
+        // Created second, so macOS places it to the left of the timer text.
+        controlItem = NSStatusBar.system.statusItem(withLength: Self.controlWidth + 4)
+        if let button = controlItem.button {
+            button.target = self
+            button.action = #selector(controlClicked)
+        }
+        controlItem.isVisible = false
 
         installMainMenu()
         makePanel()
@@ -145,21 +155,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// The menu bar icon opens the window, or hides it whenever it's showing,
     /// even if another app is in front.
-    @objc func statusItemClicked() {
-        // Like Harvest: the play/pause square at the left starts or pauses the
-        // timer; the rest of the item (or a right-click) shows the window.
-        if let event = NSApp.currentEvent, event.type == .leftMouseUp,
-           let button = statusItem.button, tracker.running != nil || tracker.pausedEntry != nil {
-            let point = button.convert(event.locationInWindow, from: nil)
-            if point.x <= Self.controlWidth + 4 {
-                Task {
-                    if tracker.running != nil { await tracker.pause() } else { await tracker.resume() }
-                    lastTitle = nil
-                    updateStatusItem()
-                }
-                return
-            }
+    @objc func controlClicked() {
+        Task {
+            if tracker.running != nil { await tracker.pause() } else { await tracker.resume() }
+            lastTitle = nil
+            updateStatusItem()
         }
+    }
+
+    @objc func statusItemClicked() {
         if panel.isVisible && !panel.isMiniaturized {
             hidePanel()
         } else {
@@ -257,9 +261,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let paused = tracker.pausedEntry
         let title: String
         if let entry = tracker.running {
-            title = " " + MenuBarDisplay.title(task: tracker.task(for: entry), notes: entry.notes, elapsed: entry.elapsed())
+            title = MenuBarDisplay.title(task: tracker.task(for: entry), notes: entry.notes, elapsed: entry.elapsed())
         } else if let paused {
-            title = " " + TimeFormat.hoursMinutes(paused.elapsed())
+            title = TimeFormat.hoursMinutes(paused.elapsed())
         } else {
             title = ""
         }
@@ -269,15 +273,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         if tracker.running != nil || paused != nil {
             let running = tracker.running != nil
-            button.image = Self.controlImage(running: running)
+            controlItem.button?.image = Self.controlImage(running: running)
+            controlItem.button?.toolTip = running ? "Pause timer" : "Resume timer"
+            controlItem.isVisible = true
+            button.image = nil
             button.attributedTitle = NSAttributedString(string: title, attributes: [
                 // No custom color: the menu bar's own text color stays legible on
                 // any wallpaper.
                 .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium),
             ])
             let task = (tracker.running ?? paused).map { tracker.task(for: $0) }
-            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)\n" + (running ? "Click the square to pause" : "Click the square to resume") }
+            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)" }
         } else {
+            controlItem.isVisible = false
             let image = NSImage(systemSymbolName: "timer", accessibilityDescription: "Harvest Bar")?
                 .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
             image?.isTemplate = true
