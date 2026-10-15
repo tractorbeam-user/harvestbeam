@@ -1,5 +1,8 @@
 import HarvestKit
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// "What are you working on?" Type (or dictate) the day in plain words; the
 /// on-device model proposes entries, you adjust them, and they're added in one
@@ -42,10 +45,12 @@ struct PlanDayView: View {
                 .font(.system(size: 13))
                 .focused($textFocused)
                 .padding(10)
+                .padding(.trailing, 26)
                 .background(field)
+                .overlay(alignment: .bottomTrailing) { micButton }
 
             Label(DayPlanner.modelAvailable
-                  ? "Matched on your Mac with Apple Intelligence. Press fn twice to dictate."
+                  ? "Matched on your Mac with Apple Intelligence."
                   : "Keyword matching. Turn on Apple Intelligence in System Settings for smarter matches.",
                   systemImage: DayPlanner.modelAvailable ? "sparkles" : "text.magnifyingglass")
                 .font(.system(size: 11))
@@ -172,6 +177,30 @@ struct PlanDayView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+    }
+
+    /// Starts the Mac's own dictation in the text box, same as pressing fn
+    /// twice (macOS offers to turn dictation on if it's off).
+    private var micButton: some View {
+        Button {
+            textFocused = true
+            #if os(macOS)
+            DispatchQueue.main.async {
+                NSApp.sendAction(Selector(("startDictation:")), to: nil, from: nil)
+            }
+            #endif
+        } label: {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.harvestOrange)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(Color.harvestOrange.opacity(0.13)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(6)
+        .help("Dictate (or press fn twice)")
+        .accessibilityLabel("Start dictation")
     }
 
     private var field: some View {

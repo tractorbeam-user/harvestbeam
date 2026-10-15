@@ -26,6 +26,9 @@ struct TrackerView: View {
     @State private var pickedProject: Int?
     @State private var isAddingEntry = false
     @State private var isPlanning = false
+    /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
+    @AppStorage("collapsedSections") private var collapsedRaw = ""
+    private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
     @State private var selectedDay = LocalDate()
     @State private var gridWidth: CGFloat = 0
     @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.task.rawValue
@@ -116,15 +119,40 @@ struct TrackerView: View {
         max(1, Int((gridWidth + Metrics.spacing) / (Metrics.tileMinWidth + Metrics.spacing)))
     }
 
+    private func toggleCollapsed(_ id: String) {
+        var set = collapsed
+        if !set.insert(id).inserted { set.remove(id) }
+        withAnimation(.snappy(duration: 0.2)) { collapsedRaw = set.sorted().joined(separator: ",") }
+    }
+
     private func tileGrid(_ sections: [TaskSection]) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             ForEach(sections) { section in
+                let isCollapsed = !isSearching && collapsed.contains(section.id)
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(section.title, systemImage: section.systemImage)
-                        .labelStyle(SectionLabelStyle())
+                    Button { toggleCollapsed(section.id) } label: {
+                        HStack(spacing: 6) {
+                            Label(section.title, systemImage: section.systemImage)
+                                .labelStyle(SectionLabelStyle())
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.tertiary)
+                                .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+                            if isCollapsed {
+                                Text("\(section.tasks.count)")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
                         .padding(.leading, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(isCollapsed ? "Show \(section.title)" : "Hide \(section.title)")
 
-                    if section.tasks.isEmpty, let hint = section.emptyHint {
+                    if isCollapsed {
+                        EmptyView()
+                    } else if section.tasks.isEmpty, let hint = section.emptyHint {
                         Text(hint)
                             .font(.callout)
                             .foregroundStyle(.secondary)
@@ -190,7 +218,8 @@ struct TrackerView: View {
     }
 
     private func mainColumn(_ sections: [TaskSection]) -> some View {
-        let flat = sections.flatMap(\.tasks)
+        // Keyboard selection skips folded sections.
+        let flat = sections.filter { isSearching || !collapsed.contains($0.id) }.flatMap(\.tasks)
         return VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
