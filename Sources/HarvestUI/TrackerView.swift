@@ -274,6 +274,12 @@ struct TrackerView: View {
         }
     }
 
+    private func closeSearch() {
+        query = ""
+        searchFocused = false
+        withAnimation(.snappy(duration: 0.2)) { isSearchOpen = false }
+    }
+
     private func openSearch() {
         withAnimation(.snappy(duration: 0.2)) { isSearchOpen = true }
         Task { searchFocused = true }
@@ -311,25 +317,25 @@ struct TrackerView: View {
                         backToProjects()
                     } else if !query.isEmpty {
                         query = ""
-                    } else if selection != nil {
-                        selection = nil
                     } else {
-                        windowActions?.close()
+                        selection = nil
+                        closeSearch()
                     }
                 }
-            if !query.isEmpty {
-                Button { query = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .help("Clear search")
+            // Clears the text, or closes search when it's already empty.
+            Button {
+                if query.isEmpty { closeSearch() } else { query = "" }
+            } label: {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
             }
+            .buttonStyle(.plain)
+            .help(query.isEmpty ? "Close search" : "Clear search")
         }
         .padding(.horizontal, 10)
-        .frame(height: 34)
-        .background(RoundedRectangle(cornerRadius: 17, style: .continuous).fill(Color.panelBackground))
+        .frame(height: 30) // Same as the footer buttons, so opening search doesn't resize the bar.
+        .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color.panelBackground))
         .overlay(
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
                 .strokeBorder(searchFocused ? Color.harvestOrange.opacity(0.7) : Color.primary.opacity(0.1), lineWidth: searchFocused ? 1.5 : 1)
         )
     }

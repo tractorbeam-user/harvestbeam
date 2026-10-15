@@ -382,11 +382,19 @@ private struct ProjectPicker: View {
                         }
                         .padding(.bottom, 4)
                     }
-                    .frame(maxHeight: 220)
+                    // A ScrollView has no height of its own inside a popover, so
+                    // size it to the rows (about 26pt each, plus client headers).
+                    .frame(height: listHeight(matches))
                     .onChange(of: highlighted) { _, index in proxy.scrollTo(index) }
                 }
             }
         }
+    }
+
+    private func listHeight(_ matches: [(client: String, task: TrackableTask)]) -> CGFloat {
+        guard !matches.isEmpty else { return 36 }
+        let clients = Set(matches.map(\.client)).count
+        return min(240, CGFloat(matches.count) * 27 + CGFloat(clients) * 24 + 8)
     }
 
     private func pick(_ task: TrackableTask) {
