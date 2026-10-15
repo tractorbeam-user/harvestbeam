@@ -111,8 +111,8 @@ struct TaskTile: View {
 
     #if os(macOS)
     private let codeFont: CGFloat = 10.5
-    private let titleFont: CGFloat = 13
-    private let subtitleFont: CGFloat = 12
+    private let titleFont: CGFloat = 12
+    private let subtitleFont: CGFloat = 11.5
     private let indicatorSize: CGFloat = 24
     #else
     private let codeFont: CGFloat = 12
