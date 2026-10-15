@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 public extension ShapeStyle where Self == Color {
     /// Harvest's brand orange, #FA5D00.
@@ -108,11 +111,27 @@ final class PopoverDimmer {
 
 private struct DimsWindow: ViewModifier {
     @Environment(PopoverDimmer.self) private var dimmer: PopoverDimmer?
+    @State private var counted = false
 
     func body(content: Content) -> some View {
         content
-            .onAppear { dimmer?.openCount += 1 }
-            .onDisappear { dimmer.map { $0.openCount = max(0, $0.openCount - 1) } }
+            .onAppear {
+                guard !counted else { return }
+                counted = true
+                dimmer?.openCount += 1
+            }
+            // Lift the dim as soon as the popover starts closing, not after
+            // its close animation finishes.
+            #if os(macOS)
+            .onReceive(NotificationCenter.default.publisher(for: NSPopover.willCloseNotification)) { _ in undim() }
+            #endif
+            .onDisappear { undim() }
+    }
+
+    private func undim() {
+        guard counted else { return }
+        counted = false
+        dimmer.map { $0.openCount = max(0, $0.openCount - 1) }
     }
 }
 

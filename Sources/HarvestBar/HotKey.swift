@@ -20,6 +20,38 @@ final class HotKey {
     private var tap: CFMachPort?
     private var retryTimer: Timer?
 
+    /// The shortcut as stored in preferences: a key code plus Carbon modifiers.
+    struct Shortcut: Equatable {
+        var keyCode: Int
+        var carbonModifiers: Int
+        static let `default` = Shortcut(keyCode: kVK_ANSI_H, carbonModifiers: optionKey)
+
+        static let keyCodeKey = "shortcut.toggle.keyCode"
+        static let modifiersKey = "shortcut.toggle.modifiers"
+
+        /// Saved shortcut, the default, or nil when the user cleared it.
+        static func load() -> Shortcut? {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: keyCodeKey) != nil else { return .default }
+            let code = defaults.integer(forKey: keyCodeKey)
+            return code < 0 ? nil : Shortcut(keyCode: code, carbonModifiers: defaults.integer(forKey: modifiersKey))
+        }
+
+        static func save(_ shortcut: Shortcut?) {
+            UserDefaults.standard.set(shortcut?.keyCode ?? -1, forKey: keyCodeKey)
+            UserDefaults.standard.set(shortcut?.carbonModifiers ?? 0, forKey: modifiersKey)
+        }
+
+        var eventFlags: CGEventFlags {
+            var flags: CGEventFlags = []
+            if carbonModifiers & optionKey != 0 { flags.insert(.maskAlternate) }
+            if carbonModifiers & cmdKey != 0 { flags.insert(.maskCommand) }
+            if carbonModifiers & controlKey != 0 { flags.insert(.maskControl) }
+            if carbonModifiers & shiftKey != 0 { flags.insert(.maskShift) }
+            return flags
+        }
+    }
+
     init(keyCode: Int = kVK_ANSI_H, carbonModifiers: Int = optionKey, action: @escaping () -> Void) {
         self.keyCode = UInt32(keyCode)
         self.carbonModifiers = UInt32(carbonModifiers)
@@ -91,7 +123,8 @@ final class HotKey {
                 }
                 let flags = event.flags.intersection([.maskAlternate, .maskCommand, .maskControl, .maskShift])
                 let code = event.getIntegerValueField(.keyboardEventKeycode)
-                guard flags == .maskAlternate, code == Int64(kVK_ANSI_H) else {
+                let wanted = MainActor.assumeIsolated { (hotKey.keyCode, hotKey.shortcutFlags) }
+                guard flags == wanted.1, code == Int64(wanted.0) else {
                     return Unmanaged.passUnretained(event)
                 }
                 DispatchQueue.main.async { MainActor.assumeIsolated { hotKey.fire() } }
@@ -105,6 +138,25 @@ final class HotKey {
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         return true
+    }
+
+    private var shortcutFlags: CGEventFlags {
+        Shortcut(keyCode: Int(keyCode), carbonModifiers: Int(carbonModifiers)).eventFlags
+    }
+
+    /// Unregisters the shortcut, so a new one can replace it.
+    func invalidate() {
+        retryTimer?.invalidate()
+        retryTimer = nil
+        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        hotKeyRef = nil
+        if let handlerRef { RemoveEventHandler(handlerRef) }
+        handlerRef = nil
+        if let tap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+        tap = nil
     }
 
     private func reenableTap() {

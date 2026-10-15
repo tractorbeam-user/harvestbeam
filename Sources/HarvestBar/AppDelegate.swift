@@ -130,7 +130,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.isOpaque = true
         panel.backgroundColor = .windowBackgroundColor
         panel.contentMinSize = NSSize(width: 340, height: 440)
-        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        // .fullScreenNone makes the green button zoom instead of going full screen.
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .fullScreenNone]
         panel.delegate = self
         setKeptOnTop(UserDefaults.standard.bool(forKey: Self.keepOnTopKey))
 
@@ -221,12 +222,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.setFrame(frame, display: true, animate: true)
     }
 
-    /// The green button toggles between your size and the default one.
+    /// The green button toggles between your size and a roomier one: wide
+    /// enough for four columns of tiles and as tall as fits, never full screen.
     func windowWillUseStandardFrame(_ window: NSWindow, defaultFrame newFrame: NSRect) -> NSRect {
-        let content = window.frameRect(forContentRect: NSRect(origin: .zero, size: Self.defaultSize)).size
+        let visible = window.screen?.visibleFrame ?? newFrame
+        let size = NSSize(width: min(780, visible.width - 40), height: min(940, visible.height - 40))
         var frame = window.frame
-        frame.origin.y += frame.height - content.height
-        frame.size = content
+        frame.origin.y += frame.height - size.height
+        frame.size = size
+        // Keep it on screen.
+        frame.origin.x = min(max(frame.origin.x, visible.minX + 20), visible.maxX - size.width - 20)
+        frame.origin.y = min(max(frame.origin.y, visible.minY + 20), visible.maxY - size.height)
         return frame
     }
 

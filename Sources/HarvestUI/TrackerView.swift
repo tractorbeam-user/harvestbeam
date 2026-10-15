@@ -222,7 +222,7 @@ struct TrackerView: View {
                 Color.black.opacity(dimmer.openCount > 0 ? 0.22 : 0)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
-                    .animation(.easeOut(duration: 0.15), value: dimmer.openCount > 0)
+                    .animation(.easeOut(duration: dimmer.openCount > 0 ? 0.15 : 0.08), value: dimmer.openCount > 0)
             }
         }
         .environment(dimmer)
