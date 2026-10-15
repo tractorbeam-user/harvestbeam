@@ -11,9 +11,10 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let tracker: TimeTracker
     private var statusItem: NSStatusItem!
-    /// Harvest-style play/pause square, its own item just left of `statusItem`
-    /// so a click on it always starts or pauses.
-    private var controlItem: NSStatusItem!
+    /// Harvest-style play/pause square: a real button laid over the item's
+    /// image spot, so a click on it always starts or pauses while the rest of
+    /// the item opens the window, with no gap between them.
+    private let controlButton = NSButton()
     private var panel: TrackerPanel!
     private var hotKey: HotKey?
     private var ticker: Timer?
@@ -38,13 +39,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.imagePosition = .imageLeading
             button.setAccessibilityTitle("Harvest Bar")
         }
-        // Created second, so macOS places it to the left of the timer text.
-        controlItem = NSStatusBar.system.statusItem(withLength: Self.controlWidth + 4)
-        if let button = controlItem.button {
-            button.target = self
-            button.action = #selector(controlClicked)
-        }
-        controlItem.isVisible = false
+        controlButton.isBordered = false
+        controlButton.imagePosition = .imageOnly
+        controlButton.target = self
+        controlButton.action = #selector(controlClicked)
+        controlButton.isHidden = true
+        statusItem.button?.addSubview(controlButton)
 
         installMainMenu()
         makePanel()
@@ -261,9 +261,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let paused = tracker.pausedEntry
         let title: String
         if let entry = tracker.running {
-            title = MenuBarDisplay.title(task: tracker.task(for: entry), notes: entry.notes, elapsed: entry.elapsed())
+            title = " " + MenuBarDisplay.title(task: tracker.task(for: entry), notes: entry.notes, elapsed: entry.elapsed())
         } else if let paused {
-            title = TimeFormat.hoursMinutes(paused.elapsed())
+            title = " " + TimeFormat.hoursMinutes(paused.elapsed())
         } else {
             title = ""
         }
@@ -273,10 +273,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         if tracker.running != nil || paused != nil {
             let running = tracker.running != nil
-            controlItem.button?.image = Self.controlImage(running: running)
-            controlItem.button?.toolTip = running ? "Pause timer" : "Resume timer"
-            controlItem.isVisible = true
-            button.image = nil
+            // A clear placeholder reserves the square's spot; the button sits on it.
+            button.image = NSImage(size: NSSize(width: Self.controlWidth, height: 16))
+            controlButton.image = Self.controlImage(running: running)
+            controlButton.toolTip = running ? "Pause timer" : "Resume timer"
+            controlButton.isHidden = false
             button.attributedTitle = NSAttributedString(string: title, attributes: [
                 // No custom color: the menu bar's own text color stays legible on
                 // any wallpaper.
@@ -284,8 +285,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             ])
             let task = (tracker.running ?? paused).map { tracker.task(for: $0) }
             button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)" }
+            button.layoutSubtreeIfNeeded()
+            if let cell = button.cell as? NSButtonCell {
+                controlButton.frame = cell.imageRect(forBounds: button.bounds)
+            }
         } else {
-            controlItem.isVisible = false
+            controlButton.isHidden = true
             let image = NSImage(systemSymbolName: "timer", accessibilityDescription: "Harvest Bar")?
                 .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
             image?.isTemplate = true
