@@ -169,12 +169,6 @@ struct TrackerView: View {
     private func mainColumn(_ sections: [TaskSection]) -> some View {
         let flat = sections.flatMap(\.tasks)
         return VStack(spacing: 0) {
-            TimerHeader()
-                .padding([.horizontal, .top], Metrics.padding)
-                .padding(.bottom, 10)
-
-            Divider()
-
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 22) {
@@ -200,6 +194,14 @@ struct TrackerView: View {
 
             Divider()
             bottomBar(flat)
+        }
+        .background {
+            // Pause the running timer from the keyboard.
+            Button("") { Task { await tracker.pause() } }
+                .keyboardShortcut(".", modifiers: .command)
+                .disabled(tracker.running == nil)
+                .opacity(0)
+                .accessibilityHidden(true)
         }
     }
 
@@ -355,7 +357,6 @@ struct TrackerView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    TimerHeader()
                     if let error = tracker.errorMessage {
                         ErrorBanner(message: error) { tracker.errorMessage = nil }
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
