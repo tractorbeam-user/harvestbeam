@@ -11,10 +11,9 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let tracker: TimeTracker
     private var statusItem: NSStatusItem!
-    /// Harvest-style play/pause square: a real button laid over the item's
-    /// image spot, so a click on it always starts or pauses while the rest of
-    /// the item opens the window, with no gap between them.
-    private let controlButton = NSButton()
+    /// Harvest-style play/pause square drawn over the item's image spot.
+    /// `statusItemClicked` checks whether the click landed on it.
+    private let controlButton = NSImageView()
     private var panel: TrackerPanel!
     private var hotKey: HotKey?
     private var ticker: Timer?
@@ -39,10 +38,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.imagePosition = .imageLeading
             button.setAccessibilityTitle("Harvest Bar")
         }
-        controlButton.isBordered = false
-        controlButton.imagePosition = .imageOnly
-        controlButton.target = self
-        controlButton.action = #selector(controlClicked)
         controlButton.isHidden = true
         statusItem.button?.addSubview(controlButton)
 
@@ -164,6 +159,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc func statusItemClicked() {
+        // Status bar clicks report the item's center as their location, so use
+        // the pointer's real screen position to tell a click on the square.
+        if let button = statusItem.button, let window = button.window, !controlButton.isHidden,
+           NSApp.currentEvent?.type != .rightMouseUp {
+            let point = button.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+            if controlButton.frame.insetBy(dx: -4, dy: -6).contains(point) {
+                controlClicked()
+                return
+            }
+        }
         if panel.isVisible && !panel.isMiniaturized {
             hidePanel()
         } else {
@@ -306,3 +311,4 @@ final class TrackerPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 }
+

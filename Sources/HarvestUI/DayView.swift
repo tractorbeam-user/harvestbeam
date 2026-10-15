@@ -30,6 +30,13 @@ extension LocalDate {
 }
 
 extension TimeTracker {
+    /// Total tracked in the calendar month that contains `day`.
+    func monthSeconds(containing day: LocalDate, at now: Date = .now) -> TimeInterval {
+        entries.reduce(0) { total, entry in
+            entry.spentDate.year == day.year && entry.spentDate.month == day.month ? total + entry.elapsed(at: now) : total
+        }
+    }
+
     /// Total tracked in the week that contains `day`.
     func weekSeconds(containing day: LocalDate, at now: Date = .now) -> TimeInterval {
         let start = day.startOfWeek(firstWeekday: firstWeekday)

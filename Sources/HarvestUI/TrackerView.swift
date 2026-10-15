@@ -558,8 +558,8 @@ private struct TitleBar: View {
                         Image(systemName: "info.circle")
                     }
                     .buttonStyle(TitleBarButtonStyle())
-                    .help("Keyboard shortcuts")
-                    .popover(isPresented: $showingHelp, arrowEdge: .bottom) { ShortcutsHelp() }
+                    .help("Time summary")
+                    .popover(isPresented: $showingHelp, arrowEdge: .bottom) { TimeSummary() }
                 }
                 .padding(.trailing, 10)
             }
@@ -585,28 +585,49 @@ private struct TitleBarButtonStyle: ButtonStyle {
     }
 }
 
-private struct ShortcutsHelp: View {
-    private let shortcuts: [(String, String)] = [
-        ("⌥H", "Show or hide this window"),
-        ("⌘T", "Go to today"),
-        ("⌘[  ⌘]", "Previous or next day"),
-        ("⌘.", "Pause the timer"),
-        ("⌘R", "Refresh"),
-        ("↩", "Start the selected search result"),
-    ]
+/// Harvest's Time Summary: hours today, yesterday, this week and this month.
+private struct TimeSummary: View {
+    @Environment(TimeTracker.self) private var tracker
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
-            ForEach(shortcuts, id: \.0) { keys, action in
-                GridRow {
-                    Text(keys).font(.system(size: 12, weight: .semibold).monospaced())
-                    Text(action).font(.system(size: 12)).foregroundStyle(.secondary)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let today = LocalDate(context.date)
+            VStack(spacing: 0) {
+                Text("Time Summary")
+                    .font(.system(size: 13, weight: .semibold))
+                    .padding(.vertical, 12)
+                Divider()
+                Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+                    GridRow {
+                        cell("Hours Today", tracker.seconds(on: today, at: context.date))
+                        Divider()
+                        cell("Hours Yesterday", tracker.seconds(on: today.adding(days: -1), at: context.date))
+                    }
+                    Divider()
+                    GridRow {
+                        cell("Hours This Week", tracker.weekSeconds(containing: today, at: context.date))
+                        Divider()
+                        cell("Hours This Month", tracker.monthSeconds(containing: today, at: context.date))
+                    }
                 }
             }
         }
+        .frame(width: 300)
         // The title bar sets white text; the popover has its own background.
         .foregroundStyle(.primary)
-        .padding(14)
+        .presentationBackground(Color.tileBackground)
+    }
+
+    private func cell(_ label: String, _ seconds: TimeInterval) -> some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+            Text(TimeFormat.hoursMinutes(seconds))
+                .font(.system(size: 24, weight: .light).monospacedDigit())
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
     }
 }
 #endif
