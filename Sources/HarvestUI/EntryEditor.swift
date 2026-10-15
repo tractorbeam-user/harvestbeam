@@ -127,18 +127,20 @@ struct NewEntryEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             Text(isToday ? "New Time Entry" : "New Time Entry · \(day.dayTitle(today: LocalDate()))")
-                .font(.system(size: 13))
-                .padding(.vertical, 10)
-            Divider()
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.top, 14)
+                .padding(.bottom, 12)
 
-            VStack(spacing: 12) {
-                HStack(alignment: .center, spacing: 8) {
+            VStack(spacing: 10) {
+                HStack(alignment: .center, spacing: Self.starGap) {
                     Button {
                         if let taskKey { tracker.favorites.toggle(taskKey) }
                     } label: {
                         Image(systemName: isFavorite ? "star.fill" : "star")
-                            .font(.system(size: 15))
+                            .font(.system(size: 14))
                             .foregroundStyle(isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary))
+                            .frame(width: Self.starWidth, height: Self.starWidth)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .disabled(taskKey == nil)
@@ -146,7 +148,7 @@ struct NewEntryEditor: View {
 
                     VStack(spacing: 0) {
                         projectMenu
-                        Divider().padding(.horizontal, 8)
+                        Divider().padding(.leading, 10)
                         taskMenu
                     }
                     .background(fieldBackground)
@@ -156,37 +158,39 @@ struct NewEntryEditor: View {
                     TextField("Notes", text: $notes, prompt: Text("Notes (optional)"), axis: .vertical)
                         .lineLimit(2...4)
                         .textFieldStyle(.plain)
-                        .padding(8)
-                        .frame(minHeight: 44, alignment: .topLeading)
+                        .font(.system(size: 13))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 9)
+                        .frame(maxWidth: .infinity, minHeight: 50, alignment: .topLeading)
                         .background(fieldBackground)
                     TextField("Hours", text: $hours, prompt: Text("0:00"))
                         .textFieldStyle(.plain)
                         .multilineTextAlignment(.trailing)
-                        .font(.system(size: 17).monospacedDigit())
-                        .padding(8)
-                        .frame(width: 76, height: 44)
+                        .font(.system(size: 15, weight: .medium).monospacedDigit())
+                        .padding(.horizontal, 10)
+                        .frame(width: 72, height: 50)
                         .background(fieldBackground)
                         .help(isToday ? "h:mm or decimal. Leave empty to start a timer." : "h:mm or decimal")
                 }
-                .padding(.leading, 23)
+                // Line the notes up under the project box, past the star.
+                .padding(.leading, Self.starWidth + Self.starGap)
             }
-            .padding(14)
+            .padding(.horizontal, 14)
 
-            Divider()
             HStack(spacing: 8) {
                 Spacer()
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button(startsTimer ? "Start" : "Save") { save() }
+                    .buttonStyle(PillButtonStyle(prominent: false))
+                Button(startsTimer ? "Start Timer" : "Save Entry") { save() }
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color(red: 0.19, green: 0.66, blue: 0.29))
+                    .buttonStyle(PillButtonStyle(prominent: true))
                     .disabled(isSaving || taskKey == nil || (!startsTimer && parsedHours == nil))
             }
-            .controlSize(.large)
-            .padding(12)
+            .padding(14)
         }
         .frame(width: 340)
+        .presentationBackground(Color.tileBackground)
         // Opened from the bottom bar, which dims its own text.
         .foregroundStyle(.primary)
         .onAppear {
@@ -198,10 +202,13 @@ struct NewEntryEditor: View {
         }
     }
 
+    private static let starWidth: CGFloat = 20
+    private static let starGap: CGFloat = 8
+
     private var fieldBackground: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(Color.tileBackground)
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Color.primary.opacity(0.15)))
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(Color.panelBackground.opacity(0.5))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
     }
 
     private var projectMenu: some View {
@@ -250,7 +257,7 @@ struct NewEntryEditor: View {
         }
         .font(.system(size: 13))
         .padding(.horizontal, 10)
-        .frame(height: 32)
+        .frame(height: 34)
         .contentShape(Rectangle())
     }
 
@@ -284,3 +291,29 @@ struct NewEntryEditor: View {
         }
     }
 }
+
+/// Rounded buttons for the entry popover: orange for the main action,
+/// a quiet tint for the rest.
+struct PillButtonStyle: ButtonStyle {
+    let prominent: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(prominent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .padding(.horizontal, 14)
+            .frame(height: 30)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(prominent ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.primary.opacity(0.07)))
+            )
+            .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.45)
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+#if DEBUG
+/// For offscreen snapshots of the New Entry popover.
+public func debugNewEntryEditor() -> some View { NewEntryEditor(day: LocalDate()) }
+#endif

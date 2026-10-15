@@ -27,6 +27,12 @@ enum DebugSnapshots {
             await settle()
             write(window, to: url.appendingPathComponent("1-running-\(suffix).png"))
 
+            let entryWindow = makeWindow(debugNewEntryEditor().environment(tracker).frame(width: 340, height: 260), appearance: appearance)
+            entryWindow.setContentSize(NSSize(width: 340, height: 260))
+            await settle()
+            write(entryWindow, to: url.appendingPathComponent("6-new-entry-\(suffix).png"))
+            entryWindow.close()
+
             if let field = firstTextField(in: window.contentView!) {
                 window.makeFirstResponder(field)
                 field.stringValue = "de"
