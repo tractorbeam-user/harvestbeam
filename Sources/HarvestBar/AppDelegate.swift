@@ -230,24 +230,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private static let controlWidth: CGFloat = 22
     private static let orange = NSColor(red: 250 / 255, green: 93 / 255, blue: 0, alpha: 1)
 
-    /// Harvest's menu bar control: an orange square with pause while running,
-    /// an outlined one with play while paused.
+    /// Harvest's menu bar control: a filled square with pause, orange while a
+    /// timer runs; gray with play when paused. Orange only ever means active.
     private static func controlImage(running: Bool) -> NSImage {
         let size = NSSize(width: controlWidth, height: 16)
         let image = NSImage(size: size, flipped: false) { rect in
-            let box = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 0.5), xRadius: 4, yRadius: 4)
-            if running {
-                orange.setFill()
-                box.fill()
-            } else {
-                orange.setStroke()
-                box.lineWidth = 1.5
-                let inset = NSBezierPath(roundedRect: rect.insetBy(dx: 1.75, dy: 1.25), xRadius: 3.5, yRadius: 3.5)
-                inset.lineWidth = 1.5
-                inset.stroke()
-            }
+            (running ? orange : NSColor(white: 0.5, alpha: 0.85)).setFill()
+            NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 0.5), xRadius: 4, yRadius: 4).fill()
             let config = NSImage.SymbolConfiguration(pointSize: 9, weight: .black)
-                .applying(.init(paletteColors: [running ? .white : orange]))
+                .applying(.init(paletteColors: [.white]))
             if let glyph = NSImage(systemSymbolName: running ? "pause.fill" : "play.fill", accessibilityDescription: nil)?
                 .withSymbolConfiguration(config) {
                 let g = glyph.size
