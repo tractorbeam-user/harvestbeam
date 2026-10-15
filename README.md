@@ -1,4 +1,4 @@
-# Harvest Bar
+# Harvestbeam
 
 A small, native Harvest timer for the Mac menu bar, with the same app on iPhone and iPad. Unofficial: it talks to the [Harvest API v2](https://help.getharvest.com/api-v2/) using your own personal access token.
 
@@ -15,9 +15,9 @@ A small, native Harvest timer for the Mac menu bar, with the same app on iPhone 
 
 ## Install
 
-Download the latest `Harvest-Bar-x.y.z.zip` from [Releases](https://github.com/tractorbeam-user/harvest-bar/releases), unzip it and drag **Harvest Bar** to Applications.
+Download the latest `Harvestbeam-x.y.z.zip` from [Releases](https://github.com/tractorbeam-user/harvest-bar/releases), unzip it and drag **Harvestbeam** to Applications.
 
-The first time, **right-click it and choose Open**. The app isn't signed with an Apple Developer ID, so macOS asks once. If macOS says it's damaged, run `xattr -dr com.apple.quarantine "/Applications/Harvest Bar.app"` in Terminal and open it again.
+The first time, **right-click it and choose Open**. The app isn't signed with an Apple Developer ID, so macOS asks once. If macOS says it's damaged, run `xattr -dr com.apple.quarantine "/Applications/Harvestbeam.app"` in Terminal and open it again.
 
 Click the timer icon in the menu bar, create a personal access token at [id.getharvest.com/developers](https://id.getharvest.com/developers), and paste it in.
 
@@ -35,9 +35,9 @@ From a clean `main`, this pushes, builds the app with that version, zips it and 
 scripts/build-app.sh --install
 ```
 
-This builds `Harvest Bar.app`, copies it to `/Applications` and launches it. Click the timer icon in the menu bar, follow the link to create a token at [id.getharvest.com/developers](https://id.getharvest.com/developers), and paste it in. If the token can reach more than one Harvest account, you'll be asked to pick one. You can turn on **Open at Login** from the gear menu.
+This builds `Harvestbeam.app`, copies it to `/Applications` and launches it. Click the timer icon in the menu bar, follow the link to create a token at [id.getharvest.com/developers](https://id.getharvest.com/developers), and paste it in. If the token can reach more than one Harvest account, you'll be asked to pick one. You can turn on **Open at Login** from the gear menu.
 
-To try the UI without an account: `open "build/Harvest Bar.app" --args --demo`.
+To try the UI without an account: `open "build/Harvestbeam.app" --args --demo`.
 
 Only the Xcode Command Line Tools are needed. The build script automatically uses the macOS 26.5 SDK, because the newest SDK expects SwiftUI macro plugins that ship only with full Xcode.
 

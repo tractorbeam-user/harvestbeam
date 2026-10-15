@@ -34,7 +34,7 @@ targets:
     info:
       path: iOS/Info.plist
       properties:
-        CFBundleDisplayName: Harvest Bar
+        CFBundleDisplayName: Harvestbeam
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
@@ -59,10 +59,10 @@ targets:
     info:
       path: macOS/Info.plist
       properties:
-        CFBundleDisplayName: Harvest Bar
+        CFBundleDisplayName: Harvestbeam
         LSUIElement: true
         LSApplicationCategoryType: public.app-category.productivity
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tractorbeam.harvestbar
-        PRODUCT_NAME: Harvest Bar
+        PRODUCT_NAME: Harvestbeam

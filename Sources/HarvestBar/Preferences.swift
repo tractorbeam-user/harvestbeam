@@ -91,7 +91,7 @@ struct GeneralPrefs: View {
     var body: some View {
         PrefsPage {
             PrefsSection("Behavior") {
-                Toggle("Open Harvest Bar at login", isOn: $openAtLogin)
+                Toggle("Open Harvestbeam at login", isOn: $openAtLogin)
                     .onChange(of: openAtLogin) { _, on in
                         try? on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
                     }
@@ -105,7 +105,7 @@ struct GeneralPrefs: View {
                         .disabled(!idleDetection)
                     Text("minutes of inactivity")
                 }
-                Text("When you come back to a running timer, Harvest Bar asks whether to keep the time you were away.")
+                Text("When you come back to a running timer, Harvestbeam asks whether to keep the time you were away.")
                     .prefsNote()
             }
             Divider()
@@ -124,7 +124,7 @@ struct GeneralPrefs: View {
                     }
                     .disabled(!remindLongTimer)
                 }
-                Text("Reminders are macOS notifications from Harvest Bar itself; click one to open the window. Turning one on asks for permission once.")
+                Text("Reminders are macOS notifications from Harvestbeam itself; click one to open the window. Turning one on asks for permission once.")
                     .prefsNote()
             }
             .onChange(of: remindNoTimer) { _, on in if on { Notifier.requestPermission() } }
@@ -161,7 +161,7 @@ struct ShortcutPrefs: View {
         PrefsPage {
             PrefsSection("Anywhere on your Mac") {
                 HStack {
-                    Text("Show or hide Harvest Bar")
+                    Text("Show or hide Harvestbeam")
                     Spacer()
                     Button { recording ? stopRecording() : startRecording() } label: {
                         Text(recording ? "Type a shortcut…" : (display.isEmpty ? "None" : display))
@@ -177,7 +177,7 @@ struct ShortcutPrefs: View {
                 Text("Use ⌘, ⌥ or ⌃ with a key. Esc cancels.").prefsNote()
             }
             Divider()
-            PrefsSection("In the Harvest Bar window") {
+            PrefsSection("In the Harvestbeam window") {
                 ForEach(inApp, id: \.0) { name, keys in
                     HStack {
                         Text(name)
@@ -240,7 +240,7 @@ struct SupportPrefs: View {
     var body: some View {
         PrefsPage {
             PrefsSection("Reset App") {
-                Text("Harvest Bar keeps your projects and recent entries in memory. Reload them from Harvest if something looks out of date.")
+                Text("Harvestbeam keeps your projects and recent entries in memory. Reload them from Harvest if something looks out of date.")
                     .prefsNote()
                 Button(reloaded ? "Reloaded" : "Reload from Harvest") {
                     Task {
@@ -269,7 +269,7 @@ struct SupportPrefs: View {
             Divider()
             PrefsSection("About") {
                 HStack {
-                    Text("Harvest Bar \(version)")
+                    Text("Harvestbeam \(version)")
                     Spacer()
                     Link("Report a Problem…", destination: URL(string: "https://github.com/tractorbeam-user/harvest-bar/issues")!)
                 }

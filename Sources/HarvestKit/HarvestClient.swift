@@ -52,7 +52,7 @@ public struct HarvestClient: HarvestService {
 
     static let apiBase = URL(string: "https://api.harvestapp.com/v2/")!
     static let idBase = URL(string: "https://id.getharvest.com/api/v2/")!
-    static let userAgent = "Harvest Bar (macOS and iOS time tracker)"
+    static let userAgent = "Harvestbeam (macOS and iOS time tracker)"
 
     public init(token: String, accountID: Int) {
         self.token = token

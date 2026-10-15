@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Builds "Harvest Bar.app" with SwiftPM and wraps it in an app bundle.
-#   scripts/build-app.sh            → build/Harvest Bar.app
+# Builds "Harvestbeam.app" with SwiftPM and wraps it in an app bundle.
+#   scripts/build-app.sh            → build/Harvestbeam.app
 #   scripts/build-app.sh --install  → also copies it to /Applications and opens it
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP_NAME="Harvest Bar"
+APP_NAME="Harvestbeam"
 BUNDLE_ID="com.tractorbeam.harvestbar"
 # scripts/release.sh passes VERSION; local builds keep the default.
 VERSION="${VERSION:-1.0.0}"
@@ -56,6 +56,7 @@ echo "Built $APP"
 if [[ "${1:-}" == "--install" ]]; then
   pkill -x HarvestBar 2>/dev/null || true
   rm -rf "/Applications/${APP_NAME}.app"
+  rm -rf "/Applications/Harvest Bar.app" # the app's old name
   cp -R "$APP" /Applications/
   open "/Applications/${APP_NAME}.app"
   echo "Installed to /Applications/${APP_NAME}.app"

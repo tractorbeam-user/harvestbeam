@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Harvest Bar Layouts</title>
+<title>Harvestbeam Layouts</title>
 <style>
 :root {
   --o: #FA5D00; --o-soft: rgba(250,93,0,.12); --o-line: rgba(250,93,0,.35);
@@ -128,7 +128,7 @@ footer { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; color: var(
 <body>
 <header class="top">
   <div class="top-inner">
-    <div class="brand"><i>◷</i>Harvest Bar</div>
+    <div class="brand"><i>◷</i>Harvestbeam</div>
     <nav class="jump" id="jump"></nav>
     <div class="live"><span class="dot" id="liveDot"></span><span class="lbl" id="liveLbl"></span></div>
     <button class="theme" id="theme">Auto</button>
@@ -136,7 +136,7 @@ footer { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; color: var(
 </header>
 
 <section class="hero">
-  <h1>10 ways to lay out <span>Harvest Bar</span></h1>
+  <h1>10 ways to lay out <span>Harvestbeam</span></h1>
   <p>Each direction keeps the same jobs: start a timer in one move, pause it, find any task, and see where the day went. Every mock below is live. All ten share one timer, so starting or pausing in any of them updates the rest.</p>
   <div class="legend">
     <span class="chip">⌘ Mac menu bar window</span>
@@ -357,7 +357,7 @@ const CONCEPTS = [
   render() {
     const r = runningTask(), mins = [...WEEK, todayMins(), 0, 0, 0], max = 480;
     const hours = [0, .7, 1.4, 1.5, .4, 1.8, 1.2, .9, 0, 0];
-    return mac('Harvest Bar', `<div style="flex:1;padding:4px 12px 12px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr;gap:10px">
+    return mac('Harvestbeam', `<div style="flex:1;padding:4px 12px 12px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr;gap:10px">
       <div style="grid-column:span 2;border-radius:16px;padding:14px;background:${r ? 'var(--o)' : 'var(--tile)'};color:${r ? '#fff' : 'var(--ink)'};${r ? '' : 'border:1px solid var(--line)'}" class="row">
         <div class="col grow"><span class="t-xs b" style="letter-spacing:.08em;opacity:.85">${r ? 'TRACKING' : 'IDLE'}</span><span class="b ell" style="font-size:17px">${r ? r.task : 'No timer running'}</span><span class="t-s ell" style="opacity:.8">${r ? r.project + ' · ' + cname(r) : 'Tap a favorite to start'}</span></div>
         ${clock('run', '') .replace('class="num ', 'style="font-size:28px;font-weight:600" class="num ')}
@@ -385,7 +385,7 @@ const CONCEPTS = [
   insp: [['v0 sidebar', 'https://mobbin.com/screens/5f353fc3-d9ce-4d1c-be9b-cc1b4ad07578'], ['Gumloop workspace', 'https://mobbin.com/screens/e9e0911a-09a4-4c72-bb98-6ac9357fa590']],
   render() {
     const r = runningTask(), list = TASKS.filter(t => t.client === L.sidebar);
-    return mac('Harvest Bar', `<div style="flex:1;display:grid;grid-template-columns:150px 1fr 200px;min-height:0;border-top:1px solid var(--line)">
+    return mac('Harvestbeam', `<div style="flex:1;display:grid;grid-template-columns:150px 1fr 200px;min-height:0;border-top:1px solid var(--line)">
       <div style="padding:10px 8px;border-right:1px solid var(--line)" class="scroll">
         <div class="row card" style="padding:6px 8px;gap:6px;color:var(--sub);margin-bottom:10px">${ICON.search}<span class="t-s">Search</span></div>
         <div class="t-xs b faint" style="padding:4px 8px;letter-spacing:.06em">CLIENTS</div>
@@ -460,7 +460,7 @@ const CONCEPTS = [
   render() {
     const val = t => L.seg === 'today' ? taskToday(t.id) / 60 : L.seg === 'week' ? t.week + taskToday(t.id) / 60 * 0 : t.week * 4.1;
     const list = [...TASKS].sort((a, b) => val(b) - val(a)), max = Math.max(...list.map(val), .1);
-    return mac('Harvest Bar', `<div style="padding:0 14px 10px">
+    return mac('Harvestbeam', `<div style="padding:0 14px 10px">
       <div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="b" style="font-size:20px">Where time goes</span><span class="t-s sub">${L.seg === 'today' ? clock('today', 'b') : L.seg === 'week' ? clock('week', 'b') : '<b class="num">131:20</b>'}</span></div>
       <div class="seg">${['today', 'week', 'month'].map(s => `<button data-seg="${s}" class="${L.seg === s ? 'on' : ''}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}</div></div>
       <div class="scroll" style="flex:1;padding:0 14px 14px">${list.map(t => { const v = val(t), on = S.running === t.id; return `<div class="row" style="padding:9px 0;border-bottom:1px solid var(--line)">
@@ -479,7 +479,7 @@ const CONCEPTS = [
   insp: [['Insight Timer presets', 'https://mobbin.com/screens/6752efd5-7190-4ffa-be3c-7ac3dbc29f4b'], ['Opal timer controls', 'https://mobbin.com/screens/d5f16900-ff7c-4508-afe1-470f1a147f12']],
   render() {
     const r = runningTask();
-    return mac('Harvest Bar', `<div style="padding:0 14px 12px"><div class="row" style="padding:10px 12px;border-radius:14px;background:${r ? 'var(--o)' : 'var(--tile)'};color:${r ? '#fff' : 'var(--ink)'};${r ? '' : 'border:1px solid var(--line)'}">
+    return mac('Harvestbeam', `<div style="padding:0 14px 12px"><div class="row" style="padding:10px 12px;border-radius:14px;background:${r ? 'var(--o)' : 'var(--tile)'};color:${r ? '#fff' : 'var(--ink)'};${r ? '' : 'border:1px solid var(--line)'}">
         <div class="col grow"><span class="b ell">${r ? r.task + ' · ' + r.project : 'Press ⌘1–⌘9 to start'}</span><span class="t-xs" style="opacity:.8">Today ${clockText('today')}</span></div>${clock('run', 'b')}</div></div>
       <div style="flex:1;padding:0 14px;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:10px">${TASKS.map((t, i) => { const on = S.running === t.id; return `<button data-play="${t.id}" style="border-radius:16px;padding:10px;text-align:left;display:flex;flex-direction:column;position:relative;color:${on ? '#fff' : 'var(--ink)'};background:${on ? 'var(--o)' : `color-mix(in srgb, ${col(t)} 14%, var(--tile))`};border:1px solid ${on ? 'var(--o)' : 'var(--line)'};${on ? 'box-shadow:0 8px 20px rgba(250,93,0,.35)' : ''}">
         <span class="kbd" style="align-self:flex-start;${on ? 'background:rgba(255,255,255,.2);color:#fff;border-color:transparent' : ''}">⌘${i + 1}</span>

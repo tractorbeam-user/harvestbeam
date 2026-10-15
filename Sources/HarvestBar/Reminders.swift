@@ -2,7 +2,7 @@ import AppKit
 import HarvestKit
 import UserNotifications
 
-/// Posts Harvest Bar's own macOS notifications. Clicking one shows the window.
+/// Posts Harvestbeam's own macOS notifications. Clicking one shows the window.
 @MainActor
 enum Notifier {
     /// Notifications need a real app bundle; debug runs from `swift build` have none.
@@ -62,7 +62,7 @@ final class Reminders {
             if minutes >= defaults.integer(forKey: Prefs.remindNoTimerAt) {
                 remindedNoTimerOn = today
                 Notifier.post(id: "no-timer-\(today)", title: "Nothing tracked yet today",
-                              body: "Start a timer or plan your day in Harvest Bar.")
+                              body: "Start a timer or plan your day in Harvestbeam.")
             }
         }
 

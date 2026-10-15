@@ -448,7 +448,7 @@ struct TrackerView: View {
                 }
                 Button("Sign Out of \(tracker.accountName ?? "Harvest")") { tracker.signOut() }
                 Divider()
-                Button("Quit Harvest Bar") { NSApplication.shared.terminate(nil) }
+                Button("Quit Harvestbeam") { NSApplication.shared.terminate(nil) }
                     .keyboardShortcut("q")
             } label: {
                 Image(systemName: "gearshape")

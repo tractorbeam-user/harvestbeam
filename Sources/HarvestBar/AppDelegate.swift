@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             button.action = #selector(statusItemClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.imagePosition = .imageLeading
-            button.setAccessibilityTitle("Harvest Bar")
+            button.setAccessibilityTitle("Harvestbeam")
         }
         controlButton.isHidden = true
         statusItem.button?.addSubview(controlButton)
@@ -90,8 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Preferences…", action: #selector(showPreferences), keyEquivalent: ",")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide Harvest Bar", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit Harvest Bar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Hide Harvestbeam", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Quit Harvestbeam", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
 
@@ -127,7 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             backing: .buffered,
             defer: false
         )
-        panel.title = "Harvest Bar"
+        panel.title = "Harvestbeam"
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.titlebarSeparatorStyle = .none
@@ -380,12 +380,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             }
         } else {
             controlButton.isHidden = true
-            let image = NSImage(systemSymbolName: "timer", accessibilityDescription: "Harvest Bar")?
+            let image = NSImage(systemSymbolName: "timer", accessibilityDescription: "Harvestbeam")?
                 .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
             image?.isTemplate = true
             button.image = image
             button.attributedTitle = NSAttributedString(string: "")
-            button.toolTip = "Harvest Bar (⌥H)"
+            button.toolTip = "Harvestbeam (⌥H)"
         }
     }
 }
