@@ -17,6 +17,7 @@ struct DayView: View {
 
 private struct WeekStrip: View {
     @Environment(TimeTracker.self) private var tracker
+    @Environment(\.windowActions) private var windowActions
     @Binding var selectedDay: LocalDate
 
     private var weekStart: LocalDate { selectedDay.startOfWeek(firstWeekday: tracker.firstWeekday) }
@@ -26,8 +27,11 @@ private struct WeekStrip: View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             VStack(spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(title(today: today))
-                        .font(.headline)
+                    // The Mac window shows the day in its title bar instead.
+                    if windowActions == nil {
+                        Text(title(today: today))
+                            .font(.headline)
+                    }
                     Spacer()
                     Text("Week \(TimeFormat.hoursMinutes(weekSeconds(at: context.date)))")
                         .font(.subheadline.monospacedDigit())
@@ -64,6 +68,7 @@ private struct WeekStrip: View {
             .accessibilityHidden(true)
         }
         .task(id: weekStart) { await tracker.ensureLoaded(from: weekStart) }
+        .onChange(of: title(today: LocalDate()), initial: true) { _, title in windowActions?.setTitle(title) }
     }
 
     private func select(_ day: LocalDate) {

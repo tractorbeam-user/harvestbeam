@@ -69,17 +69,20 @@ public struct WindowActions: Sendable {
     public var snapToMenuBar: @MainActor @Sendable () -> Void
     public var isKeptOnTop: @MainActor @Sendable () -> Bool
     public var setKeptOnTop: @MainActor @Sendable (Bool) -> Void
+    public var setTitle: @MainActor @Sendable (String) -> Void
 
     public init(
         close: @escaping @MainActor @Sendable () -> Void,
         snapToMenuBar: @escaping @MainActor @Sendable () -> Void,
         isKeptOnTop: @escaping @MainActor @Sendable () -> Bool,
-        setKeptOnTop: @escaping @MainActor @Sendable (Bool) -> Void
+        setKeptOnTop: @escaping @MainActor @Sendable (Bool) -> Void,
+        setTitle: @escaping @MainActor @Sendable (String) -> Void
     ) {
         self.close = close
         self.snapToMenuBar = snapToMenuBar
         self.isKeptOnTop = isKeptOnTop
         self.setKeptOnTop = setKeptOnTop
+        self.setTitle = setTitle
     }
 }
 

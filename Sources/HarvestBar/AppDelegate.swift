@@ -126,7 +126,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             close: { [weak self] in self?.hidePanel() },
             snapToMenuBar: { [weak self] in self?.placeBelowStatusItem() },
             isKeptOnTop: { [weak self] in self?.panel.level == .floating },
-            setKeptOnTop: { [weak self] in self?.setKeptOnTop($0) }
+            setKeptOnTop: { [weak self] in self?.setKeptOnTop($0) },
+            setTitle: { [weak self] in self?.panel.title = $0 }
         )
         let host = NSHostingView(rootView: RootView().environment(tracker).environment(\.windowActions, actions))
         host.sizingOptions = []
