@@ -613,8 +613,9 @@ private struct TimeSummary: View {
             }
         }
         .frame(width: 300)
-        // The title bar sets white text; the popover has its own background.
-        .foregroundStyle(.primary)
+        // The title bar sets white text, and `.primary` would inherit it; use
+        // the real label colors.
+        .foregroundStyle(Color.primary)
         .presentationBackground(Color.tileBackground)
     }
 
@@ -622,7 +623,7 @@ private struct TimeSummary: View {
         VStack(spacing: 4) {
             Text(label)
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.secondary)
             Text(TimeFormat.hoursMinutes(seconds))
                 .font(.system(size: 24, weight: .light).monospacedDigit())
         }

@@ -115,8 +115,9 @@ struct NewEntryEditor: View {
         }
         .frame(width: 340)
         .presentationBackground(Color.tileBackground)
-        // Opened from the bottom bar, which dims its own text.
-        .foregroundStyle(.primary)
+        // Opened from the bottom bar, which dims its own text; `.primary` would
+        // inherit that, so use the real label color.
+        .foregroundStyle(Color.primary)
         .onAppear {
             if let entry {
                 projectID = entry.key.projectID
