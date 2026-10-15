@@ -167,8 +167,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             hasPlacedPanel = true
         }
         NSApp.unhide(nil)
-        NSApp.activate()
         if panel.isMiniaturized { panel.deminiaturize(nil) }
+        // A menu bar app isn't the active app when you click its icon, and
+        // macOS's polite activate() can leave the window behind others. Force
+        // it to the front, above every other app's windows.
+        NSApp.activate(ignoringOtherApps: true)
+        panel.orderFrontRegardless()
         panel.makeKeyAndOrderFront(nil)
         tracker.didAppear()
     }
