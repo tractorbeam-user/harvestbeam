@@ -231,7 +231,7 @@ public final class TimeTracker {
             upsert(started)
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            await recover(from: error)
         }
     }
 
@@ -245,6 +245,19 @@ public final class TimeTracker {
             upsert(try await service.stopTimer(id: current.id))
             errorMessage = nil
         } catch {
+            await recover(from: error)
+        }
+    }
+
+    /// Harvest rejects stopping or restarting a timer that already changed
+    /// elsewhere (Harvest's own apps, the web). Reload instead of showing that
+    /// as an error, so the bar matches Harvest again.
+    private func recover(from error: Error) async {
+        if case HarvestError.server(let status, _) = error, status == 422 || status == 404 {
+            busyKey = nil
+            await refresh(force: true)
+            if case HarvestError.server = error { errorMessage = nil }
+        } else {
             errorMessage = error.localizedDescription
         }
     }
@@ -265,7 +278,7 @@ public final class TimeTracker {
             upsert(try await service.restartTimer(id: entry.id))
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            await recover(from: error)
         }
     }
 

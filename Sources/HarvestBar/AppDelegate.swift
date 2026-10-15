@@ -48,9 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateStatusItem() }
         }
-        poller = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in
+        // Pick up timers started or stopped in Harvest's own apps.
+        poller = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, !self.panel.isKeyWindow else { return }
+                guard let self else { return }
                 Task { await self.tracker.refresh(force: true) }
             }
         }

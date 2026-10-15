@@ -171,7 +171,10 @@ struct TrackerView: View {
             VStack(spacing: 0) {
                 TitleBar(selectedDay: $selectedDay)
                     .frame(height: max(proxy.safeAreaInsets.top, 28))
+                    .zIndex(1)
+                // Clip so scrolled content can't slide up over the title bar.
                 mainColumn(sections)
+                    .clipped()
             }
             .ignoresSafeArea(edges: .top)
         }
