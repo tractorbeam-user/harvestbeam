@@ -45,17 +45,6 @@ enum DebugSnapshots {
             await settle()
             write(window, to: url.appendingPathComponent("3-idle-\(suffix).png"))
 
-            // Sidebar with a folder, showing the Favorites slice.
-            UserDefaults.standard.set(true, forKey: "sidebarVisible")
-            let folder = tracker.favorites.createFolder(named: "Client work")
-            if let first = tracker.favorites.keys.first { tracker.favorites.file(first, in: folder) }
-            window.setContentSize(NSSize(width: 631, height: 680))
-            await settle()
-            write(window, to: url.appendingPathComponent("5-sidebar-\(suffix).png"))
-            tracker.favorites.deleteFolder(folder)
-            UserDefaults.standard.set(false, forKey: "sidebarVisible")
-            window.setContentSize(NSSize(width: 440, height: 680))
-
             tracker.signOut()
             await settle()
             write(window, to: url.appendingPathComponent("4-signin-\(suffix).png"))

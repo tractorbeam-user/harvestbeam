@@ -109,7 +109,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             defer: false
         )
         panel.title = "Harvest Bar"
+        panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
+        panel.titlebarSeparatorStyle = .none
+        // An empty compact toolbar makes the title bar a little taller, with
+        // the traffic lights centered in it; SwiftUI draws the bar itself.
+        panel.toolbar = NSToolbar(identifier: "TitleBar")
+        panel.toolbarStyle = .unifiedCompact
         panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
@@ -117,8 +123,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.backgroundColor = .windowBackgroundColor
         panel.contentMinSize = NSSize(width: 340, height: 440)
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
-        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.delegate = self
         setKeptOnTop(UserDefaults.standard.bool(forKey: Self.keepOnTopKey))
 

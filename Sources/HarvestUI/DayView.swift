@@ -15,6 +15,28 @@ struct DayView: View {
     }
 }
 
+extension LocalDate {
+    /// "Today, Oct 15", "Yesterday, Oct 14", or "Monday, Oct 12".
+    func dayTitle(today: LocalDate) -> String {
+        let date = date()
+        let dayMonth = date.formatted(.dateTime.day().month(.abbreviated))
+        switch days(until: today) {
+        case 0: return "Today, \(dayMonth)"
+        case 1: return "Yesterday, \(dayMonth)"
+        case -1: return "Tomorrow, \(dayMonth)"
+        default: return date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
+        }
+    }
+}
+
+extension TimeTracker {
+    /// Total tracked in the week that contains `day`.
+    func weekSeconds(containing day: LocalDate, at now: Date = .now) -> TimeInterval {
+        let start = day.startOfWeek(firstWeekday: firstWeekday)
+        return (0..<7).reduce(0) { $0 + seconds(on: start.adding(days: $1), at: now) }
+    }
+}
+
 private struct WeekStrip: View {
     @Environment(TimeTracker.self) private var tracker
     @Environment(\.windowActions) private var windowActions
@@ -26,22 +48,22 @@ private struct WeekStrip: View {
         let today = LocalDate()
         TimelineView(.periodic(from: .now, by: 30)) { context in
             VStack(spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    // The Mac window shows the day in its title bar instead.
-                    if windowActions == nil {
-                        Text(title(today: today))
+                // The Mac window shows the day, week total and Today in its title bar instead.
+                if windowActions == nil {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(selectedDay.dayTitle(today: today))
                             .font(.headline)
-                    }
-                    Spacer()
-                    Text("Week \(TimeFormat.hoursMinutes(weekSeconds(at: context.date)))")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                    if selectedDay != today {
-                        Button("Today") { select(today) }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .keyboardShortcut("t", modifiers: .command)
-                            .help("Go to today (⌘T)")
+                        Spacer()
+                        Text("Week \(TimeFormat.hoursMinutes(tracker.weekSeconds(containing: selectedDay, at: context.date)))")
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        if selectedDay != today {
+                            Button("Today") { select(today) }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .keyboardShortcut("t", modifiers: .command)
+                                .help("Go to today (⌘T)")
+                        }
                     }
                 }
 
@@ -68,26 +90,10 @@ private struct WeekStrip: View {
             .accessibilityHidden(true)
         }
         .task(id: weekStart) { await tracker.ensureLoaded(from: weekStart) }
-        .onChange(of: title(today: LocalDate()), initial: true) { _, title in windowActions?.setTitle(title) }
     }
 
     private func select(_ day: LocalDate) {
         withAnimation(.snappy(duration: 0.2)) { selectedDay = day }
-    }
-
-    private func weekSeconds(at now: Date) -> TimeInterval {
-        (0..<7).reduce(0) { $0 + tracker.seconds(on: weekStart.adding(days: $1), at: now) }
-    }
-
-    private func title(today: LocalDate) -> String {
-        let date = selectedDay.date()
-        let dayMonth = date.formatted(.dateTime.day().month(.abbreviated))
-        switch selectedDay.days(until: today) {
-        case 0: return "Today, \(dayMonth)"
-        case 1: return "Yesterday, \(dayMonth)"
-        case -1: return "Tomorrow, \(dayMonth)"
-        default: return date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
-        }
     }
 
     private func arrow(_ systemImage: String, help: String, action: @escaping () -> Void) -> some View {

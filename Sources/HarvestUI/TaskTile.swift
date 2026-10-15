@@ -1,12 +1,15 @@
 import HarvestKit
 import SwiftUI
 
-/// One project/task as a big, easy-to-hit tile. Click or tap anywhere on it to
-/// start its timer (or pause it if it's running); the star pins it.
+/// One project/task as a compact two-line tile: project, then task. Click or
+/// tap anywhere on it to start its timer (or pause it if it's running).
+/// Outside Favorites a star shows on hover to pin it.
 struct TaskTile: View {
     @Environment(TimeTracker.self) private var tracker
     let task: TrackableTask
     var isSelected = false
+    /// Off in Favorites, where every tile is already starred.
+    var showsStar = true
     @State private var isHovered = false
 
     private var isRunning: Bool { tracker.running?.key == task.key }
@@ -20,7 +23,6 @@ struct TaskTile: View {
             content
         }
         .buttonStyle(TileButtonStyle(isRunning: isRunning, isSelected: isSelected, isHovered: isHovered))
-        .overlay(alignment: .topTrailing) { favoriteButton }
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
@@ -31,61 +33,29 @@ struct TaskTile: View {
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: isFavorite ? "star.slash" : "star") {
                 tracker.favorites.toggle(task.key)
             }
-            Menu("Move to Folder") {
-                ForEach(tracker.favorites.folders, id: \.self) { folder in
-                    Button(folder) { tracker.favorites.file(task.key, in: folder) }
-                        .disabled(tracker.favorites.folderOf[task.key] == folder)
-                }
-                if !tracker.favorites.folders.isEmpty { Divider() }
-                Button("New Folder…") {
-                    tracker.favorites.file(task.key, in: tracker.favorites.createFolder())
-                }
-                if tracker.favorites.folderOf[task.key] != nil {
-                    Button("Remove from Folder") { tracker.favorites.file(task.key, in: nil) }
-                }
-            }
         }
-        .draggable(task.key.description)
+        .help([task.client?.name, task.projectCode].compactMap { $0 }.joined(separator: " · "))
+        .accessibilityLabel("\(task.project.name), \(task.task.name), \(task.client?.name ?? "")")
         .accessibilityHint(isRunning ? "Pauses the timer" : "Starts a timer")
     }
 
     private var content: some View {
-        // Client, then project, then task — the same order as the day list,
-        // since many projects share task names like "Product Design".
-        VStack(alignment: .leading, spacing: 0) {
-            Text(task.client?.name ?? " ")
-                .font(.caption)
-                .lineLimit(1)
-                .opacity(0.6)
-                .padding(.trailing, 30) // room for the star
-
-            Text(task.project.name)
-                .font(.system(.body, weight: .semibold))
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .padding(.top, 4)
-
-            Spacer(minLength: 6)
-
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(task.task.name)
-                        .font(.subheadline)
-                        .lineLimit(1)
-                        .opacity(0.8)
-                    if let code = task.projectCode {
-                        Text(code)
-                            .font(.caption2.monospaced())
-                            .lineLimit(1)
-                            .opacity(0.5)
-                    }
-                }
-                Spacer(minLength: 6)
-                actionIndicator
+        HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(task.project.name)
+                    .font(.system(size: titleFont, weight: .semibold))
+                Text(task.task.name)
+                    .font(.system(size: subtitleFont))
+                    .opacity(0.7)
             }
+            .lineLimit(1)
+            Spacer(minLength: 0)
+            if showsStar && (isHovered || isFavorite) && !isRunning { favoriteButton }
+            actionIndicator
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: Metrics.tileHeight, alignment: .topLeading)
+        .padding(.leading, 11)
+        .padding(.trailing, 7)
+        .frame(maxWidth: .infinity, minHeight: Metrics.tileHeight, alignment: .leading)
         .foregroundStyle(isRunning ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
     }
 
@@ -96,17 +66,15 @@ struct TaskTile: View {
             } else if isRunning {
                 Image(systemName: "pause.fill")
                     .foregroundStyle(.harvestOrange)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(.white))
+                    .background(Circle().fill(.white).frame(width: indicatorSize, height: indicatorSize))
             } else {
                 Image(systemName: "play.fill")
                     .foregroundStyle(isHovered || isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.harvestOrange))
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(Color.harvestOrange.opacity(isHovered || isSelected ? 1 : 0.13)))
+                    .background(Circle().fill(Color.harvestOrange.opacity(isHovered || isSelected ? 1 : 0.13)).frame(width: indicatorSize, height: indicatorSize))
             }
         }
-        .font(.system(size: 12, weight: .bold))
-        .frame(width: 30, height: 30)
+        .font(.system(size: 9, weight: .bold))
+        .frame(width: indicatorSize, height: indicatorSize)
     }
 
     private var favoriteButton: some View {
@@ -114,22 +82,25 @@ struct TaskTile: View {
             withAnimation(.snappy(duration: 0.2)) { tracker.favorites.toggle(task.key) }
         } label: {
             Image(systemName: isFavorite ? "star.fill" : "star")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(starStyle)
-                .frame(width: 36, height: 36)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary))
+                .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(1)
         .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
         .accessibilityLabel(isFavorite ? "Remove \(task.task.name) from Favorites" : "Add \(task.task.name) to Favorites")
     }
 
-    private var starStyle: AnyShapeStyle {
-        if isRunning { return AnyShapeStyle(.white.opacity(isFavorite ? 1 : 0.6)) }
-        if isFavorite { return AnyShapeStyle(.harvestOrange) }
-        return AnyShapeStyle(.tertiary)
-    }
+    #if os(macOS)
+    private let titleFont: CGFloat = 13
+    private let subtitleFont: CGFloat = 12
+    private let indicatorSize: CGFloat = 24
+    #else
+    private let titleFont: CGFloat = 15
+    private let subtitleFont: CGFloat = 14
+    private let indicatorSize: CGFloat = 30
+    #endif
 }
 
 private struct TileButtonStyle: ButtonStyle {
@@ -138,7 +109,7 @@ private struct TileButtonStyle: ButtonStyle {
     let isHovered: Bool
 
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
         configuration.label
             .background(shape.fill(isRunning ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.tileBackground)))
             .overlay(shape.strokeBorder(border, lineWidth: isSelected ? 2 : 1))

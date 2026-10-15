@@ -24,8 +24,6 @@ struct TrackerView: View {
     @State private var selection: TaskKey?
     @State private var selectedDay = LocalDate()
     @State private var gridWidth: CGFloat = 0
-    @State private var scope: BrowseScope = .everything
-    @AppStorage("sidebarVisible") private var sidebarVisible = false
     @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.task.rawValue
     @AppStorage(MenuBarDisplay.lengthKey) private var menuBarLength = 28
     @AppStorage(MenuBarDisplay.truncationKey) private var menuBarTruncation = MenuBarDisplay.Truncation.end.rawValue
@@ -53,7 +51,8 @@ struct TrackerView: View {
     }
 
     /// Keeps the ranking, but pulls each client's tasks together under the
-    /// position of that client's best match, so results read as groups.
+    /// position of that client's best match, and within a client each
+    /// project's tasks together, so results read as client → project → task.
     static func groupedByClient(_ ranked: [TrackableTask]) -> [TrackableTask] {
         var order: [Int?] = []
         var groups: [Int?: [TrackableTask]] = [:]
@@ -61,6 +60,16 @@ struct TrackerView: View {
             let id = task.client?.id
             if groups[id] == nil { order.append(id) }
             groups[id, default: []].append(task)
+        }
+        return order.flatMap { groupedByProject(groups[$0] ?? []) }
+    }
+
+    private static func groupedByProject(_ ranked: [TrackableTask]) -> [TrackableTask] {
+        var order: [Int] = []
+        var groups: [Int: [TrackableTask]] = [:]
+        for task in ranked {
+            if groups[task.project.id] == nil { order.append(task.project.id) }
+            groups[task.project.id, default: []].append(task)
         }
         return order.flatMap { groups[$0] ?? [] }
     }
@@ -94,9 +103,9 @@ struct TrackerView: View {
     }
 
     private func tileGrid(_ sections: [TaskSection]) -> some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 18) {
             ForEach(sections) { section in
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     Label(section.title, systemImage: section.systemImage)
                         .labelStyle(SectionLabelStyle())
                         .padding(.leading, 4)
@@ -116,7 +125,7 @@ struct TrackerView: View {
                             spacing: Metrics.spacing
                         ) {
                             ForEach(section.tasks) { task in
-                                TaskTile(task: task, isSelected: selection == task.key)
+                                TaskTile(task: task, isSelected: selection == task.key, showsStar: section.id != "favorites")
                                     .id(task.key)
                             }
                         }
@@ -143,26 +152,18 @@ struct TrackerView: View {
 
     #if os(macOS)
     private func platformBody(_ sections: [TaskSection]) -> some View {
-        HStack(spacing: 0) {
-            if sidebarVisible {
-                SidebarView(scope: $scope)
-                Divider()
+        // The window's title bar is transparent; draw our own orange one under
+        // the traffic lights, as tall as the system made it.
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                TitleBar(selectedDay: $selectedDay)
+                    .frame(height: max(proxy.safeAreaInsets.top, 28))
+                mainColumn(sections)
             }
-            mainColumn(sections)
+            .ignoresSafeArea(edges: .top)
         }
-    }
-
-    private func toggleSidebar() {
-        let show = !sidebarVisible
-        withAnimation(.snappy(duration: 0.2)) { sidebarVisible = show }
-        if !show { scope = .everything }
-        // Grow the window to make room rather than squeezing the tiles.
-        if let window = NSApp.keyWindow {
-            var frame = window.frame
-            let delta: CGFloat = show ? 191 : -191
-            frame.origin.x -= delta
-            frame.size.width += delta
-            window.setFrame(frame, display: true, animate: true)
+        .onChange(of: selectedDay.dayTitle(today: LocalDate()), initial: true) { _, title in
+            windowActions?.setTitle(title)
         }
     }
 
@@ -172,12 +173,8 @@ struct TrackerView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 22) {
-                        if isSearching || scope == .everything {
-                            if !isSearching { DayView(selectedDay: $selectedDay) }
-                            content(sections)
-                        } else {
-                            ScopeContent(scope: scope)
-                        }
+                        if !isSearching { DayView(selectedDay: $selectedDay) }
+                        content(sections)
                     }
                     .padding(.horizontal, Metrics.padding)
                     .padding(.vertical, isSearching ? 10 : Metrics.padding)
@@ -275,10 +272,6 @@ struct TrackerView: View {
     /// Search lives at the bottom, next to refresh, Open Harvest and settings.
     private func bottomBar(_ flat: [TrackableTask]) -> some View {
         HStack(spacing: 4) {
-            FooterButton(systemImage: "sidebar.left", help: "Folders and clients (⌃⌘S)") { toggleSidebar() }
-                .keyboardShortcut("s", modifiers: [.command, .control])
-                .foregroundStyle(sidebarVisible ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.secondary))
-                .padding(.trailing, 2)
             searchField(flat)
                 .padding(.trailing, 6)
 
@@ -361,12 +354,8 @@ struct TrackerView: View {
                         ErrorBanner(message: error) { tracker.errorMessage = nil }
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
-                    if isSearching || scope == .everything {
-                        if !isSearching { DayView(selectedDay: $selectedDay) }
-                        content(sections)
-                    } else {
-                        ScopeContent(scope: scope)
-                    }
+                    if !isSearching { DayView(selectedDay: $selectedDay) }
+                    content(sections)
                 }
                 .padding(Metrics.padding)
                 .frame(maxWidth: 960)
@@ -377,31 +366,6 @@ struct TrackerView: View {
             .refreshable { await tracker.refresh(force: true) }
             .navigationTitle("Timer")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        Picker("Show", selection: $scope) {
-                            Label("Everything", systemImage: "square.grid.2x2").tag(BrowseScope.everything)
-                            Label("Favorites", systemImage: "star.fill").tag(BrowseScope.favorites)
-                        }
-                        if !tracker.favorites.folders.isEmpty {
-                            Section("Folders") {
-                                Picker("Folders", selection: $scope) {
-                                    ForEach(tracker.favorites.folders, id: \.self) { Label($0, systemImage: "folder").tag(BrowseScope.folder($0)) }
-                                }
-                            }
-                        }
-                        Section("Clients") {
-                            Picker("Clients", selection: $scope) {
-                                ForEach(tracker.clients, id: \.id) { Text($0.name).tag(BrowseScope.client($0.id)) }
-                            }
-                        }
-                        Button("New Folder", systemImage: "folder.badge.plus") {
-                            scope = .folder(tracker.favorites.createFolder())
-                        }
-                    } label: {
-                        Label("Browse", systemImage: "sidebar.left")
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         if let url = tracker.harvestWebURL {
@@ -466,6 +430,94 @@ private struct FooterButton: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .help(help)
+    }
+}
+#endif
+
+#if os(macOS)
+/// Orange title bar: the selected day and its week total in the middle, then
+/// Today and keyboard help on the right. The traffic lights sit on the left.
+private struct TitleBar: View {
+    @Environment(TimeTracker.self) private var tracker
+    @Binding var selectedDay: LocalDate
+    @State private var showingHelp = false
+
+    var body: some View {
+        let today = LocalDate()
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            ZStack {
+                VStack(spacing: 0) {
+                    Text(selectedDay.dayTitle(today: today))
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Week \(TimeFormat.hoursMinutes(tracker.weekSeconds(containing: selectedDay, at: context.date)))")
+                        .font(.system(size: 11, weight: .medium).monospacedDigit())
+                        .opacity(0.8)
+                }
+                .lineLimit(1)
+
+                HStack(spacing: 2) {
+                    Spacer()
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) { selectedDay = today }
+                    } label: {
+                        Image(systemName: "\(Calendar.current.component(.day, from: .now)).calendar")
+                    }
+                    .buttonStyle(TitleBarButtonStyle())
+                    .keyboardShortcut("t", modifiers: .command)
+                    .help("Go to today (⌘T)")
+                    .accessibilityLabel("Go to today")
+
+                    Button { showingHelp.toggle() } label: {
+                        Image(systemName: "info.circle")
+                    }
+                    .buttonStyle(TitleBarButtonStyle())
+                    .help("Keyboard shortcuts")
+                    .popover(isPresented: $showingHelp, arrowEdge: .bottom) { ShortcutsHelp() }
+                }
+                .padding(.trailing, 10)
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.95, green: 0.45, blue: 0.20), Color(red: 0.92, green: 0.32, blue: 0.16)],
+                startPoint: .leading, endPoint: .trailing
+            )
+        )
+    }
+}
+
+private struct TitleBarButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 17, weight: .regular))
+            .frame(width: 30, height: 28)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.6 : 1)
+    }
+}
+
+private struct ShortcutsHelp: View {
+    private let shortcuts: [(String, String)] = [
+        ("⌥H", "Show or hide this window"),
+        ("⌘T", "Go to today"),
+        ("⌘[  ⌘]", "Previous or next day"),
+        ("⌘.", "Pause the timer"),
+        ("⌘R", "Refresh"),
+        ("↩", "Start the selected search result"),
+    ]
+
+    var body: some View {
+        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+            ForEach(shortcuts, id: \.0) { keys, action in
+                GridRow {
+                    Text(keys).font(.system(size: 12, weight: .semibold).monospaced())
+                    Text(action).font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(14)
     }
 }
 #endif
