@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(statusItemClicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.imagePosition = .imageLeading
             button.setAccessibilityTitle("Harvest Bar")
         }
@@ -145,6 +146,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// The menu bar icon opens the window, or hides it whenever it's showing,
     /// even if another app is in front.
     @objc func statusItemClicked() {
+        // Like Harvest: the play/pause square at the left starts or pauses the
+        // timer; the rest of the item (or a right-click) shows the window.
+        if let event = NSApp.currentEvent, event.type == .leftMouseUp,
+           let button = statusItem.button, tracker.running != nil || tracker.pausedEntry != nil {
+            let point = button.convert(event.locationInWindow, from: nil)
+            if point.x <= Self.controlWidth + 4 {
+                Task {
+                    if tracker.running != nil { await tracker.pause() } else { await tracker.resume() }
+                    lastTitle = nil
+                    updateStatusItem()
+                }
+                return
+            }
+        }
         if panel.isVisible && !panel.isMiniaturized {
             hidePanel()
         } else {
@@ -212,23 +227,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: Status item
 
+    private static let controlWidth: CGFloat = 22
+    private static let orange = NSColor(red: 250 / 255, green: 93 / 255, blue: 0, alpha: 1)
+
+    /// Harvest's menu bar control: an orange square with pause while running,
+    /// an outlined one with play while paused.
+    private static func controlImage(running: Bool) -> NSImage {
+        let size = NSSize(width: controlWidth, height: 16)
+        let image = NSImage(size: size, flipped: false) { rect in
+            let box = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 0.5), xRadius: 4, yRadius: 4)
+            if running {
+                orange.setFill()
+                box.fill()
+            } else {
+                orange.setStroke()
+                box.lineWidth = 1.5
+                let inset = NSBezierPath(roundedRect: rect.insetBy(dx: 1.75, dy: 1.25), xRadius: 3.5, yRadius: 3.5)
+                inset.lineWidth = 1.5
+                inset.stroke()
+            }
+            let config = NSImage.SymbolConfiguration(pointSize: 9, weight: .black)
+                .applying(.init(paletteColors: [running ? .white : orange]))
+            if let glyph = NSImage(systemSymbolName: running ? "pause.fill" : "play.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(config) {
+                let g = glyph.size
+                glyph.draw(in: NSRect(x: (rect.width - g.width) / 2 + (running ? 0 : 0.5),
+                                      y: (rect.height - g.height) / 2, width: g.width, height: g.height))
+            }
+            return true
+        }
+        image.isTemplate = false
+        image.accessibilityDescription = running ? "Pause timer" : "Resume timer"
+        return image
+    }
+
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
-        let title = tracker.running.map { entry in
-            " " + MenuBarDisplay.title(task: tracker.task(for: entry), notes: entry.notes, elapsed: entry.elapsed())
-        } ?? ""
-        guard title != lastTitle else { return }
-        lastTitle = title
+        let paused = tracker.pausedEntry
+        let title: String
+        if let entry = tracker.running {
+            title = " " + MenuBarDisplay.title(task: tracker.task(for: entry), notes: entry.notes, elapsed: entry.elapsed())
+        } else if let paused {
+            title = " " + TimeFormat.hoursMinutes(paused.elapsed())
+        } else {
+            title = ""
+        }
+        let key = "\(tracker.running != nil)|\(paused?.id ?? 0)|\(title)"
+        guard key != lastTitle else { return }
+        lastTitle = key
 
-        if tracker.running != nil {
-            let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-                .applying(.init(paletteColors: [NSColor(red: 250 / 255, green: 93 / 255, blue: 0, alpha: 1)]))
-            button.image = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: "Timer running")?
-                .withSymbolConfiguration(config)
+        if tracker.running != nil || paused != nil {
+            let running = tracker.running != nil
+            button.image = Self.controlImage(running: running)
             button.attributedTitle = NSAttributedString(string: title, attributes: [
                 .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium),
+                .foregroundColor: running ? NSColor.labelColor : NSColor.secondaryLabelColor,
             ])
-            button.toolTip = tracker.runningTask.map { "\($0.task.name) · \($0.subtitle)" }
+            let task = (tracker.running ?? paused).map { tracker.task(for: $0) }
+            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)\n" + (running ? "Click the square to pause" : "Click the square to resume") }
         } else {
             let image = NSImage(systemSymbolName: "timer", accessibilityDescription: "Harvest Bar")?
                 .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
