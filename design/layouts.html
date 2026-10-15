@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harvest Bar Layouts</title>
+<style>
+:root {
+  --o: #FA5D00; --o-soft: rgba(250,93,0,.12); --o-line: rgba(250,93,0,.35);
+  --bg: #F3F2F0; --panel: #ECECEC; --tile: #FFFFFF; --ink: #1D1D1F; --sub: #6E6E73; --faint: #A1A1A6;
+  --line: rgba(0,0,0,.08); --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 30px rgba(0,0,0,.08);
+  --c-tb: #5B6CF0; --c-acme: #12A38A; --c-nw: #B05BD6; --c-int: #8E8E93;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111112; --panel: #262628; --tile: #1C1C1E; --ink: #F5F5F7; --sub: #A1A1A6; --faint: #6E6E73;
+    --line: rgba(255,255,255,.09); --o-soft: rgba(250,93,0,.2); --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 40px rgba(0,0,0,.45);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111112; --panel: #262628; --tile: #1C1C1E; --ink: #F5F5F7; --sub: #A1A1A6; --faint: #6E6E73;
+  --line: rgba(255,255,255,.09); --o-soft: rgba(250,93,0,.2); --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 40px rgba(0,0,0,.45);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; padding: 0; }
+.num { font-variant-numeric: tabular-nums; }
+a { color: var(--o); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Page chrome */
+.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+.top-inner { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 16px; align-items: center; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; white-space: nowrap; }
+.brand i { width: 26px; height: 26px; border-radius: 8px; background: var(--o); display: grid; place-items: center; color: #fff; font-style: normal; font-size: 14px; }
+.jump { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+.jump a { color: var(--sub); font-size: 13px; padding: 6px 10px; border-radius: 999px; white-space: nowrap; }
+.jump a:hover { background: var(--line); color: var(--ink); text-decoration: none; }
+.live { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--sub); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--o); animation: pulse 1.6s ease-in-out infinite; }
+.dot.off { background: var(--faint); animation: none; }
+@keyframes pulse { 50% { opacity: .35; } }
+.theme { border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--sub); background: var(--tile); }
+
+.hero { max-width: 1180px; margin: 0 auto; padding: 56px 24px 24px; }
+.hero h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.05; letter-spacing: -.02em; margin: 0 0 14px; font-weight: 700; }
+.hero h1 span { color: var(--o); }
+.hero p { max-width: 640px; color: var(--sub); font-size: 17px; margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 12px; border-radius: 999px; background: var(--tile); border: 1px solid var(--line); color: var(--sub); }
+
+.concept { max-width: 1180px; margin: 0 auto; padding: 40px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 48px; align-items: center; border-top: 1px solid var(--line); scroll-margin-top: 64px; }
+.concept:nth-of-type(even) .stage { order: 2; }
+.concept:nth-of-type(even) .notes { order: 1; }
+.stage { min-height: 420px; display: grid; place-items: center; padding: 28px; border-radius: 28px; background:
+  radial-gradient(120% 90% at 20% 0%, var(--o-soft), transparent 55%), var(--panel); position: relative; overflow: hidden; }
+.fit { width: 100%; display: flex; justify-content: center; }
+.notes .n { font: 600 13px/1 ui-monospace, "SF Mono", Menlo, monospace; color: var(--o); letter-spacing: .08em; }
+.notes h2 { font-size: 30px; letter-spacing: -.015em; margin: 10px 0 8px; line-height: 1.1; }
+.notes .pitch { color: var(--sub); font-size: 16px; margin: 0 0 18px; }
+.notes dl { margin: 0; display: grid; gap: 12px; }
+.notes dt { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
+.notes dd { margin: 3px 0 0; }
+.notes ul { margin: 4px 0 0; padding-left: 18px; }
+.notes li { margin: 3px 0; }
+.insp { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.insp a { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--o-soft); }
+.score { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; font-size: 13px; color: var(--sub); }
+.score b { color: var(--ink); font-weight: 600; }
+.pips { display: inline-flex; gap: 2px; margin-left: 4px; vertical-align: middle; }
+.pips i { width: 6px; height: 6px; border-radius: 2px; background: var(--line); }
+.pips i.on { background: var(--o); }
+
+footer { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); }
+
+/* Devices */
+.mac { width: 380px; height: 560px; background: var(--panel); border-radius: 14px; box-shadow: var(--shadow), 0 0 0 1px var(--line); overflow: hidden; position: relative; display: flex; flex-direction: column; flex-shrink: 0; }
+.mac.wide { width: 640px; height: 440px; }
+.mac.short { height: 470px; }
+.tl { height: 30px; flex-shrink: 0; display: flex; align-items: center; gap: 7px; padding: 0 12px; }
+.tl i { width: 11px; height: 11px; border-radius: 50%; background: #FF5F57; }
+.tl i:nth-child(2), .tl i:nth-child(3) { background: var(--line); }
+.tl span { flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--sub); margin-right: 40px; }
+.phone { width: 300px; height: 620px; border-radius: 46px; background: var(--bg); box-shadow: var(--shadow), 0 0 0 10px #0b0b0c, 0 0 0 11px #2a2a2c; overflow: hidden; position: relative; display: flex; flex-direction: column; flex-shrink: 0; }
+.status { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 6px 26px 0; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.island { width: 92px; height: 26px; border-radius: 20px; background: #000; }
+.desk { width: 640px; height: 400px; border-radius: 16px; overflow: hidden; position: relative; box-shadow: var(--shadow); flex-shrink: 0;
+  background: linear-gradient(140deg, #3b2a6b 0%, #b9466d 45%, #f08a4b 100%); }
+.desk .menubar { height: 24px; background: rgba(255,255,255,.22); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 0 12px; font-size: 12px; color: #fff; font-weight: 600; }
+
+/* Shared atoms */
+.badge { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font: 700 11px/1 -apple-system, system-ui; color: #fff; flex-shrink: 0; }
+.play { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--o-soft); color: var(--o); flex-shrink: 0; transition: transform .12s, background .15s, color .15s; }
+.play:hover { background: var(--o); color: #fff; }
+.play:active { transform: scale(.92); }
+.play.on { background: var(--o); color: #fff; }
+.play svg { width: 11px; height: 11px; }
+.sub { color: var(--sub); }
+.faint { color: var(--faint); }
+.t-s { font-size: 12px; }
+.t-xs { font-size: 11px; }
+.b { font-weight: 600; }
+.ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.row { display: flex; align-items: center; gap: 10px; }
+.col { display: flex; flex-direction: column; min-width: 0; }
+.grow { flex: 1; min-width: 0; }
+.card { background: var(--tile); border-radius: 14px; border: 1px solid var(--line); }
+.kbd { font: 600 10px/1 ui-monospace, Menlo, monospace; padding: 3px 5px; border-radius: 5px; border: 1px solid var(--line); color: var(--sub); background: var(--tile); }
+.scroll { overflow-y: auto; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+.seg { display: flex; background: var(--line); border-radius: 9px; padding: 2px; font-size: 12px; font-weight: 600; }
+.seg button { flex: 1; padding: 5px 0; border-radius: 7px; color: var(--sub); }
+.seg button.on { background: var(--tile); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+@media (max-width: 960px) {
+  .concept { grid-template-columns: 1fr; gap: 24px; padding: 32px 16px; }
+  .concept:nth-of-type(even) .stage, .concept:nth-of-type(even) .notes { order: 0; }
+  .stage { padding: 18px 12px; min-height: 0; border-radius: 22px; }
+  .hero, .top-inner, footer { padding-left: 16px; padding-right: 16px; }
+  .live span.lbl { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><i>◷</i>Harvest Bar</div>
+    <nav class="jump" id="jump"></nav>
+    <div class="live"><span class="dot" id="liveDot"></span><span class="lbl" id="liveLbl"></span></div>
+    <button class="theme" id="theme">Auto</button>
+  </div>
+</header>
+
+<section class="hero">
+  <h1>10 ways to lay out <span>Harvest Bar</span></h1>
+  <p>Each direction keeps the same jobs: start a timer in one move, pause it, find any task, and see where the day went. Every mock below is live. All ten share one timer, so starting or pausing in any of them updates the rest.</p>
+  <div class="legend">
+    <span class="chip">⌘ Mac menu bar window</span>
+    <span class="chip">📱 iPhone</span>
+    <span class="chip">▭ iPad / wide</span>
+    <span class="chip">Inspiration from Mobbin, linked per concept</span>
+  </div>
+</section>
+
+<main id="concepts"></main>
+
+<footer>
+  Mock data only. Inspiration links open the referenced screens on Mobbin. Built as a design exploration for the native SwiftUI app in <code>harvest-bar/</code>.
+</footer>
+
+<script>
+// ---------- Data ----------
+const CLIENT = { tb: ['Tractorbeam', 'var(--c-tb)'], acme: ['Acme Co', 'var(--c-acme)'], nw: ['Northwind', 'var(--c-nw)'], int: ['Internal', 'var(--c-int)'] };
+const TASKS = [
+  { id: 't1', task: 'Design', project: 'Website Redesign', client: 'tb', week: 9.5 },
+  { id: 't2', task: 'Development', project: 'Context Launch', client: 'tb', week: 7.2 },
+  { id: 't3', task: 'Meetings', project: 'Internal', client: 'int', week: 4.1 },
+  { id: 't4', task: 'Design', project: 'Brand Refresh', client: 'acme', week: 3.6 },
+  { id: 't5', task: 'QA & Testing', project: 'Mobile App', client: 'acme', week: 2.2 },
+  { id: 't6', task: 'Development', project: 'Data Platform', client: 'nw', week: 3.0 },
+  { id: 't7', task: 'Strategy', project: 'Context Launch', client: 'tb', week: 1.4 },
+  { id: 't8', task: 'Admin', project: 'Internal', client: 'int', week: 0.9 },
+  { id: 't9', task: 'Project Management', project: 'Mobile App', client: 'acme', week: 1.1 },
+];
+const T = Object.fromEntries(TASKS.map(t => [t.id, t]));
+const FAVS = ['t1', 't4', 't2', 't6'];
+const RECENT = ['t6', 't4', 't3', 't2'];
+const SUGGEST = ['t7', 't5', 't8'];
+// Today's finished entries: [taskId, startHour, minutes]
+const ENTRIES = [['t4', 9.0, 42], ['t1', 9.85, 89], ['t6', 11.6, 110]];
+const WEEK = [418, 373, 180]; // minutes for previous days this week
+const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const TODAY = 3;
+
+// ---------- Shared timer ----------
+const S = { running: 't1', startedAt: Date.now() - 47 * 60000, extra: {} };
+const runSecs = () => S.running ? (Date.now() - S.startedAt) / 1000 : 0;
+function toggle(id) {
+  if (S.running) S.extra[S.running] = (S.extra[S.running] || 0) + runSecs() / 60;
+  if (S.running === id) { S.running = null; } else { S.running = id; S.startedAt = Date.now(); }
+  renderAll();
+}
+const todayMins = () => ENTRIES.reduce((a, e) => a + e[2], 0) + Object.values(S.extra).reduce((a, b) => a + b, 0) + runSecs() / 60;
+const taskToday = id => ENTRIES.filter(e => e[0] === id).reduce((a, e) => a + e[2], 0) + (S.extra[id] || 0) + (S.running === id ? runSecs() / 60 : 0);
+const hm = m => `${Math.floor(m / 60)}:${String(Math.floor(m % 60)).padStart(2, '0')}`;
+const hms = s => `${Math.floor(s / 3600)}:${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const initials = s => s.split(/\W+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const col = t => CLIENT[t.client][1];
+const cname = t => CLIENT[t.client][0];
+
+// ---------- Atoms ----------
+const ICON = {
+  play: '<svg viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg>',
+  pause: '<svg viewBox="0 0 12 12"><rect x="2" y="1.5" width="3" height="9" rx="1" fill="currentColor"/><rect x="7" y="1.5" width="3" height="9" rx="1" fill="currentColor"/></svg>',
+  star: '<svg viewBox="0 0 16 16" width="13" height="13"><path d="M8 1.2l2 4.2 4.6.6-3.4 3.2.9 4.6L8 11.6 3.9 13.8l.9-4.6L1.4 6l4.6-.6z" fill="currentColor"/></svg>',
+  search: '<svg viewBox="0 0 16 16" width="15" height="15"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  chev: d => `<svg viewBox="0 0 10 10" width="10" height="10"><path d="${d === 'l' ? 'M6.5 1.5L3 5l3.5 3.5' : 'M3.5 1.5L7 5 3.5 8.5'}" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`,
+};
+const playBtn = (id, extra = '') => `<button class="play ${S.running === id ? 'on' : ''}" data-play="${id}" aria-label="${S.running === id ? 'Pause' : 'Start'} ${T[id].task}" ${extra}>${S.running === id ? ICON.pause : ICON.play}</button>`;
+const badge = (t, size = 30) => `<div class="badge" style="width:${size}px;height:${size}px;border-radius:${size * .3}px;background:${S.running === t.id ? 'var(--o)' : col(t)}">${initials(t.project)}</div>`;
+const clock = (kind, cls = '') => `<span class="num ${cls}" data-clock="${kind}">${clockText(kind)}</span>`;
+function clockText(kind) {
+  if (kind === 'run') return S.running ? hms(runSecs()) : '0:00:00';
+  if (kind === 'runhm') return S.running ? hm(runSecs() / 60) : '0:00';
+  if (kind === 'today') return hm(todayMins());
+  if (kind === 'week') return hm(WEEK.reduce((a, b) => a + b, 0) + todayMins());
+  if (kind.startsWith('task:')) return hm(taskToday(kind.slice(5)));
+  return '';
+}
+const runningTask = () => S.running ? T[S.running] : null;
+const mac = (title, body, cls = '') => `<div class="mac ${cls}"><div class="tl"><i></i><i></i><i></i><span>${title}</span></div>${body}</div>`;
+const phone = body => `<div class="phone"><div class="status"><span>9:41</span><span class="island"></span><span>●●●</span></div>${body}</div>`;
+
+// ---------- Local UI state per concept ----------
+const L = { q: 'de', sel: 0, deck: 0, seg: 'week', sidebar: 'tb', pillOpen: true, dial: null };
+
+// ---------- Concepts ----------
+const CONCEPTS = [
+{
+  id: 'command', name: 'Command Bar', device: 'Mac',
+  pitch: 'A Spotlight-style bar that appears where you are. Type three letters and press Return; nothing else on screen.',
+  best: 'Keyboard-first people who switch tasks many times a day.',
+  pros: ['Fastest possible start: ⌥H, type, ⏎', 'Takes no space until summoned', 'Running timer lives in the bar, so pausing is one keystroke (⌘P)'],
+  con: 'Hard to browse if you don’t remember what you’re looking for.',
+  scores: { speed: 5, glance: 2, touch: 2 },
+  insp: [['Devin palette', 'https://mobbin.com/screens/274435b9-f420-4a7c-ab68-82514c1419f9'], ['Mintlify search', 'https://mobbin.com/screens/7c7ad31f-9dfe-4be7-83d7-6002fe31d4d0']],
+  render() {
+    const q = L.q.toLowerCase().trim();
+    const list = (q ? TASKS.filter(t => (t.task + ' ' + t.project + ' ' + cname(t)).toLowerCase().includes(q)) : FAVS.map(id => T[id])).slice(0, 6);
+    L.sel = Math.min(L.sel, Math.max(0, list.length - 1));
+    const r = runningTask();
+    return `<div class="desk" style="display:flex;flex-direction:column">
+      <div class="menubar"><span>${r ? '● ' + clockText('runhm') : '◷'}</span><span>Thu 15 Oct 15:56</span></div>
+      <div style="flex:1;display:grid;place-items:start center;padding-top:44px">
+        <div class="card" style="width:520px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;border-radius:16px">
+          ${r ? `<div class="row" style="padding:10px 14px;background:var(--o);color:#fff">
+            <span class="dot" style="background:#fff"></span><span class="b ell grow">${r.task} · ${r.project}</span>
+            ${clock('run', 'b')}<button class="kbd" data-play="${r.id}" style="background:#fff;color:var(--o);border:0">⌘P Pause</button></div>` : ''}
+          <div class="row" style="padding:12px 16px;border-bottom:1px solid var(--line)">
+            <span class="sub">${ICON.search}</span>
+            <input id="cmdq" value="${L.q}" placeholder="Start a timer…" style="flex:1;border:0;outline:0;background:none;font:17px -apple-system,system-ui;color:var(--ink)" aria-label="Search tasks">
+            <span class="kbd">esc</span>
+          </div>
+          <div style="padding:6px">
+            <div class="t-xs faint b" style="padding:6px 10px;text-transform:uppercase;letter-spacing:.06em">${q ? 'Tasks' : 'Favorites'}</div>
+            ${list.map((t, i) => `<div class="row" data-cmd="${i}" style="padding:8px 10px;border-radius:10px;${i === L.sel ? 'background:var(--o-soft)' : ''}">
+              ${badge(t, 26)}<div class="col grow"><span class="b ell">${t.task}</span><span class="t-s sub ell">${t.project} · ${cname(t)}</span></div>
+              <span class="t-s sub num">${clockText('task:' + t.id)}</span>
+              ${i === L.sel ? `<button class="kbd" data-play="${t.id}" style="color:var(--o)">${S.running === t.id ? '⏎ Pause' : '⏎ Start'}</button>` : `<span class="kbd">⌘${i + 1}</span>`}
+            </div>`).join('') || '<div class="sub" style="padding:18px;text-align:center">No tasks match</div>'}
+          </div>
+          <div class="row t-xs sub" style="padding:8px 14px;border-top:1px solid var(--line);gap:14px"><span><span class="kbd">↑↓</span> move</span><span><span class="kbd">⏎</span> start</span><span><span class="kbd">⌘P</span> pause</span><span class="grow"></span><span>Today ${clock('today', 'b')}</span></div>
+        </div>
+      </div></div>`;
+  },
+},
+{
+  id: 'focus', name: 'Focus Clock', device: 'iPhone',
+  pitch: 'One big number, one big button. The day’s progress wraps around the timer, and your favorites wait in a row underneath.',
+  best: 'Phone use, and people who want the timer to feel like the main event.',
+  pros: ['Huge pause target you can hit without looking', 'Progress ring shows the day against an 8-hour goal', 'Swipeable favorites row for one-tap switching'],
+  con: 'Shows little history; the week lives on a second screen.',
+  scores: { speed: 4, glance: 5, touch: 5 },
+  insp: [['Structured countdown', 'https://mobbin.com/screens/f724a5db-76fd-4df5-92e6-88ab2a51ebb9'], ['Oura session ring', 'https://mobbin.com/screens/08366dca-8bef-401f-a5d2-2514448fdf7d']],
+  render() {
+    const r = runningTask();
+    const pct = Math.min(1, todayMins() / 480), C = 2 * Math.PI * 104;
+    return phone(`<div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:6px 18px 22px">
+      <div class="row" style="width:100%;justify-content:space-between"><span class="b" style="font-size:22px">Today</span><span class="sub t-s">${clock('today', 'b')} of 8:00</span></div>
+      <div style="position:relative;width:236px;height:236px;margin:22px 0 14px">
+        <svg viewBox="0 0 236 236" width="236" height="236" style="transform:rotate(-90deg)"><circle cx="118" cy="118" r="104" stroke="var(--line)" stroke-width="12" fill="none"/>
+          <circle data-ring cx="118" cy="118" r="104" stroke="var(--o)" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}"/></svg>
+        <div style="position:absolute;inset:0;display:grid;place-items:center;text-align:center">
+          <div><div class="t-s ${r ? '' : 'sub'}" style="color:${r ? 'var(--o)' : ''};font-weight:700;letter-spacing:.08em">${r ? 'TRACKING' : 'PAUSED'}</div>
+          <div class="num" style="font-size:44px;font-weight:600;letter-spacing:-.02em">${clock('run')}</div>
+          <div class="b ell" style="max-width:170px">${r ? r.task : 'Nothing running'}</div><div class="t-s sub ell" style="max-width:170px">${r ? r.project : 'Pick a task below'}</div></div>
+        </div>
+      </div>
+      <button data-play="${r ? r.id : FAVS[0]}" aria-label="${r ? 'Pause' : 'Start'}" style="width:76px;height:76px;border-radius:50%;background:${r ? 'var(--ink)' : 'var(--o)'};color:var(--bg);display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.18)">
+        <span style="width:26px;height:26px;display:block">${r ? ICON.pause : ICON.play}</span></button>
+      <div style="width:100%;margin-top:auto">
+        <div class="t-xs b faint" style="letter-spacing:.06em;margin-bottom:8px">UP NEXT</div>
+        <div class="row scroll" style="gap:8px;overflow-x:auto">
+          ${FAVS.filter(id => id !== S.running).concat(RECENT.filter(id => !FAVS.includes(id) && id !== S.running)).map(id => `<button data-play="${id}" class="card" style="min-width:120px;padding:10px;text-align:left">
+            <div style="width:8px;height:8px;border-radius:50%;background:${col(T[id])};margin-bottom:8px"></div><div class="b ell">${T[id].task}</div><div class="t-xs sub ell">${T[id].project}</div></button>`).join('')}
+        </div>
+      </div></div>`);
+  },
+},
+{
+  id: 'ledger', name: 'Week Ledger', device: 'Mac',
+  pitch: 'Harvest’s own day view, refined: week strip on top with a fill bar per day, entries below, and a quick-add tray at the bottom.',
+  best: 'People who think in timesheets and fill in yesterday as often as today.',
+  pros: ['Instantly familiar to anyone who uses Harvest', 'Fill bars make short days obvious before Friday', 'Each entry restarts in place'],
+  con: 'Starting a brand-new task is one step further away.',
+  scores: { speed: 3, glance: 5, touch: 4 },
+  insp: [['Insight Timer day picker', 'https://mobbin.com/screens/71782ac6-9f21-4620-8cc7-e1d53c6f57c0'], ['Fresha date strip', 'https://mobbin.com/screens/b79eb06d-9b03-42fa-9b40-0c88f2c97d3a']],
+  render() {
+    const mins = [...WEEK, todayMins(), 0, 0, 0];
+    const rows = [...ENTRIES.map(e => e[0]), ...(S.running && !ENTRIES.some(e => e[0] === S.running) ? [S.running] : [])].filter((v, i, a) => a.indexOf(v) === i);
+    return mac('Today, 15 Oct', `<div style="padding:0 12px 10px">
+      <div class="card" style="padding:12px 8px">
+        <div class="row" style="justify-content:space-between;padding:0 6px 10px"><span class="b">Week of 12 Oct</span><span class="t-s sub">Week ${clock('week', 'b')}</span></div>
+        <div class="row" style="gap:0"><button class="sub" aria-label="Previous week" style="padding:0 4px">${ICON.chev('l')}</button>
+        ${DAYS.map((d, i) => `<div class="col grow" style="align-items:center;gap:5px">
+          <span style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:650;${i === TODAY ? 'background:var(--o);color:#fff' : ''}">${d}</span>
+          <span class="t-xs num ${i === TODAY ? '' : 'sub'}" style="${i === TODAY ? 'color:var(--o);font-weight:650' : ''}" ${i === TODAY ? 'data-clock="today"' : ''}>${hm(mins[i])}</span>
+          <span style="width:22px;height:4px;border-radius:2px;background:var(--line);overflow:hidden"><span ${i === TODAY ? 'data-fill' : ''} style="display:block;height:100%;width:${Math.min(100, mins[i] / 4.8)}%;background:${mins[i] >= 420 ? 'var(--c-acme)' : 'var(--o)'}"></span></span>
+        </div>`).join('')}
+        <button class="sub" aria-label="Next week" style="padding:0 4px">${ICON.chev('r')}</button></div>
+      </div></div>
+      <div class="scroll" style="flex:1;padding:0 12px">
+        <div class="card" style="overflow:hidden">${rows.map((id, i) => { const t = T[id], on = S.running === id; return `<div class="row" style="padding:11px 14px;${i ? 'border-top:1px solid var(--line);' : ''}${on ? 'background:var(--o-soft)' : ''}">
+          <div class="col grow"><span class="t-xs sub">${cname(t)}</span><span class="b ell">${t.project}</span><span class="t-s sub">${t.task}</span></div>
+          <span class="num" style="font-size:21px;${on ? 'color:var(--o)' : ''}">${clock('task:' + id)}</span>${playBtn(id)}</div>`; }).join('')}</div>
+      </div>
+      <div class="row" style="padding:10px 12px;gap:8px;border-top:1px solid var(--line);background:var(--tile)">
+        <button class="row card" style="flex:1;padding:8px 10px;gap:8px;color:var(--sub)">${ICON.search}<span class="t-s">Start something new…</span></button>
+        ${FAVS.slice(0, 3).map(id => `<button data-play="${id}" title="${T[id].task} · ${T[id].project}" style="border-radius:9px">${badge(T[id], 34)}</button>`).join('')}
+      </div>`);
+  },
+},
+{
+  id: 'timeline', name: 'Day Timeline', device: 'Mac',
+  pitch: 'Your day as a calendar column. Blocks grow as the timer runs, gaps are visible, and clicking a gap fills it.',
+  best: 'Reconstructing a day after the fact, and people who live in their calendar.',
+  pros: ['Gaps and overlaps jump out', 'The running block visibly grows', 'Natural place to add calendar events later'],
+  con: 'Less dense; a long day needs scrolling.',
+  scores: { speed: 3, glance: 4, touch: 3 },
+  insp: [['Shopify timeline', 'https://mobbin.com/screens/592a123a-d972-43cc-b1d6-33afaf47ca72'], ['Lifesum daily progress', 'https://mobbin.com/screens/f688690a-7cfe-4a5b-8b5f-797e52249267']],
+  render() {
+    const H0 = 8, H1 = 18, PX = 46, now = new Date(), nowH = Math.min(H1 - .2, Math.max(H0 + 7.8, now.getHours() + now.getMinutes() / 60));
+    const blocks = ENTRIES.map(([id, s, m]) => ({ id, s, m }));
+    if (S.running) blocks.push({ id: S.running, s: nowH - runSecs() / 3600, m: runSecs() / 60, live: true });
+    return mac('Thursday', `<div class="row" style="padding:0 14px 8px;justify-content:space-between"><span class="b" style="font-size:20px">Thu 15 Oct</span><span class="sub t-s">Tracked ${clock('today', 'b')}</span></div>
+      <div class="scroll" style="flex:1;padding:0 14px 14px"><div style="position:relative;height:${(H1 - H0) * PX}px">
+        ${Array.from({ length: H1 - H0 + 1 }, (_, i) => `<div style="position:absolute;left:0;right:0;top:${i * PX}px;border-top:1px solid var(--line)"><span class="t-xs faint num" style="position:absolute;top:-8px;left:0;background:var(--panel);padding-right:6px">${(H0 + i) % 12 || 12}${H0 + i < 12 ? 'a' : 'p'}</span></div>`).join('')}
+        <button class="t-s" style="position:absolute;left:44px;right:0;top:${(12.05 - H0 + .55) * PX}px;height:${.7 * PX}px;border:1.5px dashed var(--line);border-radius:10px;color:var(--sub)">+ Fill 0:40 gap</button>
+        ${blocks.map(b => { const t = T[b.id]; return `<div ${b.live ? 'data-live' : ''} style="position:absolute;left:44px;right:0;top:${(b.s - H0) * PX}px;height:${Math.max(26, b.m / 60 * PX)}px;border-radius:10px;padding:6px 10px;background:${b.live ? 'var(--o)' : `color-mix(in srgb, ${col(t)} 16%, var(--tile))`};border-left:4px solid ${b.live ? '#fff' : col(t)};color:${b.live ? '#fff' : 'var(--ink)'};display:flex;gap:8px;overflow:hidden">
+          <div class="col grow"><span class="b t-s ell">${t.task} · ${t.project}</span><span class="t-xs" style="opacity:.75">${b.live ? 'Running · ' + clockText('runhm') : hm(b.m)}</span></div>${b.live ? `<button data-play="${b.id}" class="play on" style="background:#fff;color:var(--o);width:24px;height:24px">${ICON.pause}</button>` : ''}</div>`; }).join('')}
+        <div style="position:absolute;left:36px;right:0;top:${(nowH - H0) * PX}px;height:2px;background:var(--o)"><span style="position:absolute;left:-4px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--o)"></span></div>
+      </div></div>`);
+  },
+},
+{
+  id: 'bento', name: 'Bento Dashboard', device: 'Mac',
+  pitch: 'Tiles of different sizes, each answering one question: what’s running, how’s today, how’s the week, what’s next.',
+  best: 'A window that stays open on a second screen all day.',
+  pros: ['Most information per glance', 'Favorites stay big and tappable', 'Charts double as navigation'],
+  con: 'Busier than the rest; it needs room to breathe.',
+  scores: { speed: 4, glance: 5, touch: 4 },
+  insp: [['Jomo screen time', 'https://mobbin.com/screens/1e81e6f2-25ef-4787-8471-1fc3448d9688'], ['Fitbit weekly bars', 'https://mobbin.com/screens/87da4565-88e3-4345-9001-744c9dafab89']],
+  render() {
+    const r = runningTask(), mins = [...WEEK, todayMins(), 0, 0, 0], max = 480;
+    const hours = [0, .7, 1.4, 1.5, .4, 1.8, 1.2, .9, 0, 0];
+    return mac('Harvest Bar', `<div style="flex:1;padding:4px 12px 12px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr;gap:10px">
+      <div style="grid-column:span 2;border-radius:16px;padding:14px;background:${r ? 'var(--o)' : 'var(--tile)'};color:${r ? '#fff' : 'var(--ink)'};${r ? '' : 'border:1px solid var(--line)'}" class="row">
+        <div class="col grow"><span class="t-xs b" style="letter-spacing:.08em;opacity:.85">${r ? 'TRACKING' : 'IDLE'}</span><span class="b ell" style="font-size:17px">${r ? r.task : 'No timer running'}</span><span class="t-s ell" style="opacity:.8">${r ? r.project + ' · ' + cname(r) : 'Tap a favorite to start'}</span></div>
+        ${clock('run', '') .replace('class="num ', 'style="font-size:28px;font-weight:600" class="num ')}
+        ${r ? `<button data-play="${r.id}" style="width:44px;height:44px;border-radius:50%;background:#fff;color:var(--o);display:grid;place-items:center"><span style="width:15px;height:15px;display:block">${ICON.pause}</span></button>` : ''}
+      </div>
+      <div class="card" style="padding:12px"><div class="t-xs b faint" style="letter-spacing:.06em">TODAY</div><div class="num b" style="font-size:24px">${clock('today')}</div>
+        <div class="row" style="align-items:flex-end;gap:3px;height:44px;margin-top:6px">${hours.map((h, i) => `<span style="flex:1;border-radius:3px;height:${Math.max(3, h / 2 * 44)}px;background:${i === 7 && r ? 'var(--o)' : 'color-mix(in srgb, var(--o) 45%, var(--line))'}"></span>`).join('')}</div>
+        <div class="row t-xs faint" style="justify-content:space-between;margin-top:3px"><span>8a</span><span>12p</span><span>5p</span></div></div>
+      <div class="card" style="padding:12px"><div class="t-xs b faint" style="letter-spacing:.06em">WEEK</div><div class="num b" style="font-size:24px">${clock('week')}</div>
+        <div class="row" style="align-items:flex-end;gap:5px;height:44px;margin-top:6px">${mins.map((m, i) => `<span style="flex:1;border-radius:3px;height:${Math.max(3, m / max * 44)}px;background:${i === TODAY ? 'var(--o)' : 'var(--line)'}"></span>`).join('')}</div>
+        <div class="row t-xs faint" style="justify-content:space-between;margin-top:3px">${DAYS.map((d, i) => `<span style="${i === TODAY ? 'color:var(--o);font-weight:700' : ''}">${d}</span>`).join('')}</div></div>
+      <div style="grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:10px">${FAVS.map(id => { const t = T[id], on = S.running === id; return `<button data-play="${id}" class="card" style="padding:12px;text-align:left;display:flex;flex-direction:column;gap:6px;${on ? 'border-color:var(--o);box-shadow:0 0 0 1px var(--o)' : ''}">
+        <div class="row" style="justify-content:space-between">${badge(t, 28)}<span class="play ${on ? 'on' : ''}" style="width:26px;height:26px">${on ? ICON.pause : ICON.play}</span></div>
+        <span class="b ell">${t.task}</span><span class="t-xs sub ell" style="margin-top:-4px">${t.project}</span></button>`; }).join('')}</div>
+    </div>`);
+  },
+},
+{
+  id: 'split', name: 'Three-Pane Studio', device: 'iPad / wide',
+  pitch: 'Clients and projects on the left, tasks in the middle, the timer and today’s entries on the right. Built for iPad and a wide Mac window.',
+  best: 'People with many clients who browse more than they search.',
+  pros: ['Every task reachable without typing', 'Timer never covers your content', 'Scales naturally from iPad to a big Mac window'],
+  con: 'Overkill in a small menu bar window; it needs to collapse to a single pane.',
+  scores: { speed: 3, glance: 4, touch: 5 },
+  insp: [['v0 sidebar', 'https://mobbin.com/screens/5f353fc3-d9ce-4d1c-be9b-cc1b4ad07578'], ['Gumloop workspace', 'https://mobbin.com/screens/e9e0911a-09a4-4c72-bb98-6ac9357fa590']],
+  render() {
+    const r = runningTask(), list = TASKS.filter(t => t.client === L.sidebar);
+    return mac('Harvest Bar', `<div style="flex:1;display:grid;grid-template-columns:150px 1fr 200px;min-height:0;border-top:1px solid var(--line)">
+      <div style="padding:10px 8px;border-right:1px solid var(--line)" class="scroll">
+        <div class="row card" style="padding:6px 8px;gap:6px;color:var(--sub);margin-bottom:10px">${ICON.search}<span class="t-s">Search</span></div>
+        <div class="t-xs b faint" style="padding:4px 8px;letter-spacing:.06em">CLIENTS</div>
+        ${Object.entries(CLIENT).map(([k, [n, c]]) => `<button data-side="${k}" class="row" style="width:100%;padding:7px 8px;border-radius:8px;gap:8px;${L.sidebar === k ? 'background:var(--o-soft);color:var(--o);font-weight:600' : ''}"><span style="width:8px;height:8px;border-radius:50%;background:${c}"></span><span class="t-s ell grow" style="text-align:left">${n}</span><span class="t-xs faint">${TASKS.filter(t => t.client === k).length}</span></button>`).join('')}
+        <div class="t-xs b faint" style="padding:12px 8px 4px;letter-spacing:.06em">PINNED</div>
+        ${FAVS.slice(0, 3).map(id => `<div class="row t-s" style="padding:6px 8px;gap:6px"><span style="color:var(--o)">${ICON.star}</span><span class="ell">${T[id].task}</span></div>`).join('')}
+      </div>
+      <div style="padding:12px" class="scroll"><div class="b" style="font-size:18px;margin-bottom:10px">${CLIENT[L.sidebar][0]}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${list.map(t => `<div class="card" style="padding:10px;${S.running === t.id ? 'border-color:var(--o)' : ''}"><div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="t-xs sub ell">${t.project}</span>${playBtn(t.id)}</div><div class="b ell">${t.task}</div><div class="t-xs sub">${t.week.toFixed(1)} h this week</div></div>`).join('')}</div></div>
+      <div style="padding:12px;border-left:1px solid var(--line);background:var(--tile);display:flex;flex-direction:column;gap:10px">
+        <div style="border-radius:14px;padding:12px;background:${r ? 'var(--o)' : 'var(--panel)'};color:${r ? '#fff' : 'var(--ink)'}"><div class="t-xs b" style="opacity:.85;letter-spacing:.08em">${r ? 'TRACKING' : 'IDLE'}</div><div class="b ell">${r ? r.task : 'Nothing running'}</div><div class="t-xs ell" style="opacity:.8">${r ? r.project : '—'}</div>
+          <div class="row" style="margin-top:8px;justify-content:space-between">${clock('run').replace('class="num', 'style="font-size:22px;font-weight:600" class="num')}${r ? `<button data-play="${r.id}" style="width:32px;height:32px;border-radius:50%;background:#fff;color:var(--o);display:grid;place-items:center"><span style="width:11px;height:11px;display:block">${ICON.pause}</span></button>` : ''}</div></div>
+        <div class="row t-s" style="justify-content:space-between"><span class="b">Today</span>${clock('today', 'sub')}</div>
+        ${ENTRIES.map(([id, , m]) => `<div class="row t-s" style="gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:${col(T[id])}"></span><span class="ell grow">${T[id].task}</span><span class="num sub">${hm(m)}</span></div>`).join('')}
+      </div></div>`, 'wide');
+  },
+},
+{
+  id: 'pill', name: 'Live Pill', device: 'Mac',
+  pitch: 'A tiny always-on-top capsule, like the Dynamic Island for your desktop. Hover to expand into quick switches; leave it alone and it stays out of the way.',
+  best: 'People who forget a timer is running, and want it visible without a window.',
+  pros: ['Always visible, never in the way', 'Pause and switch without opening anything', 'Same idea becomes an iPhone Live Activity'],
+  con: 'No room for history; pair it with one of the other layouts.',
+  scores: { speed: 5, glance: 4, touch: 3 },
+  insp: [['Jomo Dynamic Island', 'https://mobbin.com/screens/37fe77cb-8f7e-4762-961d-89e3097459a2'], ['Jomo session banner', 'https://mobbin.com/screens/ac22e3c9-5974-4d31-b371-4da5b9da5848'], ['Future Pro island', 'https://mobbin.com/screens/77547503-ef77-4bad-b72b-727466292254']],
+  render() {
+    const r = runningTask();
+    return `<div class="desk"><div class="menubar"><span>Thu 15 Oct 15:56</span></div>
+      <div style="position:absolute;top:40px;left:50%;transform:translateX(-50%);width:${L.pillOpen ? 340 : 230}px;transition:width .25s;background:#0c0c0d;color:#fff;border-radius:${L.pillOpen ? 24 : 999}px;box-shadow:0 18px 50px rgba(0,0,0,.45);overflow:hidden" data-pillwrap>
+        <div class="row" style="padding:8px 8px 8px 16px">
+          <span class="dot ${r ? '' : 'off'}"></span><span class="b ell grow">${r ? r.task : 'Not tracking'}</span>${clock('run', 'b')}
+          <button data-play="${r ? r.id : FAVS[0]}" style="width:30px;height:30px;border-radius:50%;background:${r ? '#fff' : 'var(--o)'};color:${r ? 'var(--o)' : '#fff'};display:grid;place-items:center"><span style="width:11px;height:11px;display:block">${r ? ICON.pause : ICON.play}</span></button>
+          <button data-pill style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center;transform:rotate(${L.pillOpen ? 90 : 0}deg)" aria-label="Expand">${ICON.chev('r')}</button>
+        </div>
+        ${L.pillOpen ? `<div style="padding:4px 10px 12px">${r ? `<div class="t-xs" style="opacity:.6;padding:0 6px 8px">${r.project} · ${cname(r)} · Today ${clockText('today')}</div>` : ''}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${FAVS.filter(id => id !== S.running).concat(RECENT).filter((v, i, a) => a.indexOf(v) === i && v !== S.running).slice(0, 4).map(id => `<button data-play="${id}" style="text-align:left;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.08)"><div class="row" style="gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:${col(T[id])}"></span><span class="t-s b ell">${T[id].task}</span></div><div class="t-xs ell" style="opacity:.55">${T[id].project}</div></button>`).join('')}</div>
+          <div class="row t-xs" style="opacity:.5;justify-content:center;margin-top:10px;gap:10px"><span>⌥H search</span><span>⌘P pause</span><span>drag to move</span></div></div>` : ''}
+      </div></div>`;
+  },
+},
+{
+  id: 'deck', name: 'Swipe Deck', device: 'iPhone',
+  pitch: 'Your likely tasks as a stack of big cards, ordered by what you usually do at this hour. Swipe to the next, tap to start.',
+  best: 'Thumb-only phone use with a short list of regular tasks.',
+  pros: ['Giant targets, zero precision needed', 'Suggestion order means the right card is usually first', 'Feels playful without being silly'],
+  con: 'Slow if your task is fifth in the stack; search is a fallback.',
+  scores: { speed: 3, glance: 3, touch: 5 },
+  insp: [['Opal “For You” cards', 'https://mobbin.com/screens/d5f16900-ff7c-4508-afe1-470f1a147f12'], ['Fitbit workout cards', 'https://mobbin.com/screens/db9f6c48-cf28-40bb-92ee-fa1541ae8d8b']],
+  render() {
+    const order = [...FAVS, ...SUGGEST], n = order.length, idx = ((L.deck % n) + n) % n;
+    const cards = [2, 1, 0].map(o => ({ o, t: T[order[(idx + o) % n]] }));
+    const r = runningTask();
+    return phone(`<div style="flex:1;display:flex;flex-direction:column;padding:4px 20px 22px">
+      <div class="row" style="justify-content:space-between"><span class="b" style="font-size:22px">Good afternoon</span><span class="card t-s" style="padding:5px 10px">Today ${clock('today', 'b')}</span></div>
+      ${r ? `<div class="row" style="margin-top:10px;padding:10px 12px;border-radius:14px;background:var(--o);color:#fff"><span class="dot" style="background:#fff"></span><span class="b ell grow">${r.task}</span>${clock('run', 'b')}<button data-play="${r.id}" style="width:28px;height:28px;border-radius:50%;background:#fff;color:var(--o);display:grid;place-items:center"><span style="width:10px;height:10px;display:block">${ICON.pause}</span></button></div>` : ''}
+      <div style="position:relative;flex:1;margin:18px 0 14px">${cards.map(({ o, t }) => `<div style="position:absolute;inset:0;transform:translateY(${o * 12}px) scale(${1 - o * .05});opacity:${o ? .55 - o * .15 : 1};border-radius:28px;padding:22px;color:#fff;background:linear-gradient(160deg, ${col(t)}, color-mix(in srgb, ${col(t)} 55%, #000));display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.2)">
+        ${o ? '' : `<span class="t-s" style="opacity:.8">${cname(t)} · usually around now</span><span style="font-size:34px;font-weight:700;line-height:1.05;margin-top:auto">${t.task}</span><span style="opacity:.85">${t.project}</span>
+        <button data-play="${t.id}" style="margin-top:18px;height:52px;border-radius:16px;background:#fff;color:${col(t)};font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px"><span style="width:13px;height:13px;display:block">${S.running === t.id ? ICON.pause : ICON.play}</span>${S.running === t.id ? 'Pause' : 'Start timer'}</button>`}</div>`).join('')}</div>
+      <div class="row" style="justify-content:center;gap:14px"><button data-deck="-1" class="card" style="width:46px;height:46px;border-radius:50%;display:grid;place-items:center" aria-label="Previous card">${ICON.chev('l')}</button>
+        <span class="t-s sub num">${idx + 1} / ${n}</span><button data-deck="1" class="card" style="width:46px;height:46px;border-radius:50%;display:grid;place-items:center" aria-label="Next card">${ICON.chev('r')}</button></div>
+    </div>`);
+  },
+},
+{
+  id: 'bars', name: 'Usage Bars', device: 'Mac',
+  pitch: 'Tasks ranked by where your time actually goes, each with a bar. The list is both a report and a launcher.',
+  best: 'People who care about budget and balance across clients.',
+  pros: ['Shows where the week went at a glance', 'Ranking makes the right task easy to find', 'Today, Week and Month change both the order and the bars'],
+  con: 'Brand-new tasks sit at the bottom until you use them.',
+  scores: { speed: 4, glance: 5, touch: 4 },
+  insp: [['Jomo “Most used”', 'https://mobbin.com/screens/1e81e6f2-25ef-4787-8471-1fc3448d9688'], ['Insight Timer stats', 'https://mobbin.com/screens/5ca8ed6f-5837-419f-9f99-c0e047e9e9b6']],
+  render() {
+    const val = t => L.seg === 'today' ? taskToday(t.id) / 60 : L.seg === 'week' ? t.week + taskToday(t.id) / 60 * 0 : t.week * 4.1;
+    const list = [...TASKS].sort((a, b) => val(b) - val(a)), max = Math.max(...list.map(val), .1);
+    return mac('Harvest Bar', `<div style="padding:0 14px 10px">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px"><span class="b" style="font-size:20px">Where time goes</span><span class="t-s sub">${L.seg === 'today' ? clock('today', 'b') : L.seg === 'week' ? clock('week', 'b') : '<b class="num">131:20</b>'}</span></div>
+      <div class="seg">${['today', 'week', 'month'].map(s => `<button data-seg="${s}" class="${L.seg === s ? 'on' : ''}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}</div></div>
+      <div class="scroll" style="flex:1;padding:0 14px 14px">${list.map(t => { const v = val(t), on = S.running === t.id; return `<div class="row" style="padding:9px 0;border-bottom:1px solid var(--line)">
+        <div class="col grow" style="gap:4px"><div class="row" style="gap:6px"><span class="b ell">${t.task}</span><span class="t-xs sub ell">${t.project}</span></div>
+        <div style="height:8px;border-radius:4px;background:var(--line);overflow:hidden"><div style="height:100%;width:${v / max * 100}%;border-radius:4px;background:${on ? 'var(--o)' : col(t)}"></div></div></div>
+        <span class="num t-s" style="width:44px;text-align:right">${L.seg === 'today' ? clockText('task:' + t.id) : v.toFixed(1) + 'h'}</span>${playBtn(t.id)}</div>`; }).join('')}</div>`);
+  },
+},
+{
+  id: 'dial', name: 'Speed Dial', device: 'Mac',
+  pitch: 'Nine big squares, one per favorite, each with its own ⌘1–⌘9 shortcut. Muscle memory replaces searching.',
+  best: 'A steady set of 5–9 tasks that cover most of the week.',
+  pros: ['One keystroke from anywhere: ⌥H then ⌘3', 'Color and position become memorable', 'Great on iPad as a wall of buttons'],
+  con: 'Only nine slots; everything else needs search.',
+  scores: { speed: 5, glance: 3, touch: 5 },
+  insp: [['Insight Timer presets', 'https://mobbin.com/screens/6752efd5-7190-4ffa-be3c-7ac3dbc29f4b'], ['Opal timer controls', 'https://mobbin.com/screens/d5f16900-ff7c-4508-afe1-470f1a147f12']],
+  render() {
+    const r = runningTask();
+    return mac('Harvest Bar', `<div style="padding:0 14px 12px"><div class="row" style="padding:10px 12px;border-radius:14px;background:${r ? 'var(--o)' : 'var(--tile)'};color:${r ? '#fff' : 'var(--ink)'};${r ? '' : 'border:1px solid var(--line)'}">
+        <div class="col grow"><span class="b ell">${r ? r.task + ' · ' + r.project : 'Press ⌘1–⌘9 to start'}</span><span class="t-xs" style="opacity:.8">Today ${clockText('today')}</span></div>${clock('run', 'b')}</div></div>
+      <div style="flex:1;padding:0 14px;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:10px">${TASKS.map((t, i) => { const on = S.running === t.id; return `<button data-play="${t.id}" style="border-radius:16px;padding:10px;text-align:left;display:flex;flex-direction:column;position:relative;color:${on ? '#fff' : 'var(--ink)'};background:${on ? 'var(--o)' : `color-mix(in srgb, ${col(t)} 14%, var(--tile))`};border:1px solid ${on ? 'var(--o)' : 'var(--line)'};${on ? 'box-shadow:0 8px 20px rgba(250,93,0,.35)' : ''}">
+        <span class="kbd" style="align-self:flex-start;${on ? 'background:rgba(255,255,255,.2);color:#fff;border-color:transparent' : ''}">⌘${i + 1}</span>
+        <span class="b ell" style="margin-top:auto;font-size:14px">${t.task}</span><span class="t-xs ell" style="opacity:.7">${t.project}</span>
+        ${on ? `<span style="position:absolute;top:10px;right:10px;width:14px;height:14px;display:block">${ICON.pause}</span>` : ''}</button>`; }).join('')}</div>
+      <div style="padding:12px 14px"><div class="row card" style="padding:9px 12px;gap:8px;color:var(--sub)">${ICON.search}<span class="t-s grow">Search everything else…</span><span class="kbd">⌘K</span></div></div>`, 'short');
+  },
+},
+];
+
+// ---------- Render ----------
+const main = document.getElementById('concepts');
+main.innerHTML = CONCEPTS.map((c, i) => `<section class="concept" id="${c.id}">
+  <div class="stage"><div class="fit"><div class="scaler" data-mock="${i}"></div></div></div>
+  <div class="notes"><div class="n">${String(i + 1).padStart(2, '0')} · ${c.device}</div><h2>${c.name}</h2><p class="pitch">${c.pitch}</p>
+    <dl><div><dt>Best for</dt><dd>${c.best}</dd></div>
+    <div><dt>Why it works</dt><dd><ul>${c.pros.map(p => `<li>${p}</li>`).join('')}</ul></dd></div>
+    <div><dt>Trade-off</dt><dd>${c.con}</dd></div>
+    <div><dt>Ratings</dt><dd class="score">${[['Speed to start', 'speed'], ['At a glance', 'glance'], ['Touch-friendly', 'touch']].map(([l, k]) => `<span>${l}<span class="pips">${[1, 2, 3, 4, 5].map(n => `<i class="${n <= c.scores[k] ? 'on' : ''}"></i>`).join('')}</span></span>`).join('')}</dd></div>
+    <div><dt>Inspired by (Mobbin)</dt><dd class="insp">${c.insp.map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join('')}</dd></div></dl>
+  </div></section>`).join('');
+document.getElementById('jump').innerHTML = CONCEPTS.map((c, i) => `<a href="#${c.id}">${String(i + 1).padStart(2, '0')} ${c.name}</a>`).join('');
+
+function renderAll() {
+  const active = document.activeElement && document.activeElement.id;
+  document.querySelectorAll('[data-mock]').forEach(el => { el.innerHTML = CONCEPTS[+el.dataset.mock].render(); });
+  if (active === 'cmdq') { const q = document.getElementById('cmdq'); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  fitAll(); tick();
+}
+function tick() {
+  document.querySelectorAll('[data-clock]').forEach(el => { el.textContent = clockText(el.dataset.clock); });
+  const r = runningTask();
+  document.getElementById('liveDot').className = 'dot' + (r ? '' : ' off');
+  document.getElementById('liveLbl').textContent = r ? `${r.task} · ${clockText('run')}` : 'Timer paused';
+  const ring = document.querySelector('[data-ring]');
+  if (ring) { const C = 2 * Math.PI * 104; ring.setAttribute('stroke-dashoffset', C * (1 - Math.min(1, todayMins() / 480))); }
+}
+function fitAll() {
+  document.querySelectorAll('.scaler').forEach(s => {
+    const dev = s.firstElementChild; if (!dev) return;
+    dev.style.transform = ''; s.style.height = '';
+    const avail = s.parentElement.clientWidth, w = dev.offsetWidth + 24, h = dev.offsetHeight + 24;
+    const k = Math.min(1, avail / w);
+    dev.style.transformOrigin = 'top center'; dev.style.transform = k < 1 ? `scale(${k})` : '';
+    s.style.height = (h * k) + 'px'; s.style.display = 'flex'; s.style.justifyContent = 'center'; s.style.paddingTop = '12px';
+  });
+}
+
+document.addEventListener('click', e => {
+  const p = e.target.closest('[data-play]'); if (p) { e.preventDefault(); toggle(p.dataset.play); return; }
+  const d = e.target.closest('[data-deck]'); if (d) { L.deck += +d.dataset.deck; renderAll(); return; }
+  const g = e.target.closest('[data-seg]'); if (g) { L.seg = g.dataset.seg; renderAll(); return; }
+  const sd = e.target.closest('[data-side]'); if (sd) { L.sidebar = sd.dataset.side; renderAll(); return; }
+  const pl = e.target.closest('[data-pill]'); if (pl) { L.pillOpen = !L.pillOpen; renderAll(); return; }
+  const c = e.target.closest('[data-cmd]'); if (c) { L.sel = +c.dataset.cmd; renderAll(); }
+});
+document.addEventListener('input', e => { if (e.target.id === 'cmdq') { L.q = e.target.value; L.sel = 0; renderAll(); } });
+document.addEventListener('keydown', e => {
+  if (e.target.id !== 'cmdq') return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); L.sel = Math.max(0, L.sel + (e.key === 'ArrowDown' ? 1 : -1)); renderAll(); }
+  if (e.key === 'Enter') { const b = document.querySelector('#command [data-cmd="' + L.sel + '"] [data-play]'); if (b) toggle(b.dataset.play); }
+  if (e.key === 'Escape') { L.q = ''; renderAll(); }
+});
+
+const themeBtn = document.getElementById('theme'), modes = ['auto', 'light', 'dark'];
+let mode = 'auto';
+try { mode = localStorage.getItem('hb-theme') || 'auto'; } catch (_) {}
+function applyTheme() {
+  if (mode === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = mode;
+  themeBtn.textContent = { auto: 'Auto', light: 'Light', dark: 'Dark' }[mode];
+}
+themeBtn.onclick = () => { mode = modes[(modes.indexOf(mode) + 1) % 3]; try { localStorage.setItem('hb-theme', mode); } catch (_) {} applyTheme(); };
+applyTheme();
+window.addEventListener('resize', fitAll);
+renderAll();
+setInterval(tick, 1000);
+setInterval(() => { if (S.running) renderAll(); }, 30000);
+</script>
+</body>
+</html>

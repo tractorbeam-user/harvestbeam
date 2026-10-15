@@ -1,17 +1,24 @@
 import Foundation
 import Observation
 
-/// Starred tasks, in the order the user starred them. Saved locally and, when the
-/// app is signed with an iCloud entitlement, mirrored to iCloud key-value storage
-/// so favorites follow you between Mac, iPhone and iPad.
+/// Starred tasks, in the order the user starred them, optionally filed into
+/// folders.
+///
+/// Saved locally and, when the app is signed with an iCloud entitlement,
+/// mirrored to iCloud key-value storage so favorites and folders follow you
+/// between Mac, iPhone and iPad.
 @MainActor @Observable
 public final class FavoritesStore {
     public private(set) var keys: [TaskKey] = []
+    public private(set) var folders: [String] = []
+    public private(set) var folderOf: [TaskKey: String] = [:]
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let cloud: NSUbiquitousKeyValueStore?
     @ObservationIgnored private var observer: NSObjectProtocol?
-    private static let storageKey = "favorites.v1"
+    private static let keysKey = "favorites.v1"
+    private static let foldersKey = "favoriteFolders.v1"
+    private static let folderMapKey = "favoriteFolderMap.v1"
 
     public init(defaults: UserDefaults = .standard, syncWithICloud: Bool = true) {
         self.defaults = defaults
@@ -19,7 +26,7 @@ public final class FavoritesStore {
         // silently stays local, so skip it entirely.
         let cloudAvailable = syncWithICloud && FileManager.default.ubiquityIdentityToken != nil
         self.cloud = cloudAvailable ? NSUbiquitousKeyValueStore.default : nil
-        keys = Self.decode(cloud?.array(forKey: Self.storageKey) ?? defaults.array(forKey: Self.storageKey))
+        load(preferCloud: true)
 
         if let cloud {
             observer = NotificationCenter.default.addObserver(
@@ -27,7 +34,7 @@ public final class FavoritesStore {
                 object: cloud,
                 queue: .main
             ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.reloadFromCloud() }
+                MainActor.assumeIsolated { self?.load(preferCloud: true) }
             }
             cloud.synchronize()
         }
@@ -40,6 +47,7 @@ public final class FavoritesStore {
     public func toggle(_ key: TaskKey) {
         if let index = keys.firstIndex(of: key) {
             keys.remove(at: index)
+            folderOf[key] = nil
         } else {
             keys.append(key)
         }
@@ -54,18 +62,78 @@ public final class FavoritesStore {
         persist()
     }
 
+    /// Moves a favorite one place earlier (-1) or later (+1).
+    public func shift(_ key: TaskKey, by offset: Int) {
+        guard let index = keys.firstIndex(of: key) else { return }
+        let target = min(max(index + offset, 0), keys.count - 1)
+        guard target != index else { return }
+        keys.remove(at: index)
+        keys.insert(key, at: target)
+        persist()
+    }
+
+    // MARK: Folders
+
+    public func keys(inFolder folder: String) -> [TaskKey] {
+        keys.filter { folderOf[$0] == folder }
+    }
+
+    /// Adds a folder, making the name unique ("Clients 2"), and returns it.
+    @discardableResult
+    public func createFolder(named proposed: String = "New Folder") -> String {
+        let base = proposed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New Folder" : proposed
+        var name = base
+        var n = 2
+        while folders.contains(name) { name = "\(base) \(n)"; n += 1 }
+        folders.append(name)
+        persist()
+        return name
+    }
+
+    public func renameFolder(_ folder: String, to proposed: String) {
+        let name = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let index = folders.firstIndex(of: folder), !name.isEmpty, name != folder, !folders.contains(name) else { return }
+        folders[index] = name
+        for (key, value) in folderOf where value == folder { folderOf[key] = name }
+        persist()
+    }
+
+    /// Deletes the folder; its tasks stay favorites, just unfiled.
+    public func deleteFolder(_ folder: String) {
+        folders.removeAll { $0 == folder }
+        folderOf = folderOf.filter { $0.value != folder }
+        persist()
+    }
+
+    /// Files a task into a folder (starring it if needed), or unfiles it with nil.
+    public func file(_ key: TaskKey, in folder: String?) {
+        if !keys.contains(key) { keys.append(key) }
+        folderOf[key] = folder.flatMap { folders.contains($0) ? $0 : nil }
+        persist()
+    }
+
+    // MARK: Storage
+
     private func persist() {
         let raw = keys.map(\.description)
-        defaults.set(raw, forKey: Self.storageKey)
-        cloud?.set(raw, forKey: Self.storageKey)
+        let map = Dictionary(uniqueKeysWithValues: folderOf.map { ($0.key.description, $0.value) })
+        defaults.set(raw, forKey: Self.keysKey)
+        defaults.set(folders, forKey: Self.foldersKey)
+        defaults.set(map, forKey: Self.folderMapKey)
+        cloud?.set(raw, forKey: Self.keysKey)
+        cloud?.set(folders, forKey: Self.foldersKey)
+        cloud?.set(map, forKey: Self.folderMapKey)
     }
 
-    private func reloadFromCloud() {
-        keys = Self.decode(cloud?.array(forKey: Self.storageKey))
-        defaults.set(keys.map(\.description), forKey: Self.storageKey)
-    }
-
-    private static func decode(_ array: [Any]?) -> [TaskKey] {
-        (array as? [String] ?? []).compactMap(TaskKey.init)
+    private func load(preferCloud: Bool) {
+        func array(_ key: String) -> [Any]? { (preferCloud ? cloud?.array(forKey: key) : nil) ?? defaults.array(forKey: key) }
+        func dict(_ key: String) -> [String: Any]? { (preferCloud ? cloud?.dictionary(forKey: key) : nil) ?? defaults.dictionary(forKey: key) }
+        keys = (array(Self.keysKey) as? [String] ?? []).compactMap(TaskKey.init)
+        folders = array(Self.foldersKey) as? [String] ?? []
+        var map: [TaskKey: String] = [:]
+        for (raw, value) in dict(Self.folderMapKey) as? [String: String] ?? [:] {
+            if let key = TaskKey(raw), folders.contains(value) { map[key] = value }
+        }
+        folderOf = map
     }
 }

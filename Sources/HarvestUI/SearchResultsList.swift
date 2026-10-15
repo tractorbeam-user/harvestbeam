@@ -1,0 +1,109 @@
+import HarvestKit
+import SwiftUI
+
+/// Dense, one-line-per-task results grouped under client headings, like
+/// Harvest's own project picker. Keyboard selection shows as a solid highlight.
+struct SearchResultsList: View {
+    @Environment(TimeTracker.self) private var tracker
+    /// Already grouped by client (see `TrackerView.groupedResults`).
+    let tasks: [TrackableTask]
+    let selection: TaskKey?
+    let query: String
+
+    var body: some View {
+        if tasks.isEmpty {
+            Text("No tasks match “\(query)”")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 64)
+        } else {
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                    if index == 0 || tasks[index - 1].client?.id != task.client?.id {
+                        Text(task.client?.name ?? "No client")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.top, index == 0 ? 2 : 10)
+                            .padding(.bottom, 3)
+                    }
+                    ResultRow(task: task, isSelected: selection == task.key)
+                        .id(task.key)
+                }
+            }
+            .padding(5)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.tileBackground))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
+        }
+    }
+}
+
+private struct ResultRow: View {
+    @Environment(TimeTracker.self) private var tracker
+    let task: TrackableTask
+    let isSelected: Bool
+    @State private var isHovered = false
+
+    private var isRunning: Bool { tracker.running?.key == task.key }
+    private var isFavorite: Bool { tracker.favorites.contains(task.key) }
+
+    var body: some View {
+        Button {
+            Task { await tracker.toggle(task) }
+        } label: {
+            HStack(spacing: 6) {
+                Text(task.projectCode.map { "[\($0)] " } ?? "").foregroundStyle(secondary)
+                    + Text(task.project.name)
+                    + Text("  ·  \(task.task.name)").foregroundStyle(secondary)
+                Spacer(minLength: 6)
+                if isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.harvestOrange))
+                }
+                Image(systemName: isRunning ? "pause.fill" : "play.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.harvestOrange))
+                    .opacity(isSelected || isHovered || isRunning ? 1 : 0)
+                    .frame(width: 14)
+            }
+            .font(.system(size: rowFont))
+            .lineLimit(1)
+            .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(background))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        #if os(macOS)
+        .onHover { isHovered = $0 }
+        #endif
+        .contextMenu {
+            Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: isFavorite ? "star.slash" : "star") {
+                tracker.favorites.toggle(task.key)
+            }
+        }
+        .accessibilityLabel("\(task.project.name), \(task.task.name), \(task.client?.name ?? "")")
+        .accessibilityHint(isRunning ? "Pauses the timer" : "Starts a timer")
+    }
+
+    private var secondary: Color {
+        isSelected ? .white.opacity(0.8) : .secondary
+    }
+
+    private var background: Color {
+        if isSelected { return .harvestOrange }
+        if isRunning { return Color.harvestOrange.opacity(0.12) }
+        if isHovered { return Color.primary.opacity(0.06) }
+        return .clear
+    }
+
+    #if os(macOS)
+    private let rowHeight: CGFloat = 26
+    private let rowFont: CGFloat = 13
+    #else
+    private let rowHeight: CGFloat = 40
+    private let rowFont: CGFloat = 16
+    #endif
+}

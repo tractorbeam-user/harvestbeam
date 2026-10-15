@@ -156,7 +156,10 @@ private struct EntryRow: View {
     @Environment(TimeTracker.self) private var tracker
     let entry: TimeEntry
     let task: TrackableTask
+    @Environment(\.openURL) private var openURL
     @State private var isHovered = false
+    @State private var isEditing = false
+    @State private var isConfirmingDelete = false
 
     var body: some View {
         Button {
@@ -210,6 +213,23 @@ private struct EntryRow: View {
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
+        .contextMenu {
+            Button("Edit Entry") { isEditing = true }
+            Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
+                Task { await tracker.toggle(entry) }
+            }
+            Button("Delete Entry", role: .destructive) { isConfirmingDelete = true }
+            Divider()
+            Button("View in Harvest") {
+                if let url = tracker.harvestURL(for: entry.spentDate) { openURL(url) }
+            }
+        }
+        .sheet(isPresented: $isEditing) { EntryEditor(entry: entry) }
+        .confirmationDialog("Delete this entry?", isPresented: $isConfirmingDelete) {
+            Button("Delete Entry", role: .destructive) { Task { await tracker.deleteEntry(entry) } }
+        } message: {
+            Text("\(task.project.name) · \(task.task.name), \(TimeFormat.hoursMinutes(entry.elapsed())). This also deletes it in Harvest.")
+        }
         .accessibilityHint(entry.isRunning ? "Pauses the timer" : "Restarts this entry's timer")
     }
 

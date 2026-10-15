@@ -11,6 +11,9 @@ public protocol HarvestService: Sendable {
     func restartTimer(id: Int) async throws -> TimeEntry
     func stopTimer(id: Int) async throws -> TimeEntry
     func updateNotes(id: Int, notes: String) async throws -> TimeEntry
+    /// Changes an entry's task, notes and (for stopped entries) hours.
+    func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?) async throws -> TimeEntry
+    func deleteEntry(id: Int) async throws
 }
 
 public enum HarvestError: LocalizedError, Equatable {
@@ -128,6 +131,22 @@ public struct HarvestClient: HarvestService {
         return try await send("PATCH", "time_entries/\(id)", body: Body(notes: notes))
     }
 
+    public func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?) async throws -> TimeEntry {
+        struct Body: Encodable { let projectId: Int; let taskId: Int; let notes: String; let hours: Double? }
+        return try await send("PATCH", "time_entries/\(id)", body: Body(projectId: projectID, taskId: taskID, notes: notes, hours: hours))
+    }
+
+    public func deleteEntry(id: Int) async throws {
+        struct Ignored: Decodable {}
+        var request = URLRequest(url: Self.apiBase.appendingPathComponent("time_entries/\(id)"))
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(String(accountID), forHTTPHeaderField: "Harvest-Account-Id")
+        request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+        // Harvest answers 200 with an empty body, so don't decode it.
+        let _: Ignored? = try await Self.perform(request, allowEmpty: true)
+    }
+
     // MARK: Transport
 
     private func send<T: Decodable>(_ method: String, _ path: String, query: [URLQueryItem] = []) async throws -> T {
@@ -148,6 +167,15 @@ public struct HarvestClient: HarvestService {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
         return try await Self.perform(request)
+    }
+
+    private static func perform<T: Decodable>(_ request: URLRequest, allowEmpty: Bool) async throws -> T? {
+        do {
+            let value: T = try await perform(request)
+            return value
+        } catch HarvestError.decoding where allowEmpty {
+            return nil
+        }
     }
 
     private static func perform<T: Decodable>(_ request: URLRequest) async throws -> T {

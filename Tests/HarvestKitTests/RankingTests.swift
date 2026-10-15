@@ -122,3 +122,13 @@ struct LocalDateTests {
         #expect(LocalDate(year: 2026, month: 10, day: 15).startOfWeek(firstWeekday: 1) == LocalDate(year: 2026, month: 10, day: 11))
     }
 }
+
+struct MenuBarDisplayTests {
+    @Test func truncatesAtTheEndOrMiddle() {
+        let text = "Digital Products Redesign"
+        #expect(MenuBarDisplay.truncate(text, to: 0, style: .end) == text)
+        #expect(MenuBarDisplay.truncate(text, to: 12, style: .end) == "Digital Pro…")
+        #expect(MenuBarDisplay.truncate(text, to: 12, style: .middle) == "Digita…esign")
+        #expect(MenuBarDisplay.truncate("Short", to: 12, style: .end) == "Short")
+    }
+}

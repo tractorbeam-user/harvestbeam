@@ -15,8 +15,13 @@ public final class TimeTracker {
         didSet {
             tasksByKey = Dictionary(tasks.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
             searchIndex = Ranking.SearchIndex(tasks: tasks)
+            var seen = Set<Int>()
+            clients = tasks.compactMap(\.client).filter { seen.insert($0.id).inserted }
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         }
     }
+    /// Every client with at least one assignable task, A–Z.
+    public private(set) var clients: [NamedRef] = []
     /// The last `historyDays` of the user's time entries, newest first.
     public private(set) var entries: [TimeEntry] = [] {
         didSet { usage = Ranking.usageScores(from: entries) }
@@ -122,6 +127,17 @@ public final class TimeTracker {
 
     public var favoriteTasks: [TrackableTask] {
         favorites.keys.compactMap { tasksByKey[$0] }
+    }
+
+    public func tasks(for keys: [TaskKey]) -> [TrackableTask] {
+        keys.compactMap { tasksByKey[$0] }
+    }
+
+    /// A client's tasks, by project then task name.
+    public func tasks(forClient id: Int) -> [TrackableTask] {
+        tasks.filter { $0.client?.id == id }.sorted {
+            ($0.project.name, $0.task.name) < ($1.project.name, $1.task.name)
+        }
     }
 
     public var recentTasks: [TrackableTask] {
@@ -256,6 +272,36 @@ public final class TimeTracker {
     public func resume() async {
         guard let entry = pausedEntry else { return }
         await toggle(task(for: entry))
+    }
+
+    public func updateEntry(_ entry: TimeEntry, task: TrackableTask, notes: String, hours: Double?) async {
+        guard let service else { return }
+        do {
+            upsert(try await service.updateEntry(
+                id: entry.id, projectID: task.project.id, taskID: task.task.id,
+                notes: notes, hours: entry.isRunning ? nil : hours
+            ))
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    public func deleteEntry(_ entry: TimeEntry) async {
+        guard let service else { return }
+        do {
+            try await service.deleteEntry(id: entry.id)
+            entries = entries.filter { $0.id != entry.id }
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Harvest's day view for an entry's date.
+    public func harvestURL(for day: LocalDate) -> URL? {
+        guard let base = company?.baseUri else { return harvestWebURL }
+        return URL(string: base + String(format: "/time/day/%04d/%02d/%02d", day.year, day.month, day.day))
     }
 
     public func updateNotes(_ notes: String, for entry: TimeEntry) async {

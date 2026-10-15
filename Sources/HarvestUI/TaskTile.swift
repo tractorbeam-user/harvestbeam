@@ -31,35 +31,58 @@ struct TaskTile: View {
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: isFavorite ? "star.slash" : "star") {
                 tracker.favorites.toggle(task.key)
             }
+            Menu("Move to Folder") {
+                ForEach(tracker.favorites.folders, id: \.self) { folder in
+                    Button(folder) { tracker.favorites.file(task.key, in: folder) }
+                        .disabled(tracker.favorites.folderOf[task.key] == folder)
+                }
+                if !tracker.favorites.folders.isEmpty { Divider() }
+                Button("New Folder…") {
+                    tracker.favorites.file(task.key, in: tracker.favorites.createFolder())
+                }
+                if tracker.favorites.folderOf[task.key] != nil {
+                    Button("Remove from Folder") { tracker.favorites.file(task.key, in: nil) }
+                }
+            }
         }
+        .draggable(task.key.description)
         .accessibilityHint(isRunning ? "Pauses the timer" : "Starts a timer")
     }
 
     private var content: some View {
+        // Client, then project, then task — the same order as the day list,
+        // since many projects share task names like "Product Design".
         VStack(alignment: .leading, spacing: 0) {
-            ProjectBadge(name: task.project.name, highlighted: isRunning)
+            Text(task.client?.name ?? " ")
+                .font(.caption)
+                .lineLimit(1)
+                .opacity(0.6)
+                .padding(.trailing, 30) // room for the star
 
-            Spacer(minLength: 10)
-
-            Text(task.task.name)
+            Text(task.project.name)
                 .font(.system(.body, weight: .semibold))
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
-            Text(task.project.name)
-                .font(.caption)
-                .lineLimit(1)
-                .opacity(0.75)
-                .padding(.top, 2)
+                .padding(.top, 4)
+
+            Spacer(minLength: 6)
 
             HStack(alignment: .center) {
-                Text(task.client?.name ?? " ")
-                    .font(.caption)
-                    .lineLimit(1)
-                    .opacity(0.55)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(task.task.name)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                        .opacity(0.8)
+                    if let code = task.projectCode {
+                        Text(code)
+                            .font(.caption2.monospaced())
+                            .lineLimit(1)
+                            .opacity(0.5)
+                    }
+                }
                 Spacer(minLength: 6)
                 actionIndicator
             }
-            .padding(.top, 2)
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: Metrics.tileHeight, alignment: .topLeading)
@@ -93,11 +116,11 @@ struct TaskTile: View {
             Image(systemName: isFavorite ? "star.fill" : "star")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(starStyle)
-                .frame(width: 40, height: 40)
+                .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(2)
+        .padding(1)
         .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
         .accessibilityLabel(isFavorite ? "Remove \(task.task.name) from Favorites" : "Add \(task.task.name) to Favorites")
     }
@@ -130,27 +153,5 @@ private struct TileButtonStyle: ButtonStyle {
         if isSelected { return .harvestOrange }
         if isRunning { return .clear }
         return Color.primary.opacity(isHovered ? 0.16 : 0.07)
-    }
-}
-
-/// Project initials in a rounded square; inverted on the running (orange) tile.
-struct ProjectBadge: View {
-    let name: String
-    var highlighted = false
-
-    private var initials: String {
-        let words = name.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-        return words.prefix(2).compactMap(\.first).map { String($0).uppercased() }.joined()
-    }
-
-    var body: some View {
-        Text(initials)
-            .font(.system(size: Metrics.badgeSize * 0.38, weight: .bold, design: .rounded))
-            .foregroundStyle(highlighted ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.secondary))
-            .frame(width: Metrics.badgeSize, height: Metrics.badgeSize)
-            .background(
-                RoundedRectangle(cornerRadius: Metrics.badgeSize * 0.3, style: .continuous)
-                    .fill(highlighted ? AnyShapeStyle(.white) : AnyShapeStyle(Color.primary.opacity(0.07)))
-            )
     }
 }

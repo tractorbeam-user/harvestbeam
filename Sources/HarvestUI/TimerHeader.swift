@@ -1,28 +1,47 @@
 import HarvestKit
 import SwiftUI
 
-/// The big card at the top: the running timer with Pause, today's last entry
-/// with Resume, or today's total when there's nothing to resume.
+/// A slim bar at the top: the running timer with notes and Pause, today's last
+/// entry with Resume, or today's total.
 struct TimerHeader: View {
     @Environment(TimeTracker.self) private var tracker
 
     var body: some View {
         Group {
             if let entry = tracker.running {
-                RunningCard(entry: entry, task: tracker.task(for: entry))
+                RunningBar(entry: entry, task: tracker.task(for: entry))
                     .id(entry.id)
             } else if let entry = tracker.pausedEntry {
-                PausedCard(entry: entry, task: tracker.task(for: entry))
+                PausedBar(entry: entry, task: tracker.task(for: entry))
             } else {
-                IdleCard()
+                IdleBar()
             }
         }
-        .transition(.opacity)
-        .animation(.snappy(duration: 0.25), value: tracker.running?.id)
+        .animation(.snappy(duration: 0.2), value: tracker.running?.id)
     }
 }
 
-private struct RunningCard: View {
+private struct Bar<Content: View>: View {
+    var filled = false
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 10) { content }
+            .padding(.leading, 12)
+            .padding(.trailing, 8)
+            .frame(minHeight: 52)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(filled ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.tileBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(filled ? Color.clear : Color.primary.opacity(0.07))
+            )
+    }
+}
+
+private struct RunningBar: View {
     @Environment(TimeTracker.self) private var tracker
     let entry: TimeEntry
     let task: TrackableTask
@@ -30,68 +49,48 @@ private struct RunningCard: View {
     @FocusState private var notesFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 7))
-                            .symbolEffect(.pulse, options: .repeating)
-                        Text("TRACKING")
-                            .font(.caption2.weight(.bold))
-                            .tracking(0.8)
-                    }
-                    .opacity(0.9)
-                    Text(task.task.name)
-                        .font(.title3.weight(.semibold))
-                        .lineLimit(2)
-                    Text(task.subtitle)
-                        .font(.subheadline)
-                        .lineLimit(1)
-                        .opacity(0.85)
-                }
-                Spacer(minLength: 8)
-                Button {
-                    Task { await tracker.pause() }
-                } label: {
-                    if tracker.busyKey == entry.key {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: "pause.fill")
-                    }
-                }
-                .buttonStyle(CircleButtonStyle(size: 52, fill: .white, glyph: .harvestOrange))
-                .keyboardShortcut(".", modifiers: .command)
-                .help("Pause timer (⌘.)")
-                .accessibilityLabel("Pause timer")
+        Bar(filled: true) {
+            Image(systemName: "circle.fill")
+                .font(.system(size: 7))
+                .symbolEffect(.pulse, options: .repeating)
+
+            VStack(alignment: .leading, spacing: 1) {
+                (Text(task.project.name).fontWeight(.semibold) + Text("  \(task.task.name)").foregroundStyle(.white.opacity(0.8)))
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                TextField("Notes", text: $notes, prompt: Text("Add notes…").foregroundStyle(.white.opacity(0.65)))
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .focusEffectDisabled()
+                    .focused($notesFocused)
+                    .onSubmit(save)
+                    .onChange(of: notesFocused) { _, focused in if !focused { save() } }
             }
+
+            Spacer(minLength: 4)
 
             TimelineView(.periodic(from: .now, by: 1)) { context in
-                HStack(alignment: .firstTextBaseline) {
-                    Text(TimeFormat.clock(entry.elapsed(at: context.date)))
-                        .font(.system(size: 34, weight: .semibold, design: .rounded).monospacedDigit())
-                    Spacer()
-                    Text("Today \(TimeFormat.hoursMinutes(tracker.todaySeconds(at: context.date)))")
-                        .font(.callout.weight(.medium).monospacedDigit())
-                        .opacity(0.85)
-                }
+                Text(TimeFormat.clock(entry.elapsed(at: context.date)))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
             }
 
-            TextField("Notes", text: $notes, prompt: Text("What are you working on?").foregroundStyle(.white.opacity(0.7)), axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.callout)
-                .lineLimit(1...3)
-                .focused($notesFocused)
-                .onSubmit(save)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.white.opacity(0.18)))
-                .onChange(of: notesFocused) { _, focused in if !focused { save() } }
+            Button {
+                Task { await tracker.pause() }
+            } label: {
+                if tracker.busyKey == entry.key {
+                    ProgressView().controlSize(.small).tint(.white)
+                } else {
+                    Image(systemName: "pause.fill")
+                }
+            }
+            .buttonStyle(CircleButtonStyle(size: 34, fill: .white, glyph: .harvestOrange))
+            .keyboardShortcut(".", modifiers: .command)
+            .help("Pause timer (⌘.)")
+            .accessibilityLabel("Pause timer")
         }
         .foregroundStyle(.white)
         .tint(.white)
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: Metrics.cardCorner, style: .continuous).fill(.harvestOrange))
         .onAppear { notes = entry.notes ?? "" }
     }
 
@@ -101,80 +100,54 @@ private struct RunningCard: View {
     }
 }
 
-private struct PausedCard: View {
+private struct PausedBar: View {
     @Environment(TimeTracker.self) private var tracker
     let entry: TimeEntry
     let task: TrackableTask
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Label("PAUSED", systemImage: "pause.fill")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.8)
-                    .foregroundStyle(.harvestOrange)
-                Text(task.task.name)
-                    .font(.title3.weight(.semibold))
-                    .lineLimit(2)
-                Text(task.subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        Bar {
+            Image(systemName: "pause.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.harvestOrange)
+            VStack(alignment: .leading, spacing: 1) {
+                (Text(task.project.name).fontWeight(.semibold) + Text("  \(task.task.name)").foregroundStyle(.secondary))
+                    .font(.system(size: 13))
                     .lineLimit(1)
-                Text("\(TimeFormat.hoursMinutes(entry.elapsed())) on this · Today \(TimeFormat.hoursMinutes(tracker.todaySeconds()))")
-                    .font(.caption.monospacedDigit())
+                Text("Paused at \(TimeFormat.hoursMinutes(entry.elapsed())) · Today \(TimeFormat.hoursMinutes(tracker.todaySeconds()))")
+                    .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(.secondary)
-                    .padding(.top, 4)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
             Button {
                 Task { await tracker.resume() }
             } label: {
                 if tracker.busyKey == entry.key {
                     ProgressView().controlSize(.small).tint(.white)
                 } else {
-                    Image(systemName: "play.fill").offset(x: 2)
+                    Image(systemName: "play.fill").offset(x: 1)
                 }
             }
-            .buttonStyle(CircleButtonStyle(size: 52))
+            .buttonStyle(CircleButtonStyle(size: 34))
             .help("Resume timer")
             .accessibilityLabel("Resume \(task.task.name)")
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: Metrics.cardCorner, style: .continuous).fill(Color.tileBackground))
-        .overlay(
-            RoundedRectangle(cornerRadius: Metrics.cardCorner, style: .continuous)
-                .strokeBorder(Color.harvestOrange.opacity(0.35), lineWidth: 1)
-        )
     }
 }
 
-private struct IdleCard: View {
+private struct IdleBar: View {
     @Environment(TimeTracker.self) private var tracker
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("No timer running")
-                    .font(.title3.weight(.semibold))
-                Text("Pick a task to start tracking")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        Bar {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("No timer running").font(.system(size: 13, weight: .semibold))
+                Text("Pick a task to start tracking").font(.system(size: 12)).foregroundStyle(.secondary)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 1) {
-                Text("TODAY")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.8)
-                    .foregroundStyle(.secondary)
-                Text(TimeFormat.hoursMinutes(tracker.todaySeconds()))
-                    .font(.system(size: 28, weight: .semibold, design: .rounded).monospacedDigit())
-            }
+            Text("Today \(TimeFormat.hoursMinutes(tracker.todaySeconds()))")
+                .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
+                .padding(.trailing, 4)
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: Metrics.cardCorner, style: .continuous).fill(Color.tileBackground))
-        .overlay(
-            RoundedRectangle(cornerRadius: Metrics.cardCorner, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
-        )
     }
 }

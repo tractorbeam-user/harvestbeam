@@ -131,6 +131,21 @@ public actor DemoHarvestService: HarvestService {
         }
     }
 
+    public func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?) async throws -> TimeEntry {
+        guard let a = assignments.first(where: { $0.project.id == projectID }),
+              let ta = a.taskAssignments.first(where: { $0.task.id == taskID })
+        else { throw HarvestError.server(status: 422, message: "Unknown task") }
+        return try replace(id) { e in
+            TimeEntry(id: e.id, spentDate: e.spentDate, project: NamedRef(id: a.project.id, name: a.project.name),
+                      task: ta.task, client: a.client, hours: hours ?? e.hours, hoursWithoutTimer: e.hoursWithoutTimer,
+                      notes: notes, isRunning: e.isRunning, timerStartedAt: e.timerStartedAt, createdAt: e.createdAt)
+        }
+    }
+
+    public func deleteEntry(id: Int) async throws {
+        entries.removeAll { $0.id == id }
+    }
+
     private func replace(_ id: Int, _ transform: (TimeEntry) -> TimeEntry) throws -> TimeEntry {
         guard let index = entries.firstIndex(where: { $0.id == id }) else {
             throw HarvestError.server(status: 404, message: "Entry not found")

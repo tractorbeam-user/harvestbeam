@@ -29,8 +29,8 @@ enum DebugSnapshots {
 
             if let field = firstTextField(in: window.contentView!) {
                 window.makeFirstResponder(field)
-                field.stringValue = "des"
-                field.currentEditor()?.string = "des"
+                field.stringValue = "de"
+                field.currentEditor()?.string = "de"
                 NotificationCenter.default.post(name: NSControl.textDidChangeNotification, object: field)
                 (field.currentEditor() as? NSTextView)?.didChangeText()
             }
@@ -44,6 +44,17 @@ enum DebugSnapshots {
             }
             await settle()
             write(window, to: url.appendingPathComponent("3-idle-\(suffix).png"))
+
+            // Sidebar with a folder, showing the Favorites slice.
+            UserDefaults.standard.set(true, forKey: "sidebarVisible")
+            let folder = tracker.favorites.createFolder(named: "Client work")
+            if let first = tracker.favorites.keys.first { tracker.favorites.file(first, in: folder) }
+            window.setContentSize(NSSize(width: 631, height: 680))
+            await settle()
+            write(window, to: url.appendingPathComponent("5-sidebar-\(suffix).png"))
+            tracker.favorites.deleteFolder(folder)
+            UserDefaults.standard.set(false, forKey: "sidebarVisible")
+            window.setContentSize(NSSize(width: 440, height: 680))
 
             tracker.signOut()
             await settle()
@@ -79,7 +90,7 @@ enum DebugSnapshots {
 
     private static func firstTextField(in view: NSView) -> NSTextField? {
         if let field = view as? NSTextField, field.isEditable, !(field is NSSecureTextField),
-           (field.placeholderString ?? field.placeholderAttributedString?.string ?? "").hasPrefix("Search") {
+           (field.placeholderString ?? field.placeholderAttributedString?.string ?? "").hasPrefix("Start something") {
             return field
         }
         for sub in view.subviews {

@@ -6,6 +6,9 @@ A small, native Harvest timer for the Mac menu bar, with the same app on iPhone 
 - **A real window**: it opens below the menu bar icon the first time. After that you can drag it anywhere and resize it, and it remembers where you left it. The gear menu has **Keep on Top** and **Move Below Menu Bar Icon**.
 - **Pause and resume**: the running timer has a big Pause button (⌘.), and when nothing is running, today's last entry shows a Resume button.
 - **Days and weeks**, like Harvest's own app: a week strip with each day's total, ‹ › to page weeks, ⌘[ / ⌘] for the previous or next day, and ⌘T for today. Each day lists its entries, and clicking one restarts it. Older weeks load from Harvest as you page back.
+- **Sidebar** (⌃⌘S or the sidebar button): Everything, Favorites, your own folders, and every client. Drag a tile onto a folder, or right-click a task and choose Move to Folder.
+- **Menu bar text**: shows what you're working on next to the timer. Gear → Menu Bar picks what appears (time, task, task and project, or notes), how long it can get, and whether it cuts off the end or the middle.
+- **Search** sits in the bottom bar, and results are a compact list grouped by client, with `[CODE] Project · Task` on each line. ⌘A, ⌘C and ⌘V work in every field.
 - **Tiles**: Favorites, Recent and Suggested are large click and tap targets in a grid that adds columns as the window gets wider.
 - **Favorites**: star any task to pin it. Favorites sync between devices through iCloud when the app is signed (see below).
 - **Recent**: your last few distinct tasks, taken from your Harvest history, so they're the same on every device.
