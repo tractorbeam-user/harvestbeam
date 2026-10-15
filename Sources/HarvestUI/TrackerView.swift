@@ -477,6 +477,7 @@ private struct FooterButton: View {
 /// Orange title bar: the selected day and its week total in the middle, then
 /// Today and keyboard help on the right. The traffic lights sit on the left.
 private struct TitleBar: View {
+    static let barTrailing = Color(red: 0.92, green: 0.32, blue: 0.16)
     @Environment(TimeTracker.self) private var tracker
     @Binding var selectedDay: LocalDate
     @State private var showingHelp = false
@@ -500,6 +501,15 @@ private struct TitleBar: View {
                         withAnimation(.snappy(duration: 0.2)) { selectedDay = today }
                     } label: {
                         Image(systemName: "\(Calendar.current.component(.day, from: .now)).calendar")
+                            // Harvest's "jump to today" mark: an up arrow on the
+                            // calendar's corner, cut out of the bar behind it.
+                            .overlay(alignment: .bottomTrailing) {
+                                Image(systemName: "arrow.up")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .padding(1.5)
+                                    .background(Circle().fill(Self.barTrailing))
+                                    .offset(x: 4, y: 4)
+                            }
                     }
                     .buttonStyle(TitleBarButtonStyle())
                     .keyboardShortcut("t", modifiers: .command)
@@ -520,7 +530,7 @@ private struct TitleBar: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             LinearGradient(
-                colors: [Color(red: 0.95, green: 0.45, blue: 0.20), Color(red: 0.92, green: 0.32, blue: 0.16)],
+                colors: [Color(red: 0.95, green: 0.45, blue: 0.20), Self.barTrailing],
                 startPoint: .leading, endPoint: .trailing
             )
         )
