@@ -182,10 +182,9 @@ private struct EntryRow: View {
     @State private var isConfirmingDelete = false
 
     var body: some View {
-        Button {
-            Task { await tracker.toggle(entry) }
-        } label: {
-            HStack(spacing: 12) {
+        // Double-click (or double-tap) edits; only the round button starts or
+        // pauses, so a double-click never toggles the timer by accident.
+        HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     if let client = task.client?.name {
                         Text(client)
@@ -221,15 +220,22 @@ private struct EntryRow: View {
                 }
                 .font(.system(size: 20, weight: .medium, design: .rounded).monospacedDigit())
 
-                actionIndicator
+                Button {
+                    Task { await tracker.toggle(entry) }
+                } label: {
+                    actionIndicator
+                }
+                .buttonStyle(.plain)
+                .help(entry.isRunning ? "Pause timer" : "Start timer")
+                .accessibilityLabel(entry.isRunning ? "Pause timer" : "Start timer")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .frame(minHeight: 66)
             .background(background)
             .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+            .onTapGesture(count: 2) { isEditing = true }
+            .help("Double-click to edit")
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
@@ -244,13 +250,13 @@ private struct EntryRow: View {
                 if let url = tracker.harvestURL(for: entry.spentDate) { openURL(url) }
             }
         }
-        .sheet(isPresented: $isEditing) { EntryEditor(entry: entry) }
+        .popover(isPresented: $isEditing, arrowEdge: .bottom) { NewEntryEditor(day: entry.spentDate, entry: entry) }
         .confirmationDialog("Delete this entry?", isPresented: $isConfirmingDelete) {
             Button("Delete Entry", role: .destructive) { Task { await tracker.deleteEntry(entry) } }
         } message: {
             Text("\(task.project.name) · \(task.task.name), \(TimeFormat.hoursMinutes(entry.elapsed())). This also deletes it in Harvest.")
         }
-        .accessibilityHint(entry.isRunning ? "Pauses the timer" : "Restarts this entry's timer")
+        .accessibilityAction(named: "Edit Entry") { isEditing = true }
     }
 
     private var background: Color {
