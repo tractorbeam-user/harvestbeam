@@ -146,8 +146,24 @@ public final class TimeTracker {
         Ranking.recent(from: entries, excluding: favorites.set, limit: 4).compactMap { tasksByKey[$0] }
     }
 
+    /// Tasks removed from Suggested; the next best ones take their place.
+    public private(set) var hiddenSuggestions: Set<TaskKey> = Set(
+        (UserDefaults.standard.stringArray(forKey: TimeTracker.hiddenSuggestionsKey) ?? []).compactMap(TaskKey.init)
+    )
+    private static let hiddenSuggestionsKey = "hiddenSuggestions.v1"
+
+    public func hideSuggestion(_ key: TaskKey) {
+        hiddenSuggestions.insert(key)
+        UserDefaults.standard.set(hiddenSuggestions.map(\.description), forKey: Self.hiddenSuggestionsKey)
+    }
+
+    public func showHiddenSuggestions() {
+        hiddenSuggestions = []
+        UserDefaults.standard.removeObject(forKey: Self.hiddenSuggestionsKey)
+    }
+
     public var suggestedTasks: [TrackableTask] {
-        let shown = favorites.set.union(recentTasks.map(\.key))
+        let shown = favorites.set.union(recentTasks.map(\.key)).union(hiddenSuggestions)
         let assignable = usage.filter { tasksByKey[$0.key] != nil }
         return Ranking.suggested(scores: assignable, excluding: shown, limit: 4).compactMap { tasksByKey[$0] }
     }

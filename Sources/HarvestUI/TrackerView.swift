@@ -138,7 +138,12 @@ struct TrackerView: View {
                             spacing: Metrics.spacing
                         ) {
                             ForEach(section.tasks) { task in
-                                TaskTile(task: task, isSelected: selection == task.key, showsStar: section.id != "favorites")
+                                TaskTile(
+                                    task: task, isSelected: selection == task.key, showsStar: section.id != "favorites",
+                                    onRemove: section.id == "suggested"
+                                        ? { withAnimation(.snappy(duration: 0.2)) { tracker.hideSuggestion(task.key) } }
+                                        : nil
+                                )
                                     .id(task.key)
                             }
                         }
@@ -337,6 +342,9 @@ struct TrackerView: View {
                     ))
                     Button("Move Below Menu Bar Icon") { windowActions.snapToMenuBar() }
                     Button("Reset Window Size") { windowActions.resetSize() }
+                    if !tracker.hiddenSuggestions.isEmpty {
+                        Button("Show Removed Suggestions") { tracker.showHiddenSuggestions() }
+                    }
                     Divider()
                 }
                 Menu("Menu Bar") {

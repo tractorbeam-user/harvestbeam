@@ -10,6 +10,8 @@ struct TaskTile: View {
     var isSelected = false
     /// Off in Favorites, where every tile is already starred.
     var showsStar = true
+    /// Set in Suggested: an × on hover removes the task from that list.
+    var onRemove: (() -> Void)?
     @State private var isHovered = false
 
     private var isBusy: Bool { tracker.busyKey == task.key }
@@ -38,6 +40,9 @@ struct TaskTile: View {
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: isFavorite ? "star.slash" : "star") {
                 tracker.favorites.toggle(task.key)
             }
+            if let onRemove {
+                Button("Remove from Suggested", systemImage: "xmark", action: onRemove)
+            }
         }
         .help([task.client?.name, task.projectCode].compactMap { $0 }.joined(separator: " · "))
         .accessibilityLabel("\(task.project.name), \(task.task.name), \(task.client?.name ?? "")")
@@ -61,6 +66,18 @@ struct TaskTile: View {
             }
             .lineLimit(1)
             Spacer(minLength: 0)
+            if let onRemove, isHovered, !isRunning {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Remove from Suggested")
+                .accessibilityLabel("Remove \(task.task.name) from Suggested")
+            }
             if showsStar && (isHovered || isFavorite) { favoriteButton }
             actionIndicator
         }
