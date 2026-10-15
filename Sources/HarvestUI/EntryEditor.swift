@@ -31,6 +31,7 @@ struct NewEntryEditor: View {
     @State private var notes = ""
     @State private var hours = ""
     @State private var isSaving = false
+    @State private var isFavoriteHovered = false
 
     private var isToday: Bool { day == LocalDate() }
     private var parsedHours: Double? { EntryEditor.parseHours(hours) }
@@ -54,9 +55,9 @@ struct NewEntryEditor: View {
 
             VStack(spacing: 10) {
                 VStack(spacing: 0) {
-                    projectMenu
+                    projectMenu.hoverHighlight(corners: [.topLeft, .topRight])
                     Divider().padding(.leading, 10)
-                    taskMenu
+                    taskMenu.hoverHighlight(corners: [.bottomLeft, .bottomRight])
                 }
                 .background(fieldBackground)
 
@@ -69,14 +70,16 @@ struct NewEntryEditor: View {
                         .padding(.vertical, 9)
                         .frame(maxWidth: .infinity, minHeight: 50, alignment: .topLeading)
                         .background(fieldBackground)
+                        .hoverOutline()
+                    // Big and centered so the time fills its box, like Harvest's.
                     TextField("Hours", text: $hours, prompt: Text("0:00"))
                         .textFieldStyle(.plain)
                         .multilineTextAlignment(.trailing)
-                        .font(.system(size: 15, weight: .medium).monospacedDigit())
+                        .font(.system(size: 22, weight: .light).monospacedDigit())
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 9)
-                        .frame(width: 72, height: 50, alignment: .topTrailing)
+                        .frame(width: 84, height: 50)
                         .background(fieldBackground)
+                        .hoverOutline()
                         .focused($hoursFocused)
                         .disabled(isTimerRunning)
                         .help(isTimerRunning ? "Pause the timer to change hours"
@@ -93,9 +96,14 @@ struct NewEntryEditor: View {
                     Label("Favorite", systemImage: isFavorite ? "star.fill" : "star")
                         .font(.system(size: 12, weight: .medium))
                         .fixedSize()
-                        .foregroundStyle(isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.secondary))
+                        .foregroundStyle(isFavorite || isFavoriteHovered ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.secondary))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.harvestOrange.opacity(isFavoriteHovered ? 0.1 : 0)))
                 }
                 .buttonStyle(.plain)
+                .onHover { isFavoriteHovered = $0 }
+                .padding(.leading, -8)
                 .disabled(taskKey == nil)
                 .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
                 Spacer()
@@ -225,6 +233,7 @@ struct NewEntryEditor: View {
 struct PillButtonStyle: ButtonStyle {
     let prominent: Bool
     @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovered = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -234,10 +243,13 @@ struct PillButtonStyle: ButtonStyle {
             .frame(height: 30)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(prominent ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.primary.opacity(0.07)))
+                    .fill(prominent ? AnyShapeStyle(isHovered && isEnabled ? Color(red: 0.86, green: 0.31, blue: 0) : Color.harvestOrange)
+                          : AnyShapeStyle(Color.primary.opacity(isHovered && isEnabled ? 0.12 : 0.07)))
             )
             .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.45)
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 }
 
@@ -245,3 +257,41 @@ struct PillButtonStyle: ButtonStyle {
 /// For offscreen snapshots of the New Entry popover.
 public func debugNewEntryEditor() -> some View { NewEntryEditor(day: LocalDate()) }
 #endif
+
+/// Hover feedback for the entry popover's fields and menus.
+private struct HoverHighlight: ViewModifier {
+    var corners: RectCorners = .all
+    var outline = false
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                UnevenRoundedRectangle(cornerRadii: corners.radii(8), style: .continuous)
+                    .fill(Color.primary.opacity(!outline && isHovered ? 0.05 : 0))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(outline && isHovered ? 0.18 : 0))
+            )
+            .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isHovered)
+    }
+}
+
+struct RectCorners: OptionSet {
+    let rawValue: Int
+    static let topLeft = RectCorners(rawValue: 1), topRight = RectCorners(rawValue: 2)
+    static let bottomLeft = RectCorners(rawValue: 4), bottomRight = RectCorners(rawValue: 8)
+    static let all: RectCorners = [.topLeft, .topRight, .bottomLeft, .bottomRight]
+
+    func radii(_ r: CGFloat) -> RectangleCornerRadii {
+        RectangleCornerRadii(topLeading: contains(.topLeft) ? r : 0, bottomLeading: contains(.bottomLeft) ? r : 0,
+                             bottomTrailing: contains(.bottomRight) ? r : 0, topTrailing: contains(.topRight) ? r : 0)
+    }
+}
+
+extension View {
+    fileprivate func hoverHighlight(corners: RectCorners = .all) -> some View { modifier(HoverHighlight(corners: corners)) }
+    fileprivate func hoverOutline() -> some View { modifier(HoverHighlight(outline: true)) }
+}

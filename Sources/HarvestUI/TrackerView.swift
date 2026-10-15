@@ -26,6 +26,8 @@ struct TrackerView: View {
     @State private var pickedProject: Int?
     @State private var isAddingEntry = false
     @State private var isPlanning = false
+    /// Search starts as an icon and opens into a field when you need it.
+    @State private var isSearchOpen = false
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
@@ -109,7 +111,10 @@ struct TrackerView: View {
             .onChange(of: tracker.focusRequest, initial: true) {
                 query = ""
                 selection = nil
-                Task { searchFocused = true }
+                isSearchOpen = false
+            }
+            .onChange(of: searchFocused) { _, focused in
+                if !focused && query.isEmpty { withAnimation(.snappy(duration: 0.2)) { isSearchOpen = false } }
             }
     }
 
@@ -247,13 +252,22 @@ struct TrackerView: View {
             bottomBar(flat)
         }
         .background {
-            // Pause the running timer from the keyboard.
-            Button("") { Task { await tracker.pause() } }
-                .keyboardShortcut(".", modifiers: .command)
-                .disabled(tracker.running == nil)
-                .opacity(0)
-                .accessibilityHidden(true)
+            // Pause the running timer, or open search, from the keyboard.
+            Group {
+                Button("") { Task { await tracker.pause() } }
+                    .keyboardShortcut(".", modifiers: .command)
+                    .disabled(tracker.running == nil)
+                Button("") { openSearch() }
+                    .keyboardShortcut("f", modifiers: .command)
+            }
+            .opacity(0)
+            .accessibilityHidden(true)
         }
+    }
+
+    private func openSearch() {
+        withAnimation(.snappy(duration: 0.2)) { isSearchOpen = true }
+        Task { searchFocused = true }
     }
 
     private func searchField(_ flat: [TrackableTask]) -> some View {
@@ -352,8 +366,14 @@ struct TrackerView: View {
                 .keyboardShortcut("p", modifiers: .command)
                 .popover(isPresented: $isPlanning, arrowEdge: .top) { PlanDayView(day: selectedDay) }
                 .padding(.trailing, 2)
-            searchField(flat)
-                .padding(.trailing, 6)
+            if isSearchOpen || !query.isEmpty {
+                searchField(flat)
+                    .padding(.trailing, 6)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
+            } else {
+                FooterButton(systemImage: "magnifyingglass", help: "Search tasks (⌘F)") { openSearch() }
+                Spacer()
+            }
 
             FooterButton(systemImage: "arrow.clockwise", help: "Refresh (⌘R)") {
                 Task { await tracker.refresh(force: true) }

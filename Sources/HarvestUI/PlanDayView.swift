@@ -5,8 +5,9 @@ import AppKit
 #endif
 
 /// "What are you working on?" Type (or dictate) the day in plain words; the
-/// on-device model proposes entries, you adjust them, and they're added in one
-/// go. Entries without hours start a timer when the day is today.
+/// on-device model proposes entries, you adjust them, and they're added to the
+/// day you're viewing in one go. Entries without hours are added at 0:00, so
+/// you can plan ahead and press play when you start each one.
 struct PlanDayView: View {
     @Environment(TimeTracker.self) private var tracker
     @Environment(\.dismiss) private var dismiss
@@ -24,18 +25,22 @@ struct PlanDayView: View {
     private var isToday: Bool { day == LocalDate() }
     private var included: [PlannedEntry] { proposals.filter { !excluded.contains($0.id) } }
 
-    /// Included entries that would be logged (with hours) or timed (without, today only).
-    private var ready: [(entry: PlannedEntry, hours: Double?)] {
+    /// Included entries with their hours: empty means a 0:00 placeholder.
+    private var ready: [(entry: PlannedEntry, hours: Double)] {
         included.compactMap { entry in
             let typed = hours[entry.id]?.trimmingCharacters(in: .whitespaces) ?? ""
-            if typed.isEmpty { return isToday ? (entry, nil) : nil }
+            if typed.isEmpty { return (entry, 0) }
             return EntryEditor.parseHours(typed).map { (entry, $0) }
         }
     }
 
+    private var isPast: Bool { day < LocalDate() }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(isToday ? "What are you working on today?" : "What did you work on · \(day.dayTitle(today: LocalDate()))")
+            Text(isToday ? "What are you working on today?"
+                 : isPast ? "What did you work on · \(day.dayTitle(today: LocalDate()))"
+                 : "What will you work on · \(day.dayTitle(today: LocalDate()))")
                 .font(.system(size: 13, weight: .semibold))
                 .frame(maxWidth: .infinity)
 
@@ -111,13 +116,8 @@ struct PlanDayView: View {
     }
 
     private var addLabel: String {
-        let timers = ready.filter { $0.hours == nil }.count
-        let logged = ready.count - timers
-        switch (logged, timers) {
-        case (0, _): return "Start Timer"
-        case (_, 0): return logged == 1 ? "Add Entry" : "Add \(logged) Entries"
-        default: return "Add \(logged) & Start Timer"
-        }
+        let target = isToday ? "Today" : day.dayTitle(today: LocalDate()).components(separatedBy: ",").first ?? "Day"
+        return ready.count == 1 ? "Add to \(target)" : "Add \(ready.count) to \(target)"
     }
 
     private func row(_ entry: Binding<PlannedEntry>) -> some View {
@@ -164,15 +164,15 @@ struct PlanDayView: View {
             Spacer(minLength: 6)
 
             TextField("Hours", text: Binding(get: { hours[id] ?? "" }, set: { hours[id] = $0 }),
-                      prompt: Text(isToday ? "timer" : "0:00"))
+                      prompt: Text("0:00"))
                 .textFieldStyle(.plain)
                 .multilineTextAlignment(.trailing)
                 .font(.system(size: 13, weight: .medium).monospacedDigit())
-                .frame(width: 52)
+                .frame(width: 60)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 5)
                 .background(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.12)))
-                .help(isToday ? "h:mm or decimal. Leave empty to start a timer." : "h:mm or decimal")
+                .help("h:mm or decimal. Leave empty to add it at 0:00 and press play when you start.")
                 .disabled(!isIncluded)
         }
         .padding(.horizontal, 10)
@@ -222,16 +222,13 @@ struct PlanDayView: View {
         }
     }
 
-    /// Logs the entries with hours, then starts the first timer one (today).
+    /// Adds every entry to the day; none of them starts a timer.
     private func add() {
         let items = ready
         isSaving = true
         Task {
-            for item in items where item.hours != nil {
+            for item in items {
                 await tracker.addEntry(task: item.entry.task, on: day, notes: item.entry.notes, hours: item.hours)
-            }
-            if let timer = items.first(where: { $0.hours == nil }) {
-                await tracker.addEntry(task: timer.entry.task, on: day, notes: timer.entry.notes, hours: nil)
             }
             isSaving = false
             dismiss()
