@@ -266,9 +266,8 @@ private struct EntryRow: View {
 
     @ViewBuilder private var actionIndicator: some View {
         Group {
-            if tracker.busyKey == entry.key {
-                ProgressView().controlSize(.small)
-            } else if entry.isRunning {
+            // While Harvest confirms, show the state you asked for, not a spinner.
+            if tracker.busyKey == entry.key ? !entry.isRunning : entry.isRunning {
                 Image(systemName: "pause.fill")
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)

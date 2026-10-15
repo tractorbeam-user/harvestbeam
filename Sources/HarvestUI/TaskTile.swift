@@ -12,8 +12,13 @@ struct TaskTile: View {
     var showsStar = true
     @State private var isHovered = false
 
-    private var isRunning: Bool { tracker.running?.key == task.key }
     private var isBusy: Bool { tracker.busyKey == task.key }
+    /// Shows the state you just asked for while Harvest confirms it, instead
+    /// of a spinner.
+    private var isRunning: Bool {
+        let running = tracker.running?.key == task.key
+        return isBusy ? !running : running
+    }
     private var isFavorite: Bool { tracker.favorites.contains(task.key) }
 
     var body: some View {
@@ -68,9 +73,7 @@ struct TaskTile: View {
 
     @ViewBuilder private var actionIndicator: some View {
         Group {
-            if isBusy {
-                ProgressView().controlSize(.small).tint(isRunning ? .white : nil)
-            } else if isRunning {
+            if isRunning {
                 Image(systemName: "pause.fill")
                     .foregroundStyle(.harvestOrange)
                     .background(Circle().fill(.white).frame(width: indicatorSize, height: indicatorSize))
