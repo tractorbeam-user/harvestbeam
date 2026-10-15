@@ -336,6 +336,7 @@ struct TrackerView: View {
                         set: { windowActions.setKeptOnTop($0) }
                     ))
                     Button("Move Below Menu Bar Icon") { windowActions.snapToMenuBar() }
+                    Button("Reset Window Size") { windowActions.resetSize() }
                     Divider()
                 }
                 Menu("Menu Bar") {

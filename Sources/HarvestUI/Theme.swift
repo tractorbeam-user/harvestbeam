@@ -67,6 +67,7 @@ struct CircleButtonStyle: ButtonStyle {
 public struct WindowActions: Sendable {
     public var close: @MainActor @Sendable () -> Void
     public var snapToMenuBar: @MainActor @Sendable () -> Void
+    public var resetSize: @MainActor @Sendable () -> Void
     public var isKeptOnTop: @MainActor @Sendable () -> Bool
     public var setKeptOnTop: @MainActor @Sendable (Bool) -> Void
     public var setTitle: @MainActor @Sendable (String) -> Void
@@ -74,12 +75,14 @@ public struct WindowActions: Sendable {
     public init(
         close: @escaping @MainActor @Sendable () -> Void,
         snapToMenuBar: @escaping @MainActor @Sendable () -> Void,
+        resetSize: @escaping @MainActor @Sendable () -> Void,
         isKeptOnTop: @escaping @MainActor @Sendable () -> Bool,
         setKeptOnTop: @escaping @MainActor @Sendable (Bool) -> Void,
         setTitle: @escaping @MainActor @Sendable (String) -> Void
     ) {
         self.close = close
         self.snapToMenuBar = snapToMenuBar
+        self.resetSize = resetSize
         self.isKeptOnTop = isKeptOnTop
         self.setKeptOnTop = setKeptOnTop
         self.setTitle = setTitle

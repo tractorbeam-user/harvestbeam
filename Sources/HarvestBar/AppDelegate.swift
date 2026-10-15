@@ -100,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let windowItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        windowMenu.addItem(withTitle: "Reset Window Size", action: #selector(resetPanelSize), keyEquivalent: "0")
         windowItem.submenu = windowMenu
         main.addItem(windowItem)
 
@@ -110,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func makePanel() {
         panel = TrackerPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 680),
+            contentRect: NSRect(origin: .zero, size: Self.defaultSize),
             styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -136,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let actions = WindowActions(
             close: { [weak self] in self?.hidePanel() },
             snapToMenuBar: { [weak self] in self?.placeBelowStatusItem() },
+            resetSize: { [weak self] in self?.resetPanelSize() },
             isKeptOnTop: { [weak self] in self?.panel.level == .floating },
             setKeptOnTop: { [weak self] in self?.setKeptOnTop($0) },
             setTitle: { [weak self] in self?.panel.title = $0 }
@@ -206,6 +208,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         tracker.errorMessage = nil
         // Hand focus straight back to whatever you were working in.
         NSApp.hide(nil)
+    }
+
+    static let defaultSize = NSSize(width: 440, height: 680)
+
+    /// Back to the default size, keeping the window's top-left corner put.
+    @objc func resetPanelSize() {
+        let content = panel.frameRect(forContentRect: NSRect(origin: .zero, size: Self.defaultSize)).size
+        var frame = panel.frame
+        frame.origin.y += frame.height - content.height
+        frame.size = content
+        panel.setFrame(frame, display: true, animate: true)
+    }
+
+    /// The green button toggles between your size and the default one.
+    func windowWillUseStandardFrame(_ window: NSWindow, defaultFrame newFrame: NSRect) -> NSRect {
+        let content = window.frameRect(forContentRect: NSRect(origin: .zero, size: Self.defaultSize)).size
+        var frame = window.frame
+        frame.origin.y += frame.height - content.height
+        frame.size = content
+        return frame
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
