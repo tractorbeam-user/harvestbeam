@@ -179,7 +179,6 @@ private struct EntryRow: View {
     @Environment(\.openURL) private var openURL
     @State private var isHovered = false
     @State private var isEditing = false
-    @State private var isConfirmingDelete = false
 
     var body: some View {
         // Double-click (or double-tap) edits; only the round button starts or
@@ -244,18 +243,13 @@ private struct EntryRow: View {
             Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
                 Task { await tracker.toggle(entry) }
             }
-            Button("Delete Entry", role: .destructive) { isConfirmingDelete = true }
+            Button("Delete Entry", role: .destructive) { Task { await tracker.deleteEntry(entry) } }
             Divider()
             Button("View in Harvest") {
                 if let url = tracker.harvestURL(for: entry.spentDate) { openURL(url) }
             }
         }
         .popover(isPresented: $isEditing, arrowEdge: .bottom) { NewEntryEditor(day: entry.spentDate, entry: entry) }
-        .confirmationDialog("Delete this entry?", isPresented: $isConfirmingDelete) {
-            Button("Delete Entry", role: .destructive) { Task { await tracker.deleteEntry(entry) } }
-        } message: {
-            Text("\(task.project.name) · \(task.task.name), \(TimeFormat.hoursMinutes(entry.elapsed())). This also deletes it in Harvest.")
-        }
         .accessibilityAction(named: "Edit Entry") { isEditing = true }
     }
 

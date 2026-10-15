@@ -204,6 +204,9 @@ struct TrackerView: View {
             if let error = tracker.errorMessage {
                 ErrorBanner(message: error) { tracker.errorMessage = nil }
             }
+            if let deleted = tracker.lastDeleted {
+                UndoBanner(entry: deleted, task: tracker.task(for: deleted))
+            }
 
             Divider()
             bottomBar(flat)
@@ -393,6 +396,10 @@ struct TrackerView: View {
                         ErrorBanner(message: error) { tracker.errorMessage = nil }
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
+                    if let deleted = tracker.lastDeleted {
+                        UndoBanner(entry: deleted, task: tracker.task(for: deleted))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
                     if !isSearching { DayView(selectedDay: $selectedDay) }
                     content(sections)
                 }
@@ -430,6 +437,37 @@ private struct SectionLabelStyle: LabelStyle {
             configuration.title.foregroundStyle(.secondary)
         }
         .font(.subheadline.weight(.semibold))
+    }
+}
+
+/// "Deleted … · Undo", shown after deleting an entry instead of asking first.
+/// Goes away on its own after a few seconds.
+private struct UndoBanner: View {
+    @Environment(TimeTracker.self) private var tracker
+    let entry: TimeEntry
+    let task: TrackableTask
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "trash").foregroundStyle(.secondary)
+            Text("Deleted \(task.project.name) · \(TimeFormat.hoursMinutes(entry.elapsed()))")
+                .font(.callout)
+                .lineLimit(1)
+            Spacer()
+            Button("Undo") { Task { await tracker.undoDelete() } }
+                .buttonStyle(SoftPillButtonStyle())
+                .keyboardShortcut("z", modifiers: .command)
+            Button { tracker.lastDeleted = nil } label: { Image(systemName: "xmark") }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Dismiss")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.05))
+        .task(id: entry.id) {
+            try? await Task.sleep(for: .seconds(8))
+            if tracker.lastDeleted?.id == entry.id { tracker.lastDeleted = nil }
+        }
     }
 }
 

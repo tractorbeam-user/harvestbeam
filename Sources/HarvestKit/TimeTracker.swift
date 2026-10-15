@@ -29,6 +29,8 @@ public final class TimeTracker {
     public private(set) var isRefreshing = false
     /// The task whose start/stop request is in flight.
     public private(set) var busyKey: TaskKey?
+    /// The entry most recently deleted, until it's undone or dismissed.
+    public var lastDeleted: TimeEntry?
     public var errorMessage: String?
     /// Bumped whenever the panel opens so the search field can grab focus.
     public private(set) var focusRequest = 0
@@ -325,6 +327,28 @@ public final class TimeTracker {
         do {
             try await service.deleteEntry(id: entry.id)
             entries = entries.filter { $0.id != entry.id }
+            lastDeleted = entry
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Puts the last deleted entry back: same task, day, notes and hours, and
+    /// its timer running again if it was. Harvest gives it a new ID.
+    public func undoDelete() async {
+        guard let service, let entry = lastDeleted else { return }
+        lastDeleted = nil
+        do {
+            var restored = try await service.createEntry(
+                projectID: entry.project.id, taskID: entry.task.id, spentDate: entry.spentDate,
+                notes: entry.notes, hours: entry.elapsed() / 3600
+            )
+            if entry.isRunning {
+                if let current = running { upsert(try await service.stopTimer(id: current.id)) }
+                restored = try await service.restartTimer(id: restored.id)
+            }
+            upsert(restored)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
