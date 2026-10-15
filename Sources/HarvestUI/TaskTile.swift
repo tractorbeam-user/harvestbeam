@@ -61,7 +61,7 @@ struct TaskTile: View {
             }
             .lineLimit(1)
             Spacer(minLength: 0)
-            if showsStar && (isHovered || isFavorite) && !isRunning { favoriteButton }
+            if showsStar && (isHovered || isFavorite) { favoriteButton }
             actionIndicator
         }
         .padding(.leading, 11)
@@ -93,13 +93,19 @@ struct TaskTile: View {
         } label: {
             Image(systemName: isFavorite ? "star.fill" : "star")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary))
+                .foregroundStyle(starStyle)
                 .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
         .accessibilityLabel(isFavorite ? "Remove \(task.task.name) from Favorites" : "Add \(task.task.name) to Favorites")
+    }
+
+    /// White on the orange running tile, orange when starred, faint otherwise.
+    private var starStyle: AnyShapeStyle {
+        if isRunning { return AnyShapeStyle(.white.opacity(isFavorite ? 1 : 0.7)) }
+        return isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary)
     }
 
     /// "[LP-DP-01] LP Analyst" → ("LP-DP-01", "LP Analyst"), so the code gets
