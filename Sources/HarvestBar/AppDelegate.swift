@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.target = self
-            button.action = #selector(togglePanel)
+            button.action = #selector(statusItemClicked)
             button.imagePosition = .imageLeading
             button.setAccessibilityTitle("Harvest Bar")
         }
@@ -141,6 +141,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.setFrameAutosaveName(Self.frameName)
     }
 
+    /// The menu bar icon opens the window, or hides it whenever it's showing,
+    /// even if another app is in front.
+    @objc func statusItemClicked() {
+        if panel.isVisible && !panel.isMiniaturized {
+            hidePanel()
+        } else {
+            showPanel()
+        }
+    }
+
+    /// ⌥H: bring the window forward, or hide it if it's already focused.
     @objc func togglePanel() {
         if panel.isVisible && panel.isKeyWindow && NSApp.isActive {
             hidePanel()
@@ -156,6 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         NSApp.unhide(nil)
         NSApp.activate()
+        if panel.isMiniaturized { panel.deminiaturize(nil) }
         panel.makeKeyAndOrderFront(nil)
         tracker.didAppear()
     }

@@ -108,6 +108,20 @@ public actor DemoHarvestService: HarvestService {
         return entry
     }
 
+    public func createEntry(projectID: Int, taskID: Int, spentDate: LocalDate, notes: String?, hours: Double) async throws -> TimeEntry {
+        guard let a = assignments.first(where: { $0.project.id == projectID }),
+              let ta = a.taskAssignments.first(where: { $0.task.id == taskID })
+        else { throw HarvestError.server(status: 422, message: "Unknown task") }
+        nextID += 1
+        let entry = TimeEntry(
+            id: nextID, spentDate: spentDate,
+            project: NamedRef(id: a.project.id, name: a.project.name), task: ta.task, client: a.client,
+            hours: hours, hoursWithoutTimer: hours, notes: notes, isRunning: false, timerStartedAt: nil
+        )
+        entries.append(entry)
+        return entry
+    }
+
     public func restartTimer(id: Int) async throws -> TimeEntry {
         try replace(id) { e in
             TimeEntry(id: e.id, spentDate: e.spentDate, project: e.project, task: e.task, client: e.client,

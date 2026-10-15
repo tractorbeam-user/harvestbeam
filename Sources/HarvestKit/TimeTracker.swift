@@ -287,6 +287,26 @@ public final class TimeTracker {
         }
     }
 
+    /// Adds an entry to `day`: a running timer when no hours are given (today
+    /// only), otherwise a stopped entry with those hours.
+    public func addEntry(task: TrackableTask, on day: LocalDate, notes: String, hours: Double?) async {
+        guard let service, busyKey == nil else { return }
+        busyKey = task.key
+        defer { busyKey = nil }
+        let notes = notes.isEmpty ? nil : notes
+        do {
+            if let hours {
+                upsert(try await service.createEntry(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes, hours: hours))
+            } else {
+                if let current = running { upsert(try await service.stopTimer(id: current.id)) }
+                upsert(try await service.startTimer(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes))
+            }
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     public func deleteEntry(_ entry: TimeEntry) async {
         guard let service else { return }
         do {

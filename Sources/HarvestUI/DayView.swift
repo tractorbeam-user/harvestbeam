@@ -68,11 +68,11 @@ private struct WeekStrip: View {
                 }
 
                 HStack(spacing: 0) {
-                    arrow("chevron.left", help: "Previous week") { select(selectedDay.adding(days: -7)) }
+                    arrow("chevron.left", help: "Previous day (⌘[)") { select(selectedDay.adding(days: -1)) }
                     ForEach(0..<7, id: \.self) { offset in
                         dayButton(weekStart.adding(days: offset), today: today, now: context.date)
                     }
-                    arrow("chevron.right", help: "Next week") { select(selectedDay.adding(days: 7)) }
+                    arrow("chevron.right", help: "Next day (⌘])") { select(selectedDay.adding(days: 1)) }
                 }
             }
         }
@@ -137,15 +137,22 @@ private struct WeekStrip: View {
 private struct DayEntriesList: View {
     @Environment(TimeTracker.self) private var tracker
     let day: LocalDate
+    @State private var isAdding = false
 
     var body: some View {
         let entries = tracker.entries(on: day)
         Group {
             if entries.isEmpty {
-                Text(day == LocalDate() ? "Nothing tracked yet today" : "No time tracked")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 56)
+                VStack(spacing: 8) {
+                    Text(day == LocalDate() ? "Nothing tracked yet today" : "No time tracked")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button("New Entry", systemImage: "plus") { isAdding = true }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                }
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .padding(.vertical, 14)
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
@@ -160,6 +167,7 @@ private struct DayEntriesList: View {
         .background(RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous).fill(Color.tileBackground))
         .overlay(RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
         .clipShape(RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous))
+        .sheet(isPresented: $isAdding) { NewEntryEditor(day: day) }
     }
 }
 

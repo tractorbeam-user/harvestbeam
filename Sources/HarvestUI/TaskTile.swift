@@ -42,7 +42,13 @@ struct TaskTile: View {
     private var content: some View {
         HStack(spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(task.project.name)
+                let (code, name) = Self.splitCode(task.project.name)
+                if let code {
+                    Text(code)
+                        .font(.system(size: codeFont, weight: .medium).monospaced())
+                        .opacity(0.55)
+                }
+                Text(name)
                     .font(.system(size: titleFont, weight: .semibold))
                 Text(task.task.name)
                     .font(.system(size: subtitleFont))
@@ -55,7 +61,8 @@ struct TaskTile: View {
         }
         .padding(.leading, 11)
         .padding(.trailing, 7)
-        .frame(maxWidth: .infinity, minHeight: Metrics.tileHeight, alignment: .leading)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, minHeight: Metrics.tileHeight, maxHeight: .infinity, alignment: .leading)
         .foregroundStyle(isRunning ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
     }
 
@@ -92,11 +99,23 @@ struct TaskTile: View {
         .accessibilityLabel(isFavorite ? "Remove \(task.task.name) from Favorites" : "Add \(task.task.name) to Favorites")
     }
 
+    /// "[LP-DP-01] LP Analyst" → ("LP-DP-01", "LP Analyst"), so the code gets
+    /// its own line instead of crowding out the name.
+    static func splitCode(_ projectName: String) -> (code: String?, name: String) {
+        guard projectName.hasPrefix("["), let close = projectName.firstIndex(of: "]") else { return (nil, projectName) }
+        let code = projectName[projectName.index(after: projectName.startIndex)..<close]
+        let rest = projectName[projectName.index(after: close)...].trimmingCharacters(in: .whitespaces)
+        guard !code.isEmpty, !rest.isEmpty else { return (nil, projectName) }
+        return (String(code), rest)
+    }
+
     #if os(macOS)
+    private let codeFont: CGFloat = 10.5
     private let titleFont: CGFloat = 13
     private let subtitleFont: CGFloat = 12
     private let indicatorSize: CGFloat = 24
     #else
+    private let codeFont: CGFloat = 12
     private let titleFont: CGFloat = 15
     private let subtitleFont: CGFloat = 14
     private let indicatorSize: CGFloat = 30

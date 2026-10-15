@@ -22,6 +22,8 @@ struct TrackerView: View {
 
     @State private var query = ""
     @State private var selection: TaskKey?
+    /// Search is two steps: pick a project, then one of its tasks.
+    @State private var pickedProject: Int?
     @State private var selectedDay = LocalDate()
     @State private var gridWidth: CGFloat = 0
     @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.task.rawValue
@@ -34,9 +36,17 @@ struct TrackerView: View {
 
     private func sections() -> [TaskSection] {
         if isSearching {
+            let tasks: [TrackableTask]
+            if let pickedProject {
+                tasks = tracker.tasks.filter { $0.project.id == pickedProject }.sorted { $0.task.name < $1.task.name }
+            } else {
+                // One row per project: its best-matching task stands in for it.
+                var seen = Set<Int>()
+                tasks = Self.groupedByClient(tracker.search(query)).filter { seen.insert($0.project.id).inserted }
+            }
             return [TaskSection(
                 id: "results", title: "Results", systemImage: "magnifyingglass",
-                tasks: Self.groupedByClient(tracker.search(query)), emptyHint: "No tasks match “\(query)”"
+                tasks: tasks, emptyHint: "No projects match “\(query)”"
             )]
         }
         return [
@@ -77,7 +87,8 @@ struct TrackerView: View {
     /// Search results as a compact list, otherwise the tile sections.
     @ViewBuilder private func content(_ sections: [TaskSection]) -> some View {
         if isSearching {
-            SearchResultsList(tasks: sections.first?.tasks ?? [], selection: selection, query: query)
+            SearchResultsList(tasks: sections.first?.tasks ?? [], selection: selection, query: query,
+                              pickedProject: pickedProject, pick: pick, back: backToProjects)
         } else {
             tileGrid(sections)
         }
@@ -87,6 +98,7 @@ struct TrackerView: View {
         let sections = sections()
         platformBody(sections)
             .onChange(of: query) {
+                pickedProject = nil
                 selection = isSearching ? sections.first?.tasks.first?.key : nil
             }
             .onChange(of: tracker.focusRequest, initial: true) {
@@ -227,12 +239,12 @@ struct TrackerView: View {
                 .onSubmit {
                     guard let key = selection ?? (isSearching ? flat.first?.key : nil),
                           let task = flat.first(where: { $0.key == key }) else { return }
-                    query = ""
-                    selection = nil
-                    Task { await tracker.toggle(task) }
+                    pick(task)
                 }
                 .onExitCommand {
-                    if !query.isEmpty {
+                    if pickedProject != nil {
+                        backToProjects()
+                    } else if !query.isEmpty {
                         query = ""
                     } else if selection != nil {
                         selection = nil
@@ -255,6 +267,25 @@ struct TrackerView: View {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
                 .strokeBorder(searchFocused ? Color.harvestOrange.opacity(0.7) : Color.primary.opacity(0.1), lineWidth: searchFocused ? 1.5 : 1)
         )
+    }
+
+    /// In search: a project row opens its tasks; a task row starts it.
+    private func pick(_ task: TrackableTask) {
+        if isSearching && pickedProject == nil {
+            pickedProject = task.project.id
+            selection = sections().first?.tasks.first?.key
+            return
+        }
+        query = ""
+        pickedProject = nil
+        selection = nil
+        Task { await tracker.toggle(task) }
+    }
+
+    private func backToProjects() {
+        let project = pickedProject
+        pickedProject = nil
+        selection = sections().first?.tasks.first { $0.project.id == project }?.key
     }
 
     private func moveSelection(by step: Int, in flat: [TrackableTask]) {
@@ -517,6 +548,8 @@ private struct ShortcutsHelp: View {
                 }
             }
         }
+        // The title bar sets white text; the popover has its own background.
+        .foregroundStyle(.primary)
         .padding(14)
     }
 }
