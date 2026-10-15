@@ -9,7 +9,9 @@ public enum TimeFormat {
 
     /// "1:05", Harvest's own hours:minutes style.
     public static func hoursMinutes(_ seconds: TimeInterval) -> String {
-        let minutes = max(0, Int(seconds)) / 60
+        // Nearest minute, like Harvest's own apps (rounding down read a minute
+        // behind them half the time).
+        let minutes = Int((max(0, seconds) / 60).rounded())
         return String(format: "%d:%02d", minutes / 60, minutes % 60)
     }
 }

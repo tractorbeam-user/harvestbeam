@@ -33,6 +33,12 @@ enum DebugSnapshots {
             write(entryWindow, to: url.appendingPathComponent("6-new-entry-\(suffix).png"))
             entryWindow.close()
 
+            let summaryWindow = makeWindow(debugTimeSummary().environment(tracker).frame(width: 300, height: 200), appearance: appearance)
+            summaryWindow.setContentSize(NSSize(width: 300, height: 200))
+            await settle()
+            write(summaryWindow, to: url.appendingPathComponent("7-summary-\(suffix).png"))
+            summaryWindow.close()
+
             if let field = firstTextField(in: window.contentView!) {
                 window.makeFirstResponder(field)
                 field.stringValue = "de"

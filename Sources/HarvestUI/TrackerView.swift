@@ -586,6 +586,11 @@ private struct TitleBarButtonStyle: ButtonStyle {
 }
 
 /// Harvest's Time Summary: hours today, yesterday, this week and this month.
+#if DEBUG
+/// For offscreen snapshots; white text around it like the title bar.
+public func debugTimeSummary() -> some View { TimeSummary().foregroundStyle(.white) }
+#endif
+
 private struct TimeSummary: View {
     @Environment(TimeTracker.self) private var tracker
 
@@ -597,19 +602,19 @@ private struct TimeSummary: View {
                     .font(.system(size: 13, weight: .semibold))
                     .padding(.vertical, 12)
                 Divider()
-                Grid(horizontalSpacing: 0, verticalSpacing: 0) {
-                    GridRow {
-                        cell("Hours Today", tracker.seconds(on: today, at: context.date))
-                        Divider()
-                        cell("Hours Yesterday", tracker.seconds(on: today.adding(days: -1), at: context.date))
-                    }
+                HStack(spacing: 0) {
+                    cell("Hours Today", tracker.seconds(on: today, at: context.date))
                     Divider()
-                    GridRow {
-                        cell("Hours This Week", tracker.weekSeconds(containing: today, at: context.date))
-                        Divider()
-                        cell("Hours This Month", tracker.monthSeconds(containing: today, at: context.date))
-                    }
+                    cell("Hours Yesterday", tracker.seconds(on: today.adding(days: -1), at: context.date))
                 }
+                .fixedSize(horizontal: false, vertical: true)
+                Divider()
+                HStack(spacing: 0) {
+                    cell("Hours This Week", tracker.weekSeconds(containing: today, at: context.date))
+                    Divider()
+                    cell("Hours This Month", tracker.monthSeconds(containing: today, at: context.date))
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
         .frame(width: 300)
