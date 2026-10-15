@@ -11,9 +11,16 @@ public final class TimeTracker {
     public private(set) var user: HarvestUser?
     public private(set) var company: Company?
     public private(set) var accountName: String?
-    public private(set) var tasks: [TrackableTask] = []
+    public private(set) var tasks: [TrackableTask] = [] {
+        didSet {
+            tasksByKey = Dictionary(tasks.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+            searchIndex = Ranking.SearchIndex(tasks: tasks)
+        }
+    }
     /// The last `historyDays` of the user's time entries, newest first.
-    public private(set) var entries: [TimeEntry] = []
+    public private(set) var entries: [TimeEntry] = [] {
+        didSet { usage = Ranking.usageScores(from: entries) }
+    }
     public private(set) var isRefreshing = false
     /// The task whose start/stop request is in flight.
     public private(set) var busyKey: TaskKey?
@@ -26,7 +33,14 @@ public final class TimeTracker {
 
     @ObservationIgnored private var service: (any HarvestService)?
     @ObservationIgnored private var lastRefresh: Date?
+    // Derived from `tasks` and `entries` when they change, not on every
+    // keystroke or redraw.
     @ObservationIgnored private var tasksByKey: [TaskKey: TrackableTask] = [:]
+    @ObservationIgnored private var searchIndex = Ranking.SearchIndex(tasks: [])
+    @ObservationIgnored private var usage: [TaskKey: Double] = [:]
+    /// Earliest day `entries` covers; older weeks are fetched on demand.
+    @ObservationIgnored private var loadedFrom: LocalDate?
+    @ObservationIgnored private var isLoadingHistory = false
 
     static let historyDays = 60
 
@@ -75,7 +89,35 @@ public final class TimeTracker {
     }
 
     public func todaySeconds(at now: Date = .now) -> TimeInterval {
-        todayEntries.reduce(0) { $0 + $1.elapsed(at: now) }
+        seconds(on: LocalDate(), at: now)
+    }
+
+    /// A day's entries in the order they were created, like Harvest's day view.
+    public func entries(on day: LocalDate) -> [TimeEntry] {
+        entries.filter { $0.spentDate == day }.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    public func seconds(on day: LocalDate, at now: Date = .now) -> TimeInterval {
+        entries.reduce(0) { $1.spentDate == day ? $0 + $1.elapsed(at: now) : $0 }
+    }
+
+    /// The weekday the account's weeks start on (`Calendar` numbering).
+    public var firstWeekday: Int { company?.firstWeekday ?? 2 }
+
+    /// Fetches older entries when you page back past what's loaded.
+    public func ensureLoaded(from day: LocalDate) async {
+        guard let service, let user, let loadedFrom, day < loadedFrom, !isLoadingHistory else { return }
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+        let from = day.adding(days: -28) // a few weeks at a time
+        do {
+            let older = try await service.timeEntries(userID: user.id, from: from, to: loadedFrom.adding(days: -1))
+            let known = Set(entries.map(\.id))
+            entries = Self.sorted(entries + older.filter { !known.contains($0.id) })
+            self.loadedFrom = from
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     public var favoriteTasks: [TrackableTask] {
@@ -88,12 +130,19 @@ public final class TimeTracker {
 
     public var suggestedTasks: [TrackableTask] {
         let shown = favorites.set.union(recentTasks.map(\.key))
-        let assignable = entries.filter { tasksByKey[$0.key] != nil }
-        return Ranking.suggested(from: assignable, excluding: shown, limit: 4).compactMap { tasksByKey[$0] }
+        let assignable = usage.filter { tasksByKey[$0.key] != nil }
+        return Ranking.suggested(scores: assignable, excluding: shown, limit: 4).compactMap { tasksByKey[$0] }
     }
 
     public func search(_ query: String) -> [TrackableTask] {
-        Ranking.search(query, in: tasks, usage: Ranking.usageScores(from: entries), favorites: favorites.set)
+        Array(searchIndex.search(query, usage: usage, favorites: favorites.set).prefix(100))
+    }
+
+    /// Today's most recently tracked entry, when nothing is running, so it can
+    /// be resumed with one click.
+    public var pausedEntry: TimeEntry? {
+        guard running == nil else { return nil }
+        return todayEntries.max { $0.updatedAt < $1.updatedAt }
     }
 
     public var harvestWebURL: URL? {
@@ -120,13 +169,15 @@ public final class TimeTracker {
             if company == nil { company = try? await service.company() }
 
             let today = LocalDate()
+            let from = today.adding(days: -Self.historyDays)
             async let assignments = service.projectAssignments()
-            async let history = service.timeEntries(userID: me.id, from: today.adding(days: -Self.historyDays), to: today)
+            async let history = service.timeEntries(userID: me.id, from: from, to: today)
             let (loadedAssignments, loadedEntries) = try await (assignments, history)
 
             tasks = ProjectAssignment.trackableTasks(from: loadedAssignments)
-            tasksByKey = Dictionary(tasks.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
-            entries = Self.sorted(loadedEntries)
+            // Keep any older weeks already paged in.
+            entries = Self.sorted(loadedEntries + entries.filter { $0.spentDate < from })
+            loadedFrom = min(loadedFrom ?? from, from)
             lastRefresh = .now
             phase = .ready
             errorMessage = nil
@@ -140,11 +191,11 @@ public final class TimeTracker {
 
     // MARK: Timer actions
 
-    /// Starts tracking `task`, or stops it if it's the one already running.
+    /// Starts tracking `task`, or pauses it if it's the one already running.
     /// Reuses today's entry for the same task, like Harvest's own timer does.
     public func toggle(_ task: TrackableTask) async {
         if running?.key == task.key {
-            await stop()
+            await pause()
             return
         }
         guard let service, busyKey == nil else { return }
@@ -168,7 +219,9 @@ public final class TimeTracker {
         }
     }
 
-    public func stop() async {
+    /// Stops the running timer. Harvest keeps the entry, so `resume()` (or
+    /// starting the same task again today) carries on where it left off.
+    public func pause() async {
         guard let service, let current = running, busyKey == nil else { return }
         busyKey = current.key
         defer { busyKey = nil }
@@ -178,6 +231,31 @@ public final class TimeTracker {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Restarts a specific entry (from the day view), or pauses it if running.
+    public func toggle(_ entry: TimeEntry) async {
+        if entry.isRunning {
+            await pause()
+            return
+        }
+        guard let service, busyKey == nil else { return }
+        busyKey = entry.key
+        defer { busyKey = nil }
+        do {
+            if let current = running {
+                upsert(try await service.stopTimer(id: current.id))
+            }
+            upsert(try await service.restartTimer(id: entry.id))
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    public func resume() async {
+        guard let entry = pausedEntry else { return }
+        await toggle(task(for: entry))
     }
 
     public func updateNotes(_ notes: String, for entry: TimeEntry) async {
@@ -215,8 +293,8 @@ public final class TimeTracker {
         company = nil
         accountName = nil
         tasks = []
-        tasksByKey = [:]
         entries = []
+        loadedFrom = nil
         lastRefresh = nil
         phase = .signedOut
     }

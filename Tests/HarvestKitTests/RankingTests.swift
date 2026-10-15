@@ -7,7 +7,7 @@ struct RankingTests {
     let today = LocalDate(year: 2026, month: 10, day: 15) // a Thursday
 
     func entry(_ id: Int, project: Int, task: Int, daysAgo: Int, minute: Int = 0) -> TimeEntry {
-        let day = today.adding(days: -daysAgo, calendar: calendar)
+        let day = today.adding(days: -daysAgo)
         let stamp = day.date(in: calendar).addingTimeInterval(Double(9 * 3600 + minute * 60))
         return TimeEntry(
             id: id, spentDate: day,
@@ -45,7 +45,7 @@ struct RankingTests {
         // Task C: once, long ago.
         entries.append(entry(300, project: 3, task: 3, daysAgo: 55))
 
-        let keys = Ranking.suggested(from: entries, today: today, limit: 3, calendar: calendar)
+        let keys = Ranking.suggested(from: entries, today: today, limit: 3)
         #expect(keys.first == TaskKey(projectID: 2, taskID: 2))
         #expect(keys.last == TaskKey(projectID: 3, taskID: 3))
     }
@@ -53,7 +53,7 @@ struct RankingTests {
     @Test func sameWeekdayGetsABump() {
         // Both used once, equally long ago (7 vs 6 days); only one on a Thursday.
         let entries = [entry(1, project: 1, task: 1, daysAgo: 7), entry(2, project: 2, task: 2, daysAgo: 6)]
-        let keys = Ranking.suggested(from: entries, today: today, calendar: calendar)
+        let keys = Ranking.suggested(from: entries, today: today)
         #expect(keys.first == TaskKey(projectID: 1, taskID: 1))
     }
 
@@ -103,5 +103,22 @@ struct RankingTests {
         #expect(entry.spentDate == today)
         #expect(entry.isRunning)
         #expect(entry.client?.name == "ABC Corp")
+    }
+}
+
+struct LocalDateTests {
+    @Test func ordinalAndWeekdayMatchCalendar() {
+        let calendar = Calendar(identifier: .gregorian)
+        var day = LocalDate(year: 2023, month: 12, day: 25)
+        for _ in 0..<800 {
+            let next = day.adding(days: 1)
+            #expect(day.days(until: next) == 1)
+            #expect(LocalDate(day.date(in: calendar).addingTimeInterval(36 * 3600), calendar: calendar) == next)
+            #expect(day.weekday == calendar.component(.weekday, from: day.date(in: calendar)))
+            day = next
+        }
+        #expect(LocalDate(year: 1970, month: 1, day: 1).ordinal == 0)
+        #expect(LocalDate(year: 2026, month: 10, day: 15).startOfWeek(firstWeekday: 2) == LocalDate(year: 2026, month: 10, day: 12))
+        #expect(LocalDate(year: 2026, month: 10, day: 15).startOfWeek(firstWeekday: 1) == LocalDate(year: 2026, month: 10, day: 11))
     }
 }

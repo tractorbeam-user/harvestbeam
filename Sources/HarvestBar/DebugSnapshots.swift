@@ -37,7 +37,7 @@ enum DebugSnapshots {
             await settle()
             write(window, to: url.appendingPathComponent("2-search-\(suffix).png"))
 
-            await tracker.stop()
+            await tracker.pause()
             if let field = firstTextField(in: window.contentView!) {
                 field.currentEditor()?.string = ""
                 (field.currentEditor() as? NSTextView)?.didChangeText()
@@ -55,7 +55,7 @@ enum DebugSnapshots {
 
     private static func makeWindow(_ view: some View, appearance: NSAppearance.Name) -> NSWindow {
         let window = NSWindow(
-            contentRect: NSRect(x: -3000, y: 0, width: 380, height: 560),
+            contentRect: NSRect(x: -3000, y: 0, width: 440, height: 680),
             styleMask: [.borderless], backing: .buffered, defer: false
         )
         window.isReleasedWhenClosed = false

@@ -55,7 +55,7 @@ public actor DemoHarvestService: HarvestService {
         var id = 1
         for daysAgo in 0..<35 {
             let day = today.adding(days: -daysAgo)
-            guard ![1, 7].contains(day.weekday()) else { continue }
+            guard ![1, 7].contains(day.weekday) else { continue }
             let totalWeight = pattern.reduce(0) { $0 + $1.3 }
             for (projectID, task, client, weight) in pattern where random() < weight / totalWeight * 3 {
                 let stamp = day.date().addingTimeInterval(9 * 3600 + random() * 8 * 3600)
@@ -83,7 +83,7 @@ public actor DemoHarvestService: HarvestService {
     }
 
     public func company() async throws -> Company {
-        Company(baseUri: "https://example.harvestapp.com", name: "Tractorbeam (demo)")
+        Company(baseUri: "https://example.harvestapp.com", name: "Tractorbeam (demo)", weekStartDay: "Monday")
     }
 
     public func projectAssignments() async throws -> [ProjectAssignment] {

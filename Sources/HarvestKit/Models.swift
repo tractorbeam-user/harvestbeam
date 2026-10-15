@@ -72,11 +72,23 @@ public struct Company: Codable, Sendable, Equatable {
     public let baseUri: String
     public let name: String
     public let wantsTimestampTimers: Bool?
+    /// "Monday", "Sunday" or "Saturday".
+    public let weekStartDay: String?
 
-    public init(baseUri: String, name: String, wantsTimestampTimers: Bool? = false) {
+    public init(baseUri: String, name: String, wantsTimestampTimers: Bool? = false, weekStartDay: String? = "Monday") {
         self.baseUri = baseUri
         self.name = name
         self.wantsTimestampTimers = wantsTimestampTimers
+        self.weekStartDay = weekStartDay
+    }
+
+    /// `Calendar`-style weekday the account's weeks start on (2 = Monday).
+    public var firstWeekday: Int {
+        switch weekStartDay?.lowercased() {
+        case "sunday": return 1
+        case "saturday": return 7
+        default: return 2
+        }
     }
 }
 

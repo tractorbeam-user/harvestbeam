@@ -13,15 +13,17 @@ struct TaskSection: Identifiable {
     var emptyHint: String?
 }
 
-/// Search, Favorites, Suggested and Recent. Laid out as a compact keyboard-
-/// driven panel on the Mac and as a native inset list on iPhone and iPad.
+/// Timer card, search, then Favorites / Recent / Suggested as grids of tiles.
+/// The grid adds columns as the window (or iPad screen) gets wider.
 struct TrackerView: View {
     @Environment(TimeTracker.self) private var tracker
     @Environment(\.openURL) private var openURL
-    let onClose: (() -> Void)?
+    @Environment(\.windowActions) private var windowActions
 
     @State private var query = ""
     @State private var selection: TaskKey?
+    @State private var selectedDay = LocalDate()
+    @State private var gridWidth: CGFloat = 0
     @FocusState private var searchFocused: Bool
 
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -36,7 +38,7 @@ struct TrackerView: View {
         return [
             TaskSection(
                 id: "favorites", title: "Favorites", systemImage: "star.fill",
-                tasks: tracker.favoriteTasks, emptyHint: "Star a task to keep it here"
+                tasks: tracker.favoriteTasks, emptyHint: "Tap the star on any task to keep it here"
             ),
             TaskSection(id: "recent", title: "Recent", systemImage: "clock.arrow.circlepath", tasks: tracker.recentTasks),
             TaskSection(id: "suggested", title: "Suggested", systemImage: "sparkles", tasks: tracker.suggestedTasks),
@@ -57,47 +59,80 @@ struct TrackerView: View {
             }
     }
 
+    // MARK: Shared grid
+
+    private var columnCount: Int {
+        max(1, Int((gridWidth + Metrics.spacing) / (Metrics.tileMinWidth + Metrics.spacing)))
+    }
+
+    private func tileGrid(_ sections: [TaskSection]) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            ForEach(sections) { section in
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(section.title, systemImage: section.systemImage)
+                        .labelStyle(SectionLabelStyle())
+                        .padding(.leading, 4)
+
+                    if section.tasks.isEmpty, let hint = section.emptyHint {
+                        Text(hint)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 64)
+                            .background(
+                                RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
+                                    .strokeBorder(Color.primary.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                            )
+                    } else {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: Metrics.tileMinWidth), spacing: Metrics.spacing)],
+                            spacing: Metrics.spacing
+                        ) {
+                            ForEach(section.tasks) { task in
+                                TaskTile(task: task, isSelected: selection == task.key)
+                                    .id(task.key)
+                            }
+                        }
+                    }
+                }
+            }
+            if !isSearching {
+                Text("Search to find any of your \(tracker.tasks.count) tasks")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { gridWidth = proxy.size.width }
+                    .onChange(of: proxy.size.width) { _, width in gridWidth = width }
+            }
+        )
+    }
+
     // MARK: Mac
 
     #if os(macOS)
     private func platformBody(_ sections: [TaskSection]) -> some View {
         let flat = sections.flatMap(\.tasks)
         return VStack(spacing: 0) {
-            TimerHeader()
-                .padding([.horizontal, .top], 12)
-
-            searchField(flat)
-                .padding(12)
+            VStack(spacing: 12) {
+                TimerHeader()
+                searchField(flat)
+            }
+            .padding([.horizontal, .top], Metrics.padding)
+            .padding(.bottom, 12)
 
             Divider()
 
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 1) {
-                        ForEach(sections) { section in
-                            sectionHeader(section)
-                            if section.tasks.isEmpty, let hint = section.emptyHint {
-                                Text(hint)
-                                    .font(.callout)
-                                    .foregroundStyle(.tertiary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                            }
-                            ForEach(section.tasks) { task in
-                                TaskRow(task: task, isSelected: selection == task.key)
-                                    .id(task.key)
-                            }
-                        }
-                        if !isSearching {
-                            Text("Type to search all \(tracker.tasks.count) tasks")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 14)
-                        }
+                    VStack(spacing: 22) {
+                        if !isSearching { DayView(selectedDay: $selectedDay) }
+                        tileGrid(sections)
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 10)
+                    .padding(Metrics.padding)
                 }
                 .onChange(of: selection) { _, key in
                     guard let key else { return }
@@ -115,23 +150,41 @@ struct TrackerView: View {
     }
 
     private func searchField(_ flat: [TrackableTask]) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(searchFocused ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.secondary))
             TextField("Search projects and tasks", text: $query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14))
+                .font(.system(size: 15))
                 .focused($searchFocused)
-                .onKeyPress(.downArrow) { moveSelection(by: 1, in: flat); return .handled }
-                .onKeyPress(.upArrow) { moveSelection(by: -1, in: flat); return .handled }
+                .onKeyPress(.downArrow) { moveSelection(by: columnCount, in: flat); return .handled }
+                .onKeyPress(.upArrow) { moveSelection(by: -columnCount, in: flat); return .handled }
+                .onKeyPress(.rightArrow) {
+                    guard selection != nil else { return .ignored }
+                    moveSelection(by: 1, in: flat)
+                    return .handled
+                }
+                .onKeyPress(.leftArrow) {
+                    guard selection != nil else { return .ignored }
+                    moveSelection(by: -1, in: flat)
+                    return .handled
+                }
                 .onSubmit {
                     guard let key = selection ?? (isSearching ? flat.first?.key : nil),
                           let task = flat.first(where: { $0.key == key }) else { return }
                     query = ""
+                    selection = nil
                     Task { await tracker.toggle(task) }
                 }
                 .onExitCommand {
-                    if query.isEmpty { onClose?() } else { query = "" }
+                    if !query.isEmpty {
+                        query = ""
+                    } else if selection != nil {
+                        selection = nil
+                    } else {
+                        windowActions?.close()
+                    }
                 }
             if !query.isEmpty {
                 Button { query = "" } label: {
@@ -141,12 +194,12 @@ struct TrackerView: View {
                 .help("Clear search")
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 34)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.quaternary.opacity(0.7)))
+        .padding(.horizontal, 12)
+        .frame(height: 42)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.tileBackground))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color.harvestOrange.opacity(searchFocused ? 0.55 : 0), lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(searchFocused ? Color.harvestOrange.opacity(0.7) : Color.primary.opacity(0.1), lineWidth: searchFocused ? 1.5 : 1)
         )
     }
 
@@ -162,23 +215,13 @@ struct TrackerView: View {
         selection = flat[next].key
     }
 
-    private func sectionHeader(_ section: TaskSection) -> some View {
-        Label(section.title, systemImage: section.systemImage)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .labelStyle(SectionLabelStyle())
-            .padding(.horizontal, 10)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
-    }
-
     private var footer: some View {
         HStack(spacing: 2) {
             Text(tracker.accountName ?? "")
                 .lineLimit(1)
             Text("·")
             Text("⌥H")
-                .help("Press Option-H anywhere to open")
+                .help("Press Option-H anywhere to show or hide")
             Spacer()
 
             FooterButton(systemImage: "arrow.clockwise", help: "Refresh (⌘R)") {
@@ -191,10 +234,17 @@ struct TrackerView: View {
 
             FooterButton(systemImage: "arrow.up.forward.app", help: "Open Harvest") {
                 if let url = tracker.harvestWebURL { openURL(url) }
-                onClose?()
             }
 
             Menu {
+                if let windowActions {
+                    Toggle("Keep on Top", isOn: Binding(
+                        get: { windowActions.isKeptOnTop() },
+                        set: { windowActions.setKeptOnTop($0) }
+                    ))
+                    Button("Move Below Menu Bar Icon") { windowActions.snapToMenuBar() }
+                    Divider()
+                }
                 Toggle("Open at Login", isOn: Binding(
                     get: { SMAppService.mainApp.status == .enabled },
                     set: { enabled in
@@ -213,14 +263,14 @@ struct TrackerView: View {
             .menuIndicator(.hidden)
             .tint(.secondary)
             .fixedSize()
-            .frame(width: 28, height: 28)
+            .frame(width: 30, height: 30)
             .help("Settings")
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-        .padding(.leading, 14)
+        .padding(.leading, Metrics.padding)
         .padding(.trailing, 8)
-        .frame(height: 38)
+        .frame(height: 40)
     }
     #endif
 
@@ -229,47 +279,21 @@ struct TrackerView: View {
     #if os(iOS)
     private func platformBody(_ sections: [TaskSection]) -> some View {
         NavigationStack {
-            List {
-                Section {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
                     TimerHeader()
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                }
-
-                if let error = tracker.errorMessage {
-                    Section {
+                    if let error = tracker.errorMessage {
                         ErrorBanner(message: error) { tracker.errorMessage = nil }
-                            .listRowInsets(EdgeInsets())
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
+                    if !isSearching { DayView(selectedDay: $selectedDay) }
+                    tileGrid(sections)
                 }
-
-                ForEach(sections) { section in
-                    Section {
-                        if section.tasks.isEmpty, let hint = section.emptyHint {
-                            Text(hint).foregroundStyle(.secondary)
-                        }
-                        ForEach(section.tasks) { task in
-                            TaskRow(task: task)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
-                                .listRowBackground(
-                                    tracker.running?.key == task.key ? Color.harvestOrange.opacity(0.08) : nil
-                                )
-                                .swipeActions(edge: .leading) {
-                                    let favorite = tracker.favorites.contains(task.key)
-                                    Button(favorite ? "Unfavorite" : "Favorite", systemImage: favorite ? "star.slash" : "star.fill") {
-                                        tracker.favorites.toggle(task.key)
-                                    }
-                                    .tint(.harvestOrange)
-                                }
-                        }
-                        .onMove(perform: section.id == "favorites" ? { tracker.favorites.move(fromOffsets: $0, toOffset: $1) } : nil)
-                    } header: {
-                        Label(section.title, systemImage: section.systemImage)
-                            .labelStyle(SectionLabelStyle())
-                    }
-                }
+                .padding(Metrics.padding)
+                .frame(maxWidth: 960)
+                .frame(maxWidth: .infinity)
             }
-            .listStyle(.insetGrouped)
+            .background(Color.panelBackground)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search projects and tasks")
             .refreshable { await tracker.refresh(force: true) }
             .navigationTitle("Timer")
@@ -294,10 +318,11 @@ struct TrackerView: View {
 
 private struct SectionLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 5) {
-            configuration.icon.foregroundStyle(.harvestOrange).imageScale(.small)
-            configuration.title.textCase(.uppercase).tracking(0.4)
+        HStack(spacing: 6) {
+            configuration.icon.foregroundStyle(.harvestOrange)
+            configuration.title.foregroundStyle(.secondary)
         }
+        .font(.subheadline.weight(.semibold))
     }
 }
 
@@ -316,7 +341,7 @@ private struct ErrorBanner: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color.harvestOrange.opacity(0.1))
+        .background(Color.harvestOrange.opacity(0.12))
     }
 }
 
@@ -330,8 +355,8 @@ private struct FooterButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .frame(width: 28, height: 28)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(isHovered ? 0.08 : 0)))
+                .frame(width: 30, height: 30)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(isHovered ? 0.08 : 0)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

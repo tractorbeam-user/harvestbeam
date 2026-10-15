@@ -3,17 +3,23 @@ import HarvestKit
 import HarvestUI
 import SwiftUI
 
-/// Owns the menu bar item and its popover. The item shows a clock when idle and
-/// an orange dot with the elapsed time while a timer runs.
+/// Owns the menu bar item and the tracker window. The item shows a clock when
+/// idle and an orange dot with the elapsed time while a timer runs. The window
+/// opens below the item the first time, then stays wherever you drag it, at
+/// whatever size you leave it.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let tracker: TimeTracker
     private var statusItem: NSStatusItem!
-    private let popover = NSPopover()
+    private var panel: TrackerPanel!
     private var hotKey: HotKey?
     private var ticker: Timer?
     private var poller: Timer?
     private var lastTitle: String?
+    private var hasPlacedPanel = false
+
+    private static let frameName = "HarvestBarWindow"
+    private static let keepOnTopKey = "keepOnTop"
 
     init(tracker: TimeTracker) {
         self.tracker = tracker
@@ -23,19 +29,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.target = self
-            button.action = #selector(togglePopover)
+            button.action = #selector(togglePanel)
             button.imagePosition = .imageLeading
             button.setAccessibilityTitle("Harvest Bar")
         }
 
-        let host = NSHostingController(rootView: RootView { [weak self] in self?.closePopover() }.environment(tracker))
-        host.sizingOptions = [.preferredContentSize]
-        popover.contentViewController = host
-        popover.behavior = .transient
-        popover.animates = true
-        popover.delegate = self
+        makePanel()
 
-        hotKey = HotKey { [weak self] in self?.togglePopover() }
+        hotKey = HotKey { [weak self] in self?.togglePanel() }
         #if DEBUG
         FileHandle.standardError.write(Data("⌥H shortcut mode: \(hotKey!.mode)\n".utf8))
         #endif
@@ -47,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         poller = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, !self.popover.isShown else { return }
+                guard let self, !self.panel.isKeyWindow else { return }
                 Task { await self.tracker.refresh(force: true) }
             }
         }
@@ -55,31 +56,98 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         Task {
             await tracker.refresh(force: true)
-            // First run: open the panel so there's somewhere to paste a token.
-            if tracker.phase == .signedOut || tracker.isDemo { showPopover() }
+            // First run: open the window so there's somewhere to paste a token.
+            if tracker.phase == .signedOut || tracker.isDemo { showPanel() }
         }
     }
 
-    // MARK: Popover
+    // MARK: Window
 
-    @objc func togglePopover() {
-        popover.isShown ? closePopover() : showPopover()
+    private func makePanel() {
+        panel = TrackerPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 680),
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "Harvest Bar"
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
+        panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
+        panel.isOpaque = true
+        panel.backgroundColor = .windowBackgroundColor
+        panel.contentMinSize = NSSize(width: 340, height: 440)
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.delegate = self
+        setKeptOnTop(UserDefaults.standard.bool(forKey: Self.keepOnTopKey))
+
+        let actions = WindowActions(
+            close: { [weak self] in self?.hidePanel() },
+            snapToMenuBar: { [weak self] in self?.placeBelowStatusItem() },
+            isKeptOnTop: { [weak self] in self?.panel.level == .floating },
+            setKeptOnTop: { [weak self] in self?.setKeptOnTop($0) }
+        )
+        let host = NSHostingView(rootView: RootView().environment(tracker).environment(\.windowActions, actions))
+        host.sizingOptions = []
+        panel.contentView = host
+
+        hasPlacedPanel = panel.setFrameUsingName(Self.frameName)
+        panel.setFrameAutosaveName(Self.frameName)
     }
 
-    func showPopover() {
-        guard let button = statusItem.button else { return }
+    @objc func togglePanel() {
+        if panel.isVisible && panel.isKeyWindow && NSApp.isActive {
+            hidePanel()
+        } else {
+            showPanel()
+        }
+    }
+
+    func showPanel() {
+        if !hasPlacedPanel {
+            placeBelowStatusItem()
+            hasPlacedPanel = true
+        }
+        NSApp.unhide(nil)
         NSApp.activate()
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+        panel.makeKeyAndOrderFront(nil)
         tracker.didAppear()
     }
 
-    func closePopover() {
-        popover.performClose(nil)
+    func hidePanel() {
+        panel.orderOut(nil)
+        tracker.errorMessage = nil
+        // Hand focus straight back to whatever you were working in.
+        NSApp.hide(nil)
     }
 
-    func popoverDidClose(_ notification: Notification) {
-        tracker.errorMessage = nil
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        hidePanel()
+        return false
+    }
+
+    private func placeBelowStatusItem() {
+        let size = panel.frame.size
+        let anchor = statusItem.button?.window?.frame
+        let screen = statusItem.button?.window?.screen ?? NSScreen.main ?? NSScreen.screens[0]
+        let visible = screen.visibleFrame
+        var x: CGFloat
+        if let anchor, anchor.width > 0, visible.insetBy(dx: -1, dy: -40).intersects(anchor) {
+            x = anchor.midX - size.width / 2
+        } else {
+            x = visible.maxX - size.width - 12
+        }
+        x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
+        let y = visible.maxY - size.height - 8
+        panel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true, animate: panel.isVisible)
+    }
+
+    private func setKeptOnTop(_ onTop: Bool) {
+        panel.level = onTop ? .floating : .normal
+        UserDefaults.standard.set(onTop, forKey: Self.keepOnTopKey)
     }
 
     // MARK: Status item
@@ -108,4 +176,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.toolTip = "Harvest Bar (⌥H)"
         }
     }
+}
+
+/// A utility window that can take keyboard focus for the search field.
+final class TrackerPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }

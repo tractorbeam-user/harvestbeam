@@ -2,12 +2,16 @@
 
 A small, native Harvest timer for the Mac menu bar, with the same app on iPhone and iPad. Unofficial: it talks to the [Harvest API v2](https://help.getharvest.com/api-v2/) using your own personal access token.
 
-- **⌥H anywhere** opens the panel with the search field focused. Type, use ↑/↓, and press Return to start. Esc clears the search, then closes the panel.
-- **Favorites**: star any task to pin it at the top. Favorites sync between devices through iCloud when the app is signed (see below).
+- **⌥H anywhere** shows or hides the window with the search field focused. Type, use the arrow keys to move between tiles, and press Return to start. Esc clears the search, then hides the window.
+- **A real window**: it opens below the menu bar icon the first time. After that you can drag it anywhere and resize it, and it remembers where you left it. The gear menu has **Keep on Top** and **Move Below Menu Bar Icon**.
+- **Pause and resume**: the running timer has a big Pause button (⌘.), and when nothing is running, today's last entry shows a Resume button.
+- **Days and weeks**, like Harvest's own app: a week strip with each day's total, ‹ › to page weeks, ⌘[ / ⌘] for the previous or next day, and ⌘T for today. Each day lists its entries, and clicking one restarts it. Older weeks load from Harvest as you page back.
+- **Tiles**: Favorites, Recent and Suggested are large click and tap targets in a grid that adds columns as the window gets wider.
+- **Favorites**: star any task to pin it. Favorites sync between devices through iCloud when the app is signed (see below).
 - **Recent**: your last few distinct tasks, taken from your Harvest history, so they're the same on every device.
 - **Suggested**: tasks you use most over the last 60 days. Each entry's weight halves every two weeks, and tasks you tend to track on the same weekday get a bump.
-- **Search** across task, project, project code and client. Every word has to match, prefix matches rank first, and accents and case are ignored.
-- **Running timer**: shows elapsed time in the menu bar (orange dot), takes notes inline, and stops with ⌘. or the Stop button. Starting a task you've already tracked today restarts that entry, the same way Harvest's own timer works.
+- **Search** across task, project, project code and client. Every word has to match, prefix matches rank first, and accents and case are ignored. Task names are indexed once when they load, so typing stays instant even with thousands of tasks.
+- **Menu bar**: an orange dot and the elapsed time while a timer runs. Starting a task you've already tracked today restarts that entry, the same way Harvest's own timer works.
 - Your token is stored in the Keychain, never in preferences.
 
 ## Run it on your Mac
@@ -28,7 +32,7 @@ The shortcut is registered with Carbon's hotkey API, which needs no permissions.
 
 ## iPhone and iPad
 
-The Mac and iOS apps share everything except the menu bar shell (`Sources/HarvestBar`). On iPhone and iPad the same screens show as a native inset list with a search bar, pull to refresh, swipe right to favorite, drag to reorder favorites, and 56pt rows that are easy to tap.
+The Mac and iOS apps share everything except the menu bar shell (`Sources/HarvestBar`). On iPhone and iPad you get the same timer card, day view and large tiles, sized for touch, plus a native search bar and pull to refresh.
 
 Building for iOS needs full Xcode:
 

@@ -4,24 +4,21 @@ import SwiftUI
 /// Entry point for both platforms: sign-in, first load, or the tracker.
 public struct RootView: View {
     @Environment(TimeTracker.self) private var tracker
-    private let onClose: (() -> Void)?
 
-    /// `onClose` dismisses the menu bar panel (Esc). Leave nil on iOS.
-    public init(onClose: (() -> Void)? = nil) {
-        self.onClose = onClose
-    }
+    public init() {}
 
     public var body: some View {
         Group {
             switch tracker.phase {
             case .signedOut: SignInView()
             case .loading: LoadingView()
-            case .ready: TrackerView(onClose: onClose)
+            case .ready: TrackerView()
             }
         }
         .tint(.harvestOrange)
         #if os(macOS)
-        .frame(width: 380, height: 560)
+        .frame(minWidth: 340, maxWidth: .infinity, minHeight: 440, maxHeight: .infinity)
+        .background(Color.panelBackground.ignoresSafeArea())
         #endif
     }
 }
