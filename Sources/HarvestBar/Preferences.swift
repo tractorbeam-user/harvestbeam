@@ -78,7 +78,7 @@ final class PreferencesWindowController: NSWindowController {
 
 // MARK: General
 
-private struct GeneralPrefs: View {
+struct GeneralPrefs: View {
     @AppStorage(Prefs.showInDock) private var showInDock = false
     @AppStorage(Prefs.idleDetection) private var idleDetection = true
     @AppStorage(Prefs.idleMinutes) private var idleMinutes = 10
@@ -146,7 +146,7 @@ private struct GeneralPrefs: View {
 
 // MARK: Shortcuts
 
-private struct ShortcutPrefs: View {
+struct ShortcutPrefs: View {
     @AppStorage(Prefs.shortcutDisplay) private var display = "⌥H"
     @State private var recording = false
     @State private var monitor: Any?
@@ -227,7 +227,7 @@ private struct ShortcutPrefs: View {
 
 // MARK: Support
 
-private struct SupportPrefs: View {
+struct SupportPrefs: View {
     @Environment(TimeTracker.self) private var tracker
     let resetLayout: () -> Void
     @State private var reloaded = false

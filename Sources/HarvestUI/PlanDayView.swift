@@ -19,6 +19,7 @@ struct PlanDayView: View {
     @State private var hours: [UUID: String] = [:]
     @State private var engine: DayPlanner.Engine?
     @State private var isThinking = false
+    @State private var suggestedFor = ""
     @State private var isSaving = false
     @FocusState private var textFocused: Bool
 
@@ -49,6 +50,12 @@ struct PlanDayView: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .focused($textFocused)
+                // Return suggests (or adds what's suggested); Shift-Return is a new line.
+                .onKeyPress(keys: [.return]) { press in
+                    guard !press.modifiers.contains(.shift) else { return .ignored }
+                    submit()
+                    return .handled
+                }
                 .padding(10)
                 .padding(.trailing, 26)
                 .background(field)
@@ -210,8 +217,17 @@ struct PlanDayView: View {
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
     }
 
+    private func submit() {
+        if engine != nil, text == suggestedFor, !proposals.isEmpty, !ready.isEmpty, !isSaving {
+            add()
+        } else if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isThinking {
+            suggest()
+        }
+    }
+
     private func suggest() {
         let text = text
+        suggestedFor = text
         isThinking = true
         Task {
             let result = await tracker.planDay(text)

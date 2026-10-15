@@ -39,6 +39,15 @@ enum DebugSnapshots {
             write(summaryWindow, to: url.appendingPathComponent("7-summary-\(suffix).png"))
             summaryWindow.close()
 
+            for (name, view) in [("general", AnyView(GeneralPrefs())), ("shortcuts", AnyView(ShortcutPrefs())),
+                                 ("support", AnyView(SupportPrefs(resetLayout: {})))] {
+                let prefsWindow = makeWindow(view.environment(tracker).frame(width: 480, height: 560, alignment: .top), appearance: appearance)
+                prefsWindow.setContentSize(NSSize(width: 480, height: 560))
+                await settle()
+                write(prefsWindow, to: url.appendingPathComponent("8-prefs-\(name)-\(suffix).png"))
+                prefsWindow.close()
+            }
+
             if let field = firstTextField(in: window.contentView!) {
                 window.makeFirstResponder(field)
                 field.stringValue = "de"

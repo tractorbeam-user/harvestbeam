@@ -44,13 +44,15 @@ struct TrackerView: View {
 
     private func sections() -> [TaskSection] {
         if isSearching {
-            let tasks: [TrackableTask]
-            if let pickedProject {
-                tasks = tracker.tasks.filter { $0.project.id == pickedProject }.sorted { $0.task.name < $1.task.name }
-            } else {
-                // One row per project: its best-matching task stands in for it.
-                var seen = Set<Int>()
-                tasks = Self.groupedByClient(tracker.search(query)).filter { seen.insert($0.project.id).inserted }
+            // One row per matching project; the open one lists its tasks right
+            // below it, like an accordion.
+            var seen = Set<Int>()
+            var tasks: [TrackableTask] = []
+            for match in Self.groupedByClient(tracker.search(query)) where seen.insert(match.project.id).inserted {
+                tasks.append(match.projectRow)
+                if match.project.id == pickedProject {
+                    tasks += tracker.tasks.filter { $0.project.id == match.project.id }.sorted { $0.task.name < $1.task.name }
+                }
             }
             return [TaskSection(
                 id: "results", title: "Results", systemImage: "magnifyingglass",
@@ -96,7 +98,7 @@ struct TrackerView: View {
     @ViewBuilder private func content(_ sections: [TaskSection]) -> some View {
         if isSearching {
             SearchResultsList(tasks: sections.first?.tasks ?? [], selection: selection, query: query,
-                              pickedProject: pickedProject, pick: pick, back: backToProjects)
+                              pickedProject: pickedProject, pick: pick)
         } else {
             tileGrid(sections)
         }
@@ -344,10 +346,14 @@ struct TrackerView: View {
     }
 
     /// In search: a project row opens its tasks; a task row starts it.
+    /// In search: a project row opens or closes its tasks below it; a task
+    /// row starts it.
     private func pick(_ task: TrackableTask) {
-        if isSearching && pickedProject == nil {
-            pickedProject = task.project.id
-            selection = sections().first?.tasks.first?.key
+        if task.isProjectRow {
+            withAnimation(.snappy(duration: 0.2)) {
+                pickedProject = pickedProject == task.project.id ? nil : task.project.id
+            }
+            selection = task.key
             return
         }
         query = ""
@@ -357,9 +363,9 @@ struct TrackerView: View {
     }
 
     private func backToProjects() {
-        let project = pickedProject
-        pickedProject = nil
-        selection = sections().first?.tasks.first { $0.project.id == project }?.key
+        guard let project = pickedProject else { return }
+        withAnimation(.snappy(duration: 0.2)) { pickedProject = nil }
+        selection = TaskKey(projectID: project, taskID: TrackableTask.projectRowTaskID)
     }
 
     private func moveSelection(by step: Int, in flat: [TrackableTask]) {
@@ -715,3 +721,13 @@ private struct TimeSummary: View {
     }
 }
 #endif
+
+extension TrackableTask {
+    /// Search lists projects as rows of their own; this marks one.
+    static let projectRowTaskID = -1
+    var isProjectRow: Bool { task.id == Self.projectRowTaskID }
+    var projectRow: TrackableTask {
+        TrackableTask(project: project, projectCode: projectCode, client: client,
+                      task: NamedRef(id: Self.projectRowTaskID, name: ""))
+    }
+}
