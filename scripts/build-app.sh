@@ -7,7 +7,9 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="Harvest Bar"
 BUNDLE_ID="com.tractorbeam.harvestbar"
-VERSION="1.0.0"
+# scripts/release.sh passes VERSION; local builds keep the default.
+VERSION="${VERSION:-1.0.0}"
+BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 APP="build/${APP_NAME}.app"
 
 # With only the Command Line Tools installed, the newest macOS SDK expects
@@ -39,7 +41,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleVersion</key><string>${BUILD}</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>

@@ -2,21 +2,34 @@
 
 A small, native Harvest timer for the Mac menu bar, with the same app on iPhone and iPad. Unofficial: it talks to the [Harvest API v2](https://help.getharvest.com/api-v2/) using your own personal access token.
 
-- **⌥H anywhere** shows or hides the window with the search field focused. Type, use the arrow keys to move between tiles, and press Return to start. Esc clears the search, then hides the window.
-- **A real window**: it opens below the menu bar icon the first time. After that you can drag it anywhere and resize it, and it remembers where you left it. The gear menu has **Keep on Top** and **Move Below Menu Bar Icon**.
-- **Pause and resume**: the running timer has a big Pause button (⌘.), and when nothing is running, today's last entry shows a Resume button.
-- **Days and weeks**, like Harvest's own app: a week strip with each day's total, ‹ › to page weeks, ⌘[ / ⌘] for the previous or next day, and ⌘T for today. Each day lists its entries, and clicking one restarts it. Older weeks load from Harvest as you page back.
-- **Menu bar text**: shows what you're working on next to the timer. Gear → Menu Bar picks what appears (time, task, task and project, or notes), how long it can get, and whether it cuts off the end or the middle.
-- **Search** sits in the bottom bar, and results are a compact list grouped by client, with `[CODE] Project · Task` on each line. ⌘A, ⌘C and ⌘V work in every field.
-- **Tiles**: Favorites, Recent and Suggested are large click and tap targets in a grid that adds columns as the window gets wider.
-- **Favorites**: star any task to pin it. Favorites sync between devices through iCloud when the app is signed (see below).
-- **Recent**: your last few distinct tasks, taken from your Harvest history, so they're the same on every device.
-- **Suggested**: tasks you use most over the last 60 days. Each entry's weight halves every two weeks, and tasks you tend to track on the same weekday get a bump.
-- **Search** across task, project, project code and client. Every word has to match, prefix matches rank first, and accents and case are ignored. Task names are indexed once when they load, so typing stays instant even with thousands of tasks.
-- **Menu bar**: an orange dot and the elapsed time while a timer runs. Starting a task you've already tracked today restarts that entry, the same way Harvest's own timer works.
+- **Menu bar, like Harvest's own**: an orange square with pause while a timer runs, gray with play when paused, then the time and what you're working on. Click the square to pause or resume; click the rest to show or hide the window. Gear → Menu Bar picks what text appears and how long it can get.
+- **⌥H anywhere** shows or hides the window with the search field focused. Type, use the arrow keys, and press Return.
+- **Orange title bar** with the selected day and the week's total. The calendar button (⌘T) jumps to today, and the info button opens a Time Summary: hours today, yesterday, this week and this month.
+- **Days**: a week strip with each day's total. ‹ › and ⌘[ / ⌘] move a day at a time. Each day lists its entries with play/pause. Double-click an entry to edit its project, task, notes or hours. Deleting asks nothing and offers Undo (⌘Z) instead.
+- **New entries**: + in the bottom bar (⌘N), or New Entry on an empty day, opens a Harvest-style popover: project, then task, notes and hours. On today, leave hours empty to start a timer; on other days it logs the hours.
+- **Search** in two steps: matching projects first, grouped by client, then the picked project's tasks. Every word has to match across task, project, code and client, and favorites and frequently used tasks rank higher.
+- **Favorites, Recent and Suggested** as compact tiles: project, then task, with a bracketed code like `[LP-DP-01]` on its own line. Star any task to pin it; favorites sync through iCloud when the app is signed.
+- **Stays in sync** with Harvest's own apps: it checks every minute, and if a timer changed elsewhere it reloads instead of erroring. Times round to the nearest minute, as Harvest's do.
+- **A real window**: drag it anywhere and resize it. Gear menu: Keep on Top, Move Below Menu Bar Icon, Reset Window Size (⌘0, or the green button).
 - Your token is stored in the Keychain, never in preferences.
 
-## Run it on your Mac
+## Install
+
+Download the latest `Harvest-Bar-x.y.z.zip` from [Releases](https://github.com/tractorbeam-user/harvest-bar/releases), unzip it and drag **Harvest Bar** to Applications.
+
+The first time, **right-click it and choose Open**. The app isn't signed with an Apple Developer ID, so macOS asks once. If macOS says it's damaged, run `xattr -dr com.apple.quarantine "/Applications/Harvest Bar.app"` in Terminal and open it again.
+
+Click the timer icon in the menu bar, create a personal access token at [id.getharvest.com/developers](https://id.getharvest.com/developers), and paste it in.
+
+## Releasing
+
+```bash
+scripts/release.sh 1.1.0
+```
+
+From a clean `main`, this pushes, builds the app with that version, zips it and publishes a GitHub Release with install notes. It needs the GitHub CLI (`gh`) signed in.
+
+## Build it yourself
 
 ```bash
 scripts/build-app.sh --install
@@ -52,8 +65,8 @@ Pick your team under Signing for both targets, then run **HarvestBar-iOS** on yo
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `Sources/HarvestKit`    | Models, Harvest API client, Keychain, favorites, ranking (recent/suggested/search), `TimeTracker` state, demo data |
 | `Sources/HarvestUI`     | SwiftUI views shared by macOS and iOS                                                                              |
-| `Sources/HarvestBar`    | Mac menu bar app: status item, popover, ⌥H                                                                         |
+| `Sources/HarvestBar`    | Mac menu bar app: status item, window, ⌥H                                                                          |
 | `iOS`                   | iPhone/iPad app entry point                                                                                        |
 | `Tests/HarvestKitTests` | Ranking, search and decoding tests (run in Xcode, or with `swift test` once Xcode is installed)                    |
 
-Debug builds can render the panel to PNGs with demo data, in light and dark mode: `swift build && .build/debug/HarvestBar --snapshots /tmp/harvest-snaps`.
+Debug builds can render the panel to PNGs with demo data, in light and dark mode: `swift build && .build/debug/HarvestBar --snapshots ~/Desktop/harvest-snaps`.
