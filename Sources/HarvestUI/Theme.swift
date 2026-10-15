@@ -99,3 +99,24 @@ public extension EnvironmentValues {
         set { self[WindowActionsKey.self] = newValue }
     }
 }
+
+/// Counts open popovers so the window behind them can dim, like Harvest's.
+@MainActor @Observable
+final class PopoverDimmer {
+    var openCount = 0
+}
+
+private struct DimsWindow: ViewModifier {
+    @Environment(PopoverDimmer.self) private var dimmer: PopoverDimmer?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { dimmer?.openCount += 1 }
+            .onDisappear { dimmer.map { $0.openCount = max(0, $0.openCount - 1) } }
+    }
+}
+
+extension View {
+    /// Put on a popover's content to dim the window while it's open.
+    func dimsWindow() -> some View { modifier(DimsWindow()) }
+}

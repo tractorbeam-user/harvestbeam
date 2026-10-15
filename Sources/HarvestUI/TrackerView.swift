@@ -28,6 +28,7 @@ struct TrackerView: View {
     @State private var isPlanning = false
     /// Search starts as an icon and opens into a field when you need it.
     @State private var isSearchOpen = false
+    @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
@@ -216,7 +217,15 @@ struct TrackerView: View {
                     .clipped()
             }
             .ignoresSafeArea(edges: .top)
+            // Dim everything, title bar included, while a popover is open.
+            .overlay {
+                Color.black.opacity(dimmer.openCount > 0 ? 0.22 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .animation(.easeOut(duration: 0.15), value: dimmer.openCount > 0)
+            }
         }
+        .environment(dimmer)
         .onChange(of: selectedDay.dayTitle(today: LocalDate()), initial: true) { _, title in
             windowActions?.setTitle(title)
         }
@@ -586,12 +595,12 @@ private struct TitleBar: View {
         let today = LocalDate()
         TimelineView(.periodic(from: .now, by: 30)) { context in
             ZStack {
-                VStack(spacing: 0) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(selectedDay.dayTitle(today: today))
                         .font(.system(size: 13, weight: .semibold))
                     Text("Week \(TimeFormat.hoursMinutes(tracker.weekSeconds(containing: selectedDay, at: context.date)))")
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .opacity(0.8)
+                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .opacity(0.75)
                 }
                 .lineLimit(1)
 
@@ -679,6 +688,7 @@ private struct TimeSummary: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .dimsWindow()
         .frame(width: 300)
         // The title bar sets white text, and `.primary` would inherit it; use
         // the real label colors.

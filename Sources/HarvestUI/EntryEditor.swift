@@ -35,7 +35,8 @@ struct NewEntryEditor: View {
 
     private var isToday: Bool { day == LocalDate() }
     private var parsedHours: Double? { EntryEditor.parseHours(hours) }
-    private var startsTimer: Bool { entry == nil && isToday && hours.trimmingCharacters(in: .whitespaces).isEmpty }
+    private var hoursEmpty: Bool { hours.trimmingCharacters(in: .whitespaces).isEmpty }
+    private var startsTimer: Bool { entry == nil && isToday && hoursEmpty }
     private var isTimerRunning: Bool { entry?.isRunning ?? false }
     private var selectedTask: TrackableTask? {
         guard let taskKey else { return nil }
@@ -113,11 +114,12 @@ struct NewEntryEditor: View {
                 Button(startsTimer ? "Start Timer" : "Save Entry") { save() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(PillButtonStyle(prominent: true))
-                    .disabled(isSaving || taskKey == nil || (!startsTimer && !isTimerRunning && parsedHours == nil))
+                    .disabled(isSaving || taskKey == nil || (!startsTimer && !isTimerRunning && !hoursEmpty && parsedHours == nil))
             }
             .padding(14)
         }
         .frame(width: 340)
+        .dimsWindow()
         .presentationBackground(Color.tileBackground)
         // Opened from the bottom bar, which dims its own text; `.primary` would
         // inherit that, so use the real label color.
@@ -143,24 +145,13 @@ struct NewEntryEditor: View {
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
     }
 
+    /// Click and type to filter projects, like Harvest's picker; arrows and
+    /// Return pick one.
     private var projectMenu: some View {
-        Menu {
-            ForEach(projectGroups, id: \.name) { group in
-                Section(group.name) {
-                    ForEach(group.projects, id: \.project.id) { task in
-                        Button(projectLabel(task)) {
-                            projectID = task.project.id
-                            if taskKey?.projectID != task.project.id { taskKey = tasks(in: task.project.id).first?.key }
-                        }
-                    }
-                }
-            }
-        } label: {
-            menuLabel(selectedTask.map(projectLabel) ?? "Choose a project…", placeholder: selectedTask == nil)
+        ProjectPicker(groups: projectGroups, selected: selectedTask, label: projectLabel) { task in
+            projectID = task.project.id
+            if taskKey?.projectID != task.project.id { taskKey = tasks(in: task.project.id).first?.key }
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
     }
 
     private var taskMenu: some View {
@@ -220,7 +211,8 @@ struct NewEntryEditor: View {
             if let entry {
                 await tracker.updateEntry(entry, task: task, notes: notes, hours: parsedHours)
             } else {
-                await tracker.addEntry(task: task, on: day, notes: notes, hours: startsTimer ? nil : parsedHours)
+                // Empty hours on another day adds a 0:00 entry to fill in later.
+                await tracker.addEntry(task: task, on: day, notes: notes, hours: startsTimer ? nil : (parsedHours ?? 0))
             }
             isSaving = false
             dismiss()
@@ -294,4 +286,112 @@ struct RectCorners: OptionSet {
 extension View {
     fileprivate func hoverHighlight(corners: RectCorners = .all) -> some View { modifier(HoverHighlight(corners: corners)) }
     fileprivate func hoverOutline() -> some View { modifier(HoverHighlight(outline: true)) }
+}
+
+/// Harvest-style project combo box: shows the chosen project; click it and
+/// type to filter by project, code or client, grouped by client.
+private struct ProjectPicker: View {
+    let groups: [(name: String, projects: [TrackableTask])]
+    let selected: TrackableTask?
+    let label: (TrackableTask) -> String
+    let onPick: (TrackableTask) -> Void
+
+    @State private var query = ""
+    @State private var highlighted = 0
+    @FocusState private var focused: Bool
+
+    private var matches: [(client: String, task: TrackableTask)] {
+        let words = query.lowercased().folding(options: .diacriticInsensitive, locale: nil)
+            .split(separator: " ").map(String.init)
+        var result: [(client: String, task: TrackableTask)] = []
+        for group in groups {
+            for task in group.projects {
+                let haystack = (label(task) + " " + group.name).lowercased().folding(options: .diacriticInsensitive, locale: nil)
+                if words.allSatisfy(haystack.contains) { result.append((group.name, task)) }
+            }
+        }
+        return Array(result.prefix(80))
+    }
+
+    var body: some View {
+        let matches = matches
+        VStack(spacing: 0) {
+            HStack {
+                ZStack(alignment: .leading) {
+                    TextField("Project", text: $query, prompt: Text(focused ? "Search projects…" : ""))
+                        .textFieldStyle(.plain)
+                        .focused($focused)
+                        .onKeyPress(.downArrow) { highlighted = min(highlighted + 1, max(matches.count - 1, 0)); return .handled }
+                        .onKeyPress(.upArrow) { highlighted = max(highlighted - 1, 0); return .handled }
+                        .onSubmit { if matches.indices.contains(highlighted) { pick(matches[highlighted].task) } }
+                        .onExitCommand { query = ""; focused = false }
+                    if !focused && query.isEmpty {
+                        Text(selected.map(label) ?? "Choose a project…")
+                            .foregroundStyle(selected == nil ? Color.secondary : Color.primary)
+                            .lineLimit(1)
+                            .allowsHitTesting(false)
+                    }
+                }
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.secondary)
+                    .rotationEffect(.degrees(focused ? 180 : 0))
+            }
+            .font(.system(size: 13))
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .contentShape(Rectangle())
+            .onTapGesture { focused = true }
+            .onChange(of: query) { highlighted = 0 }
+
+            if focused {
+                Divider()
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            if matches.isEmpty {
+                                Text("No projects match “\(query)”")
+                                    .font(.system(size: 12)).foregroundStyle(Color.secondary)
+                                    .padding(10)
+                            }
+                            ForEach(Array(matches.enumerated()), id: \.element.task.project.id) { index, match in
+                                if index == 0 || matches[index - 1].client != match.client {
+                                    Text(match.client)
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(Color.secondary)
+                                        .padding(.horizontal, 10)
+                                        .padding(.top, index == 0 ? 6 : 10)
+                                        .padding(.bottom, 2)
+                                }
+                                Text(label(match.task))
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(index == highlighted ? Color.white : Color.primary)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(RoundedRectangle(cornerRadius: 5)
+                                        .fill(index == highlighted ? Color.harvestOrange : Color.clear))
+                                    .padding(.horizontal, 4)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { pick(match.task) }
+                                    .onHover { if $0 { highlighted = index } }
+                                    .id(index)
+                            }
+                        }
+                        .padding(.bottom, 4)
+                    }
+                    .frame(maxHeight: 220)
+                    .onChange(of: highlighted) { _, index in proxy.scrollTo(index) }
+                }
+            }
+        }
+    }
+
+    private func pick(_ task: TrackableTask) {
+        onPick(task)
+        query = ""
+        focused = false
+    }
 }

@@ -110,6 +110,7 @@ struct PlanDayView: View {
         }
         .padding(16)
         .frame(width: 400)
+        .dimsWindow()
         .foregroundStyle(Color.primary)
         .presentationBackground(Color.tileBackground)
         .onAppear { textFocused = true }
