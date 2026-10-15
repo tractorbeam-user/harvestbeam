@@ -43,8 +43,8 @@ public final class TimeTracker {
     // Derived from `tasks` and `entries` when they change, not on every
     // keystroke or redraw.
     @ObservationIgnored private var tasksByKey: [TaskKey: TrackableTask] = [:]
-    @ObservationIgnored private var searchIndex = Ranking.SearchIndex(tasks: [])
-    @ObservationIgnored private var usage: [TaskKey: Double] = [:]
+    @ObservationIgnored private(set) var searchIndex = Ranking.SearchIndex(tasks: [])
+    @ObservationIgnored private(set) var usage: [TaskKey: Double] = [:]
     /// Earliest day `entries` covers; older weeks are fetched on demand.
     @ObservationIgnored private var loadedFrom: LocalDate?
     @ObservationIgnored private var isLoadingHistory = false

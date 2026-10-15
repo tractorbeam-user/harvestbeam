@@ -4,11 +4,12 @@ import Foundation
 /// UserDefaults so the settings menu and the status item agree.
 public enum MenuBarDisplay {
     public enum Content: String, CaseIterable, Sendable {
-        case timeOnly, task, taskAndProject, notes
+        case timeOnly, project, task, taskAndProject, notes
 
         public var label: String {
             switch self {
             case .timeOnly: return "Time Only"
+            case .project: return "Project"
             case .task: return "Task"
             case .taskAndProject: return "Task and Project"
             case .notes: return "Notes (or Task)"
@@ -34,18 +35,18 @@ public enum MenuBarDisplay {
 
     public static func register(in defaults: UserDefaults = .standard) {
         defaults.register(defaults: [
-            contentKey: Content.task.rawValue,
+            contentKey: Content.project.rawValue,
             lengthKey: 28,
             truncationKey: Truncation.end.rawValue,
             showTimeKey: true,
         ])
     }
 
-    /// The text after the icon, e.g. "1:05  Design — Website Redesign".
+    /// The text after the icon, e.g. "1:05  Website Redesign".
     public static func title(
         task: TrackableTask, notes: String?, elapsed: TimeInterval, defaults: UserDefaults = .standard
     ) -> String {
-        let content = Content(rawValue: defaults.string(forKey: contentKey) ?? "") ?? .task
+        let content = Content(rawValue: defaults.string(forKey: contentKey) ?? "") ?? .project
         let limit = defaults.integer(forKey: lengthKey)
         let truncation = Truncation(rawValue: defaults.string(forKey: truncationKey) ?? "") ?? .end
         let showTime = defaults.bool(forKey: showTimeKey)
@@ -53,6 +54,7 @@ public enum MenuBarDisplay {
         let label: String
         switch content {
         case .timeOnly: label = ""
+        case .project: label = task.projectNameParts.name
         case .task: label = task.task.name
         case .taskAndProject: label = "\(task.task.name) — \(task.project.name)"
         case .notes:

@@ -53,27 +53,12 @@ struct NewEntryEditor: View {
                 .padding(.bottom, 12)
 
             VStack(spacing: 10) {
-                HStack(alignment: .center, spacing: Self.starGap) {
-                    Button {
-                        if let taskKey { tracker.favorites.toggle(taskKey) }
-                    } label: {
-                        Image(systemName: isFavorite ? "star.fill" : "star")
-                            .font(.system(size: 14))
-                            .foregroundStyle(isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary))
-                            .frame(width: Self.starWidth, height: Self.starWidth)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(taskKey == nil)
-                    .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
-
-                    VStack(spacing: 0) {
-                        projectMenu
-                        Divider().padding(.leading, 10)
-                        taskMenu
-                    }
-                    .background(fieldBackground)
+                VStack(spacing: 0) {
+                    projectMenu
+                    Divider().padding(.leading, 10)
+                    taskMenu
                 }
+                .background(fieldBackground)
 
                 HStack(alignment: .top, spacing: 10) {
                     TextField("Notes", text: $notes, prompt: Text("Notes (optional)"), axis: .vertical)
@@ -89,19 +74,30 @@ struct NewEntryEditor: View {
                         .multilineTextAlignment(.trailing)
                         .font(.system(size: 15, weight: .medium).monospacedDigit())
                         .padding(.horizontal, 10)
-                        .frame(width: 72, height: 50)
+                        .padding(.vertical, 9)
+                        .frame(width: 72, height: 50, alignment: .topTrailing)
                         .background(fieldBackground)
                         .focused($hoursFocused)
                         .disabled(isTimerRunning)
                         .help(isTimerRunning ? "Pause the timer to change hours"
                               : startsTimer || (entry == nil && isToday) ? "h:mm or decimal. Leave empty to start a timer." : "h:mm or decimal")
                 }
-                // Line the notes up under the project box, past the star.
-                .padding(.leading, Self.starWidth + Self.starGap)
             }
             .padding(.horizontal, 14)
 
             HStack(spacing: 8) {
+                // Favorite sits opposite the buttons instead of in a gutter.
+                Button {
+                    if let taskKey { tracker.favorites.toggle(taskKey) }
+                } label: {
+                    Label("Favorite", systemImage: isFavorite ? "star.fill" : "star")
+                        .font(.system(size: 12, weight: .medium))
+                        .fixedSize()
+                        .foregroundStyle(isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.secondary))
+                }
+                .buttonStyle(.plain)
+                .disabled(taskKey == nil)
+                .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
                 Spacer()
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -132,9 +128,6 @@ struct NewEntryEditor: View {
             }
         }
     }
-
-    private static let starWidth: CGFloat = 20
-    private static let starGap: CGFloat = 8
 
     private var fieldBackground: some View {
         RoundedRectangle(cornerRadius: 8, style: .continuous)

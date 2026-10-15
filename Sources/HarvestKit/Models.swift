@@ -47,6 +47,17 @@ public struct TrackableTask: Identifiable, Hashable, Sendable {
     public var key: TaskKey { TaskKey(projectID: project.id, taskID: task.id) }
     public var id: TaskKey { key }
 
+    /// "[LP-DP-01] LP Analyst" → ("LP-DP-01", "LP Analyst"), for showing the
+    /// code apart from the name. Names without a leading code come back whole.
+    public var projectNameParts: (code: String?, name: String) {
+        let full = project.name
+        guard full.hasPrefix("["), let close = full.firstIndex(of: "]") else { return (nil, full) }
+        let code = full[full.index(after: full.startIndex)..<close]
+        let rest = full[full.index(after: close)...].trimmingCharacters(in: .whitespaces)
+        guard !code.isEmpty, !rest.isEmpty else { return (nil, full) }
+        return (String(code), rest)
+    }
+
     /// "Website Redesign · Acme Co"
     public var subtitle: String {
         [project.name, client?.name].compactMap { $0 }.joined(separator: " · ")

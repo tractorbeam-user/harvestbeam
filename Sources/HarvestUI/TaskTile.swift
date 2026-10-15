@@ -52,7 +52,7 @@ struct TaskTile: View {
     private var content: some View {
         HStack(spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
-                let (code, name) = Self.splitCode(task.project.name)
+                let (code, name) = task.projectNameParts
                 if let code {
                     Text(code)
                         .font(.system(size: codeFont, weight: .medium).monospaced())
@@ -123,16 +123,6 @@ struct TaskTile: View {
     private var starStyle: AnyShapeStyle {
         if isRunning { return AnyShapeStyle(.white.opacity(isFavorite ? 1 : 0.7)) }
         return isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary)
-    }
-
-    /// "[LP-DP-01] LP Analyst" → ("LP-DP-01", "LP Analyst"), so the code gets
-    /// its own line instead of crowding out the name.
-    static func splitCode(_ projectName: String) -> (code: String?, name: String) {
-        guard projectName.hasPrefix("["), let close = projectName.firstIndex(of: "]") else { return (nil, projectName) }
-        let code = projectName[projectName.index(after: projectName.startIndex)..<close]
-        let rest = projectName[projectName.index(after: close)...].trimmingCharacters(in: .whitespaces)
-        guard !code.isEmpty, !rest.isEmpty else { return (nil, projectName) }
-        return (String(code), rest)
     }
 
     #if os(macOS)
