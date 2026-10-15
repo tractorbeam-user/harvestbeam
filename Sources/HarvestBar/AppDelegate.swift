@@ -280,8 +280,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let running = tracker.running != nil
             button.image = Self.controlImage(running: running)
             button.attributedTitle = NSAttributedString(string: title, attributes: [
+                // No custom color: the menu bar's own text color stays legible on
+                // any wallpaper.
                 .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium),
-                .foregroundColor: running ? NSColor.labelColor : NSColor.secondaryLabelColor,
             ])
             let task = (tracker.running ?? paused).map { tracker.task(for: $0) }
             button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)\n" + (running ? "Click the square to pause" : "Click the square to resume") }
