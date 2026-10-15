@@ -2,13 +2,14 @@ import AppKit
 import HarvestKit
 import HarvestUI
 import SwiftUI
+import UserNotifications
 
 /// Owns the menu bar item and the tracker window. The item shows a clock when
 /// idle and an orange dot with the elapsed time while a timer runs. The window
 /// opens below the item the first time, then stays wherever you drag it, at
 /// whatever size you leave it.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUserNotificationCenterDelegate {
     private let tracker: TimeTracker
     private var statusItem: NSStatusItem!
     /// Harvest-style play/pause square drawn over the item's image spot.
@@ -16,6 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let controlButton = NSImageView()
     private var panel: TrackerPanel!
     private var hotKey: HotKey?
+    private var reminders: Reminders?
+    private lazy var preferences = PreferencesWindowController(tracker: tracker) { [weak self] in
+        self?.resetPanelSize()
+    }
     private var ticker: Timer?
     private var poller: Timer?
     private var lastTitle: String?
@@ -44,10 +49,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         installMainMenu()
         makePanel()
 
-        hotKey = HotKey { [weak self] in self?.togglePanel() }
-        #if DEBUG
-        FileHandle.standardError.write(Data("⌥H shortcut mode: \(hotKey!.mode)\n".utf8))
-        #endif
+        Prefs.register()
+        Prefs.applyDockVisibility()
+        registerHotKey()
+        NotificationCenter.default.addObserver(forName: .toggleShortcutChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.registerHotKey() }
+        }
+        Notifier.setDelegate(self)
+        reminders = Reminders(tracker: tracker) { [weak self] idle in self?.askAboutIdleTime(idle) }
 
         // Keep the menu bar clock ticking, and pick up timers started on the web
         // or on another device.
@@ -79,6 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Preferences…", action: #selector(showPreferences), keyEquivalent: ",")
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide Harvest Bar", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "Quit Harvest Bar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
@@ -143,7 +154,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             setKeptOnTop: { [weak self] in self?.setKeptOnTop($0) },
             setTitle: { [weak self] in self?.panel.title = $0 }
         )
-        let host = NSHostingView(rootView: RootView().environment(tracker).environment(\.windowActions, actions))
+        var windowActions = actions
+        windowActions.openPreferences = { [weak self] in self?.showPreferences() }
+        let host = NSHostingView(rootView: RootView().environment(tracker).environment(\.windowActions, windowActions))
         host.sizingOptions = []
         panel.contentView = host
 
@@ -212,6 +225,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     static let defaultSize = NSSize(width: 440, height: 680)
+
+    @objc func showPreferences() {
+        preferences.show()
+    }
+
+    /// (Re)registers the show/hide shortcut from preferences; none if cleared.
+    private func registerHotKey() {
+        hotKey?.invalidate()
+        hotKey = HotKey.Shortcut.load().map { shortcut in
+            HotKey(keyCode: shortcut.keyCode, carbonModifiers: shortcut.carbonModifiers) { [weak self] in self?.togglePanel() }
+        }
+    }
+
+    /// Back from being away with a timer running: keep the time, or take it off.
+    private func askAboutIdleTime(_ seconds: TimeInterval) {
+        guard let entry = tracker.running else { return }
+        let task = tracker.task(for: entry)
+        let alert = NSAlert()
+        alert.messageText = "You were away for \(TimeFormat.hoursMinutes(seconds))"
+        alert.informativeText = "\(task.project.name) · \(task.task.name) kept running while you were away."
+        alert.addButton(withTitle: "Remove Time and Keep Going")
+        alert.addButton(withTitle: "Remove Time and Stop")
+        alert.addButton(withTitle: "Keep Time")
+        alert.icon = NSApp.applicationIconImage
+        NSApp.activate(ignoringOtherApps: true)
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: Task { await tracker.removeIdleTime(seconds, keepRunning: true) }
+        case .alertSecondButtonReturn: Task { await tracker.removeIdleTime(seconds, keepRunning: false) }
+        default: break
+        }
+    }
+
+    // MARK: Notifications
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter, willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        await MainActor.run { showPanel() }
+    }
 
     /// Back to the default size, keeping the window's top-left corner put.
     @objc func resetPanelSize() {

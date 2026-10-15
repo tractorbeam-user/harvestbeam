@@ -74,6 +74,8 @@ public struct WindowActions: Sendable {
     public var isKeptOnTop: @MainActor @Sendable () -> Bool
     public var setKeptOnTop: @MainActor @Sendable (Bool) -> Void
     public var setTitle: @MainActor @Sendable (String) -> Void
+    /// Opens the Preferences window; set by the Mac app after init.
+    public var openPreferences: (@MainActor @Sendable () -> Void)?
 
     public init(
         close: @escaping @MainActor @Sendable () -> Void,

@@ -82,8 +82,7 @@ struct NewEntryEditor: View {
                         .background(fieldBackground)
                         .hoverOutline()
                         .focused($hoursFocused)
-                        .disabled(isTimerRunning)
-                        .help(isTimerRunning ? "Pause the timer to change hours"
+                        .help(isTimerRunning ? "Change the time; the timer keeps running from there"
                               : startsTimer || (entry == nil && isToday) ? "h:mm or decimal. Leave empty to start a timer." : "h:mm or decimal")
                 }
             }

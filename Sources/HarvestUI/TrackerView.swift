@@ -268,6 +268,9 @@ struct TrackerView: View {
                     .disabled(tracker.running == nil)
                 Button("") { openSearch() }
                     .keyboardShortcut("f", modifiers: .command)
+                // No refresh button: it syncs every minute and when opened.
+                Button("") { Task { await tracker.refresh(force: true) } }
+                    .keyboardShortcut("r", modifiers: .command)
             }
             .opacity(0)
             .accessibilityHidden(true)
@@ -390,13 +393,6 @@ struct TrackerView: View {
                 Spacer()
             }
 
-            FooterButton(systemImage: "arrow.clockwise", help: "Refresh (⌘R)") {
-                Task { await tracker.refresh(force: true) }
-            }
-            .keyboardShortcut("r", modifiers: .command)
-            .rotationEffect(.degrees(tracker.isRefreshing ? 360 : 0))
-            .animation(tracker.isRefreshing ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default,
-                       value: tracker.isRefreshing)
 
             FooterButton(systemImage: "arrow.up.forward.app", help: "Open Harvest") {
                 if let url = tracker.harvestWebURL { openURL(url) }
@@ -440,6 +436,10 @@ struct TrackerView: View {
                     }
                 ))
                 Divider()
+                if let open = windowActions?.openPreferences {
+                    Button("Preferences…") { open() }
+                        .keyboardShortcut(",", modifiers: .command)
+                }
                 Button("Sign Out of \(tracker.accountName ?? "Harvest")") { tracker.signOut() }
                 Divider()
                 Button("Quit Harvest Bar") { NSApplication.shared.terminate(nil) }

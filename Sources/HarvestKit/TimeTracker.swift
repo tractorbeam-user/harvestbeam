@@ -308,13 +308,41 @@ public final class TimeTracker {
     public func updateEntry(_ entry: TimeEntry, task: TrackableTask, notes: String, hours: Double?) async {
         guard let service else { return }
         do {
-            upsert(try await service.updateEntry(
-                id: entry.id, projectID: task.project.id, taskID: task.task.id,
-                notes: notes, hours: entry.isRunning ? nil : hours
-            ))
+            // Harvest won't set hours on a running timer, so when the time
+            // changed: stop it, set the hours, and start it again.
+            if entry.isRunning, let hours, abs(hours - entry.elapsed() / 3600) > 1.0 / 120 {
+                let stopped = try await service.stopTimer(id: entry.id)
+                let updated = try await service.updateEntry(
+                    id: stopped.id, projectID: task.project.id, taskID: task.task.id, notes: notes, hours: hours
+                )
+                upsert(try await service.restartTimer(id: updated.id))
+            } else {
+                upsert(try await service.updateEntry(
+                    id: entry.id, projectID: task.project.id, taskID: task.task.id,
+                    notes: notes, hours: entry.isRunning ? nil : hours
+                ))
+            }
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            await recover(from: error)
+        }
+    }
+
+    /// Takes time you were away off the running timer, optionally stopping it.
+    public func removeIdleTime(_ seconds: TimeInterval, keepRunning: Bool) async {
+        guard let service, let current = running else { return }
+        do {
+            let stopped = try await service.stopTimer(id: current.id)
+            let hours = max(0, stopped.hours - seconds / 3600)
+            var updated = try await service.updateEntry(
+                id: stopped.id, projectID: stopped.project.id, taskID: stopped.task.id,
+                notes: stopped.notes ?? "", hours: hours
+            )
+            if keepRunning { updated = try await service.restartTimer(id: updated.id) }
+            upsert(updated)
+            errorMessage = nil
+        } catch {
+            await recover(from: error)
         }
     }
 
