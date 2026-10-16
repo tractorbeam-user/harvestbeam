@@ -200,7 +200,7 @@ struct TrackerView: View {
                                     onRemove: section.id == "suggested"
                                         ? { withAnimation(.snappy(duration: 0.2)) { tracker.hideSuggestion(task.key) } }
                                         : nil,
-                                    isFavoriteStyle: section.id == "favorites"
+                                    acceptsDrops: section.id == "favorites"
                                 )
                                     .id(task.key)
                             }
@@ -215,10 +215,16 @@ struct TrackerView: View {
                 } isTargeted: { targeted in
                     if section.id == "favorites" { favoritesTargeted = targeted }
                 }
-                .padding(section.id == "favorites" && favoritesTargeted ? 4 : 0)
+                // Favorites sit on their own soft orange panel, brighter while
+                // something is dragged over it.
+                .padding(section.id == "favorites" ? 10 : 0)
                 .background(
-                    RoundedRectangle(cornerRadius: Metrics.tileCorner + 4, style: .continuous)
-                        .fill(Color.harvestOrange.opacity(section.id == "favorites" && favoritesTargeted ? 0.08 : 0))
+                    RoundedRectangle(cornerRadius: Metrics.tileCorner + 2, style: .continuous)
+                        .fill(Color.harvestOrange.opacity(section.id != "favorites" ? 0 : favoritesTargeted ? 0.16 : 0.07))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Metrics.tileCorner + 2, style: .continuous)
+                        .strokeBorder(Color.harvestOrange.opacity(section.id == "favorites" && favoritesTargeted ? 0.5 : 0), lineWidth: 1.5)
                 )
             }
             if !isSearching {

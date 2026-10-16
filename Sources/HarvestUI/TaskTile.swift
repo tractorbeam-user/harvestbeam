@@ -12,8 +12,8 @@ struct TaskTile: View {
     var showsStar = true
     /// Set in Suggested: an × on hover removes the task from that list.
     var onRemove: (() -> Void)?
-    /// Favorites get a warm tint and an orange edge so they read as your own.
-    var isFavoriteStyle = false
+    /// In Favorites, dropping another tile on this one puts it just before.
+    var acceptsDrops = false
     @State private var isDropTarget = false
     @State private var isHovered = false
 
@@ -27,13 +27,14 @@ struct TaskTile: View {
     private var isFavorite: Bool { tracker.favorites.contains(task.key) }
 
     var body: some View {
-        Button {
-            Task { await tracker.toggle(task) }
-        } label: {
-            content
-        }
-        .buttonStyle(TileButtonStyle(isRunning: isRunning, isSelected: isSelected || isDropTarget, isHovered: isHovered,
-                                     isFavoriteStyle: isFavoriteStyle))
+        // Not a Button: on macOS a button keeps the mouse press to itself, so
+        // the tile could never be dragged. A tap starts or pauses instead.
+        content
+            .modifier(TileChrome(isRunning: isRunning, isSelected: isSelected || isDropTarget, isHovered: isHovered))
+            .onTapGesture { Task { await tracker.toggle(task) } }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { Task { await tracker.toggle(task) } }
         // Drag any tile into Favorites; in Favorites, drop on a tile to put
         // the dragged one before it.
         .draggable(task.key.description) {
@@ -44,10 +45,10 @@ struct TaskTile: View {
                 .foregroundStyle(.white)
         }
         .dropDestination(for: String.self) { items, _ in
-            guard isFavoriteStyle, let key = items.first.flatMap(TaskKey.init) else { return false }
+            guard acceptsDrops, let key = items.first.flatMap(TaskKey.init) else { return false }
             withAnimation(.snappy(duration: 0.2)) { tracker.favorites.place(key, before: task.key) }
             return true
-        } isTargeted: { isDropTarget = isFavoriteStyle && $0 }
+        } isTargeted: { isDropTarget = acceptsDrops && $0 }
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
@@ -156,37 +157,24 @@ struct TaskTile: View {
     #endif
 }
 
-private struct TileButtonStyle: ButtonStyle {
+private struct TileChrome: ViewModifier {
     let isRunning: Bool
     let isSelected: Bool
     let isHovered: Bool
-    var isFavoriteStyle = false
 
-    func makeBody(configuration: Configuration) -> some View {
+    func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
-        configuration.label
+        content
             .background(shape.fill(isRunning ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.tileBackground)))
-            .background(shape.fill(Color.harvestOrange.opacity(isFavoriteStyle && !isRunning ? 0.06 : 0)).blendMode(.normal))
-            .overlay(alignment: .leading) {
-                // An orange edge marks favorites.
-                if isFavoriteStyle && !isRunning {
-                    UnevenRoundedRectangle(cornerRadii: .init(topLeading: 11, bottomLeading: 11), style: .continuous)
-                        .fill(Color.harvestOrange)
-                        .frame(width: 4)
-                }
-            }
             .overlay(shape.strokeBorder(border, lineWidth: isSelected ? 2 : 1))
             .shadow(color: .black.opacity(isHovered ? 0.10 : 0.04), radius: isHovered ? 6 : 2, y: isHovered ? 2 : 1)
             .contentShape(shape)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
             .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 
     private var border: Color {
         if isSelected { return .harvestOrange }
         if isRunning { return .clear }
-        if isFavoriteStyle { return Color.harvestOrange.opacity(isHovered ? 0.4 : 0.22) }
         return Color.primary.opacity(isHovered ? 0.16 : 0.07)
     }
 }

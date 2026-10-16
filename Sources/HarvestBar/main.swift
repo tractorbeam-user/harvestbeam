@@ -36,5 +36,11 @@ MainActor.assumeIsolated {
     let app = NSApplication.shared
     app.delegate = delegate
     app.setActivationPolicy(.accessory)
+    #if DEBUG
+    // `--show` opens the window at launch, for testing.
+    if arguments.arguments.contains("--show") {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { delegate.showPanel() }
+    }
+    #endif
     app.run()
 }
