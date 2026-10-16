@@ -140,6 +140,78 @@
   .summary { display: flex; gap: 18px; padding: 0 14px; height: 44px; align-items: center; background: var(--tile); border-top: 1px solid var(--rule); font-size: 12px; color: var(--ink-2); }
   .summary strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
   .summary .spacer { flex: 1; }
+
+  /* 6 · Big tiles */
+  .bigtiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bt { background: var(--tile); border-radius: 16px; box-shadow: 0 0 0 1px var(--rule); padding: 14px; height: 128px; display: flex; flex-direction: column; justify-content: space-between; }
+  .bt .p { font: 500 16px/1.15 var(--display); letter-spacing: -.01em; }
+  .bt .k { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .bt .foot { display: flex; justify-content: space-between; align-items: flex-end; }
+  .bt .t { font: 400 24px/1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .bt.live { background: var(--orange); color: #fff; box-shadow: none; }
+  .bt.live .k { color: rgba(255,255,255,.8); }
+  .bt.add { background: transparent; box-shadow: inset 0 0 0 1.5px var(--rule); border: 0; align-items: center; justify-content: center; color: var(--ink-3); font-size: 13px; }
+
+  /* 7 · Week board */
+  .week { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 12px; }
+  .wd { text-align: center; font-size: 11px; color: var(--ink-2); }
+  .wd strong { display: block; font: 500 15px/1.2 var(--display); color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .wd .col { height: 80px; background: #f2f2f2; border-radius: 6px; margin-top: 6px; position: relative; overflow: hidden; }
+  .wd .col span { position: absolute; left: 0; right: 0; bottom: 0; }
+  .wd.today { color: var(--orange); }
+  .wd.today .col { box-shadow: inset 0 0 0 1.5px var(--orange); }
+  .goal { height: 6px; border-radius: 3px; background: #ececec; overflow: hidden; margin-top: 8px; }
+  .goal span { display: block; height: 100%; width: 75%; background: var(--orange); }
+
+  /* 8 · Menu dropdown */
+  .menubar { height: 24px; background: rgba(0,0,0,.05); display: flex; justify-content: flex-end; align-items: center; gap: 14px; padding: 0 12px; font-size: 12px; }
+  .menubar .mb { display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,.08); border-radius: 5px; padding: 1px 6px; font-weight: 500; }
+  .menubar .mb i { width: 14px; height: 12px; background: var(--orange); border-radius: 3px; display: inline-block; }
+  .dropdown { margin: 4px 10px 0 auto; width: 300px; background: rgba(255,255,255,.96); border-radius: 12px; box-shadow: 0 12px 34px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.15); padding: 6px; font-size: 13px; }
+  .dropdown .field { margin: 4px; padding: 6px 9px; border-radius: 7px; background: rgba(0,0,0,.05); color: var(--ink-3); }
+  .dropdown .item { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 6px; }
+  .dropdown .item.hi { background: var(--orange); color: #fff; }
+  .dropdown .item .x { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dropdown .item .s { color: var(--ink-3); font-size: 11px; }
+  .dropdown .item.hi .s { color: rgba(255,255,255,.8); }
+  .dropdown .sep { height: 1px; background: var(--rule); margin: 5px 6px; }
+  .dropdown .hd { font-size: 11px; font-weight: 600; color: var(--ink-3); padding: 4px 9px 2px; }
+  .desk { width: 380px; height: 640px; max-width: 100%; border-radius: 12px; overflow: hidden; background: linear-gradient(160deg, #cfd8dc, #eceff1); box-shadow: 0 20px 50px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.2); }
+
+  /* 9 · Mini player */
+  .pill { margin: 70px auto 0; width: 300px; background: #1d1d1f; color: #fff; border-radius: 18px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.35); }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 4px rgba(250,93,0,.25); }
+  .pill .p { font: 500 14px/1.2 var(--display); }
+  .pill .k { font-size: 11.5px; opacity: .6; }
+  .pill .t { font: 300 26px/1 var(--display); font-variant-numeric: tabular-nums; margin-left: auto; }
+  .pill .btn { width: 32px; height: 32px; border-radius: 50%; background: var(--orange); display: grid; place-items: center; font-size: 10px; }
+  .pill-menu { margin: 8px auto 0; width: 300px; background: rgba(29,29,31,.92); color: #fff; border-radius: 14px; padding: 6px; font-size: 12.5px; box-shadow: 0 12px 30px rgba(0,0,0,.3); }
+  .pill-menu div { padding: 7px 10px; border-radius: 8px; display: flex; justify-content: space-between; }
+  .pill-menu div:first-child { background: rgba(255,255,255,.1); }
+  .pill-menu span { opacity: .55; }
+
+  /* 10 · Wide split */
+  .wide { width: 100%; max-width: 760px; }
+  .wide .win { width: 100%; height: 520px; }
+  .split { flex: 1; display: grid; grid-template-columns: 220px 1fr; min-height: 0; }
+  .split .side { background: #f6f6f6; border-right: 1px solid var(--rule); padding: 12px 10px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+  .split .side .hd { font-size: 10.5px; font-weight: 600; color: var(--ink-3); letter-spacing: .05em; text-transform: uppercase; margin: 8px 6px 4px; }
+  .split .side .it { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; font-size: 12.5px; }
+  .split .side .it.live { background: var(--orange); color: #fff; }
+  .split .side .it .x { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .split .main { background: var(--tile); padding: 22px 26px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+  .split .main h3 { font: 500 34px/1 var(--display); letter-spacing: -.025em; margin: 0; }
+  .split .main h3 span { color: var(--ink-3); }
+  .split .big { display: flex; gap: 28px; border-top: 2px solid var(--ink); padding-top: 10px; }
+  .split .big div { font-size: 11px; color: var(--ink-2); }
+  .split .big strong { display: block; font: 500 28px/1.1 var(--display); color: var(--ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .split .big .live strong { color: var(--orange); }
+  .split table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .split td { padding: 10px 0; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+  .split td.t { font: 500 17px/1 var(--display); font-variant-numeric: tabular-nums; width: 64px; }
+  .split td .p { font: 500 15px/1.2 var(--display); }
+  .split td .k { color: var(--ink-2); font-size: 12px; }
+  .split tr.live td.t { color: var(--orange); }
   footer.page { max-width: 1240px; margin: 0 auto; padding: 8px 24px 48px; color: var(--ink-2); font-size: 13px; }
 
   @media (max-width: 440px) {
@@ -151,7 +223,7 @@
 </head>
 <body>
 <header class="page">
-  <h1>Harvestbeam · five layout directions</h1>
+  <h1>Harvestbeam · ten layout directions</h1>
   <p>Same features, arranged so starting, switching and stopping a timer takes one look and one click. Each uses your real projects. Pick one, or mix parts, and I'll build it.</p>
 </header>
 
@@ -321,6 +393,161 @@
       <li>One pattern to learn: row, time, play.</li>
       <li>Starred rows stay on top of "Start"; the rest fill in from recent.</li>
       <li>Fits more in a small window, and works well when docked narrow.</li>
+    </ul>
+  </section>
+
+  <!-- 6 -->
+  <section class="direction">
+    <h2><span>6</span>Big tiles</h2>
+    <p class="why">Favorites become large square buttons with today's time on each, like a launcher. The running one is solid orange. Good for a handful of regular projects.</p>
+    <div class="win">
+      <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">Friday, Oct 16<small>Today 3:28</small></div><div class="icons">▦ ⓘ</div></div>
+      <div class="body">
+        <div class="bigtiles">
+          <div class="bt live"><div><div class="p">Digital Products</div><div class="k">Product Design</div></div><div class="foot"><span class="t">1:23</span><span class="pause" style="background:#fff;color:var(--orange)">❚❚</span></div></div>
+          <div class="bt"><div><div class="p">Context</div><div class="k">Product Design</div></div><div class="foot"><span class="t">1:05</span><span class="play">▶</span></div></div>
+          <div class="bt"><div><div class="p">Managerial Tasks</div><div class="k">Product Design</div></div><div class="foot"><span class="t faint">0:00</span><span class="play">▶</span></div></div>
+          <div class="bt"><div><div class="p">LP Analyst Website</div><div class="k">Product Design</div></div><div class="foot"><span class="t faint">0:00</span><span class="play">▶</span></div></div>
+          <div class="bt"><div><div class="p">Social Content Creation</div><div class="k">Product Design</div></div><div class="foot"><span class="t">0:00</span><span class="play">▶</span></div></div>
+          <div class="bt add">＋ Add a favorite</div>
+        </div>
+      </div>
+      <div class="bottombar"><span>＋</span><span>✦</span><span>⌕</span><span class="spacer"></span><span class="muted" style="font-size:12px">Week <b class="mono" style="color:var(--ink)">29:52</b></span><span>⚙︎</span></div>
+    </div>
+    <ul>
+      <li>Huge click targets: switching is one click anywhere on a tile.</li>
+      <li>Time on each tile answers "how much on this today?" at a glance.</li>
+      <li>Today's list moves to a "Day" tab for when you need to edit.</li>
+    </ul>
+  </section>
+
+  <!-- 7 -->
+  <section class="direction">
+    <h2><span>7</span>Week board</h2>
+    <p class="why">For people who fill timesheets by the week: five day columns with a goal bar on top, and the selected day's entries below. Gaps are obvious before Friday's deadline.</p>
+    <div class="win">
+      <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">Week of Oct 12</div><div class="icons">▦ ⓘ</div></div>
+      <div class="body">
+        <div class="card" style="padding:12px 12px 4px">
+          <div class="label" style="justify-content:space-between"><span>Week <b class="mono">29:52</b> of 40:00</span><span class="faint">75%</span></div>
+          <div class="goal"><span></span></div>
+          <div class="week" style="padding:12px 0 8px">
+            <div class="wd">Mon<strong>8:51</strong><div class="col"><span style="height:100%;background:#5b6cf0"></span></div></div>
+            <div class="wd">Tue<strong>6:58</strong><div class="col"><span style="height:80%;background:#5b6cf0"></span></div></div>
+            <div class="wd">Wed<strong>6:13</strong><div class="col"><span style="height:72%;background:#5b6cf0"></span></div></div>
+            <div class="wd">Thu<strong>3:01</strong><div class="col"><span style="height:36%;background:#e5a100"></span></div></div>
+            <div class="wd today">Fri<strong>3:28</strong><div class="col"><span style="height:40%;background:var(--orange)"></span></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="background:var(--orange-soft)"><div class="text"><div class="proj">Digital Products</div><div class="task">Product Design</div></div><span class="mono" style="color:var(--orange);font-weight:600">1:23</span><div class="pause">❚❚</div></div>
+          <div class="row"><div class="text"><div class="proj">Context</div><div class="task">Product Design</div></div><span class="mono">1:05</span><div class="play">▶</div></div>
+          <div class="row"><div class="text"><div class="proj">Social Content Creation</div><div class="task">Product Design</div></div><span class="mono">0:00</span><div class="play">▶</div></div>
+        </div>
+        <div class="card row" style="color:#a15c00;background:#fff7e6"><span>⚠︎</span><div class="text"><div>Thursday is light (3:01). Add time?</div></div><span class="play">＋</span></div>
+      </div>
+      <div class="bottombar"><span>＋</span><span>✦</span><span>⌕</span><span class="spacer"></span><span>⚙︎</span></div>
+    </div>
+    <ul>
+      <li>Uses your weekly capacity from Harvest for the goal bar.</li>
+      <li>Light days get a nudge, so nothing slips before invoicing.</li>
+      <li>Click a column to see and edit that day.</li>
+    </ul>
+  </section>
+
+  <!-- 8 -->
+  <section class="direction">
+    <h2><span>8</span>Menu, not window</h2>
+    <p class="why">Clicking the menu bar opens a native-feeling menu instead of a window: search at the top, then running, favorites and recent. The full window is one item away.</p>
+    <div class="desk">
+      <div class="menubar"><span>no event</span><span class="mb"><i></i>1:23 Digital Products</span><span>Fri 12:43</span></div>
+      <div class="dropdown">
+        <div class="field">Search or start something…</div>
+        <div class="hd">Running</div>
+        <div class="item hi"><span>❚❚</span><span class="x">Digital Products · Product Design</span><span class="s">1:23</span></div>
+        <div class="sep"></div>
+        <div class="hd">Favorites</div>
+        <div class="item"><span class="faint">▶</span><span class="x">Context · Product Design</span><span class="s">⌘1</span></div>
+        <div class="item"><span class="faint">▶</span><span class="x">Managerial Tasks · Product Design</span><span class="s">⌘2</span></div>
+        <div class="item"><span class="faint">▶</span><span class="x">LP Analyst Website · Product Design</span><span class="s">⌘3</span></div>
+        <div class="sep"></div>
+        <div class="hd">Recent</div>
+        <div class="item"><span class="faint">▶</span><span class="x">Social Content Creation · Product Design</span></div>
+        <div class="item"><span class="faint">▶</span><span class="x">TB Corporate · Product Design</span></div>
+        <div class="sep"></div>
+        <div class="item"><span class="x">Today 3:28 · Week 29:52</span><span class="s">⌥H</span></div>
+        <div class="item"><span class="x">Open Timesheet…</span><span class="s">⌘O</span></div>
+        <div class="item"><span class="x">Plan My Day…</span><span class="s">⌘P</span></div>
+      </div>
+    </div>
+    <ul>
+      <li>The fastest possible switch: click the menu bar, click a task.</li>
+      <li>Feels like part of macOS; the keyboard works like any menu.</li>
+      <li>The timesheet window stays for editing and planning.</li>
+    </ul>
+  </section>
+
+  <!-- 9 -->
+  <section class="direction">
+    <h2><span>9</span>Mini player</h2>
+    <p class="why">A small floating pill shows what's running, like a music mini player. Click the name to switch with a short list; expand to the full window when needed.</p>
+    <div class="desk">
+      <div class="menubar"><span>no event</span><span class="mb"><i></i>1:23</span><span>Fri 12:43</span></div>
+      <div class="pill"><span class="dot"></span><div><div class="p">Digital Products ▾</div><div class="k">Product Design</div></div><span class="t">1:23</span><span class="btn">❚❚</span></div>
+      <div class="pill-menu">
+        <div>Context · Product Design<span>1:05</span></div>
+        <div>Managerial Tasks · Product Design<span>⌘2</span></div>
+        <div>Social Content Creation<span>0:00</span></div>
+        <div>Search all tasks…<span>⌘F</span></div>
+        <div>Open full window<span>⌘O</span></div>
+      </div>
+    </div>
+    <ul>
+      <li>Stays on top in a corner without covering your work.</li>
+      <li>A constant gentle reminder that the clock is running (or isn't).</li>
+      <li>Optional: shows only while a timer runs, or always.</li>
+    </ul>
+  </section>
+
+  <!-- 10 -->
+  <section class="direction wide" style="grid-column: 1 / -1">
+    <h2><span>10</span>Wide split (Swiss, for the bigger window)</h2>
+    <p class="why">When the window is wide (green button), a sidebar of favorites and recent sits beside a large, typographic day view. The same Swiss scale as 2, with more room.</p>
+    <div class="win">
+      <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="title">Friday, Oct 16<small>Week 29:52</small></div><div class="icons">▦ ⓘ</div></div>
+      <div class="split">
+        <div class="side">
+          <div class="field" style="padding:6px 9px;border-radius:7px;background:rgba(0,0,0,.05);color:var(--ink-3);font-size:12.5px">⌕ Search tasks</div>
+          <div class="hd">Favorites</div>
+          <div class="it live"><span>❚❚</span><span class="x">Digital Products</span><span>1:23</span></div>
+          <div class="it"><span class="faint">▶</span><span class="x">Context</span><span class="faint">⌘2</span></div>
+          <div class="it"><span class="faint">▶</span><span class="x">Managerial Tasks</span><span class="faint">⌘3</span></div>
+          <div class="it"><span class="faint">▶</span><span class="x">LP Analyst Website</span><span class="faint">⌘4</span></div>
+          <div class="hd">Recent</div>
+          <div class="it"><span class="faint">▶</span><span class="x">Social Content Creation</span></div>
+          <div class="it"><span class="faint">▶</span><span class="x">TB Corporate</span></div>
+          <div class="it"><span class="faint">▶</span><span class="x">Website Design and Dev</span></div>
+        </div>
+        <div class="main">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><h3>Friday <span>16 October</span></h3><span class="muted">‹ Today ›</span></div>
+          <div class="big">
+            <div class="live">Running<strong>1:23</strong></div>
+            <div>Today<strong>3:28</strong></div>
+            <div>Week<strong>29:52</strong></div>
+            <div>Goal<strong>40:00</strong></div>
+          </div>
+          <table>
+            <tr class="live"><td class="t">1:23</td><td><div class="p">Digital Products</div><div class="k">Product Design · Tractorbeam</div></td><td style="width:34px"><span class="pause">❚❚</span></td></tr>
+            <tr><td class="t">1:05</td><td><div class="p">Context</div><div class="k">Product Design · TB-OP-01 · Tractorbeam Marketing</div></td><td><span class="play">▶</span></td></tr>
+            <tr><td class="t">0:00</td><td><div class="p">Social Content Creation</div><div class="k">Product Design · TB-OP-04</div></td><td><span class="play">▶</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    <ul>
+      <li>Compact layout when narrow, this layout when wide: same app, two sizes.</li>
+      <li>Large regular-weight numerals do the work instead of boxes and borders.</li>
+      <li>Everything visible at once: no scrolling to reach favorites.</li>
     </ul>
   </section>
 
