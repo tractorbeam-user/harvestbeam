@@ -30,7 +30,7 @@ struct TaskTile: View {
         // Not a Button: on macOS a button keeps the mouse press to itself, so
         // the tile could never be dragged. A tap starts or pauses instead.
         content
-            .modifier(TileChrome(isRunning: isRunning, isSelected: isSelected || isDropTarget, isHovered: isHovered))
+            .modifier(TileChrome(isRunning: isRunning, isSelected: isSelected, isHovered: isHovered))
             .onTapGesture { Task { await tracker.toggle(task) } }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
@@ -48,7 +48,22 @@ struct TaskTile: View {
             guard acceptsDrops, let key = items.first.flatMap(TaskKey.init) else { return false }
             withAnimation(.snappy(duration: 0.2)) { tracker.favorites.place(key, before: task.key) }
             return true
-        } isTargeted: { isDropTarget = acceptsDrops && $0 }
+        } isTargeted: { targeted in
+            withAnimation(.snappy(duration: 0.15)) { isDropTarget = acceptsDrops && targeted }
+        }
+        // While a tile is dragged over this one, an insertion line in the gap
+        // before it shows where it'll land, and this tile makes a little room.
+        .offset(x: isDropTarget ? 6 : 0)
+        .overlay(alignment: .leading) {
+            if isDropTarget {
+                Capsule()
+                    .fill(Color.harvestOrange)
+                    .frame(width: 3)
+                    .padding(.vertical, 2)
+                    .offset(x: -(Metrics.spacing / 2) - 1.5)
+                    .transition(.opacity)
+            }
+        }
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif

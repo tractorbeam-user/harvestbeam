@@ -186,6 +186,7 @@ private struct EntryRow: View {
     @Environment(\.openURL) private var openURL
     @State private var isHovered = false
     @State private var isEditing = false
+    private var isFavorite: Bool { tracker.favorites.contains(entry.key) }
 
     var body: some View {
         // Double-click (or double-tap) edits; only the round button starts or
@@ -213,6 +214,22 @@ private struct EntryRow: View {
                 .multilineTextAlignment(.leading)
 
                 Spacer(minLength: 8)
+
+                // Star on hover (always shown once it's a favorite).
+                if isHovered || isFavorite {
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) { tracker.favorites.toggle(entry.key) }
+                    } label: {
+                        Image(systemName: isFavorite ? "star.fill" : "star")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
+                    .accessibilityLabel(isFavorite ? "Remove from Favorites" : "Add to Favorites")
+                }
 
                 Group {
                     if entry.isRunning {
@@ -242,11 +259,14 @@ private struct EntryRow: View {
             .contentShape(Rectangle())
             .onTapGesture(count: 2) { isEditing = true }
             .help("Double-click to edit")
+            // Drag an entry into Favorites, like a tile.
+            .draggable(entry.key.description)
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
         .contextMenu {
             Button("Edit Entry") { isEditing = true }
+            Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
             Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
                 Task { await tracker.toggle(entry) }
             }
