@@ -29,8 +29,15 @@ struct TrackerView: View {
     /// Search starts as an icon and opens into a field when you need it.
     @State private var isSearchOpen = false
     @State private var favoritesTargeted = false
+    /// The Tiles and List layouts (and Classic's big ask box) were tried and
+    /// set aside; flip these to bring them back.
+    private static let showsLayoutSwitcher = false
+    private static let showsAskBox = false
     @AppStorage("windowLayout") private var layoutRaw = WindowLayout.classic.rawValue
-    private var layout: WindowLayout { WindowLayout(rawValue: layoutRaw) ?? .classic }
+    private var layout: WindowLayout {
+        Self.showsLayoutSwitcher ? WindowLayout(rawValue: layoutRaw) ?? .classic : .classic
+    }
+    private var asksFirst: Bool { Self.showsAskBox && layout == .classic }
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
@@ -120,7 +127,7 @@ struct TrackerView: View {
                 query = ""
                 selection = nil
                 isSearchOpen = false
-                if layout == .classic { Task { searchFocused = true } }
+                if asksFirst { Task { searchFocused = true } }
                 // Opening the window on a new day goes straight to it.
                 let today = LocalDate()
                 if today != lastToday {
@@ -281,7 +288,7 @@ struct TrackerView: View {
         // Keyboard selection skips folded sections.
         let flat = sections.filter { isSearching || !collapsed.contains($0.id) }.flatMap(\.tasks)
         return VStack(spacing: 0) {
-            if layout == .classic {
+            if asksFirst {
                 // Ask first: the big box is always there, focused when the window opens.
                 searchField(flat, large: true)
                     .padding(.horizontal, Metrics.padding)
@@ -476,7 +483,7 @@ struct TrackerView: View {
                 .keyboardShortcut("p", modifiers: .command)
                 .popover(isPresented: $isPlanning, arrowEdge: .top) { PlanDayView(day: selectedDay) }
                 .padding(.trailing, 2)
-            if layout == .classic {
+            if asksFirst {
                 Spacer()
             } else if isSearchOpen || !query.isEmpty {
                 searchField(flat)
@@ -488,7 +495,8 @@ struct TrackerView: View {
             }
 
 
-            // Layout switcher.
+            // Layout switcher (hidden for now).
+            if Self.showsLayoutSwitcher {
             Picker("Layout", selection: $layoutRaw) {
                 ForEach(WindowLayout.allCases) { option in
                     Image(systemName: option.systemImage).help(option.label).tag(option.rawValue)
@@ -499,6 +507,7 @@ struct TrackerView: View {
             .fixedSize()
             .padding(.trailing, 4)
             .help("Layout: Classic, Tiles or List")
+            }
 
             FooterButton(systemImage: "arrow.up.forward.app", help: "Open Harvest") {
                 if let url = tracker.harvestWebURL { openURL(url) }
