@@ -29,10 +29,10 @@ struct TrackerView: View {
     /// Search starts as an icon and opens into a field when you need it.
     @State private var isSearchOpen = false
     @State private var favoritesTargeted = false
-    /// The Tiles and List layouts (and Classic's big ask box) were tried and
-    /// set aside; flip these to bring them back.
+    /// Classic with the big "What are you working on?" box is the one layout.
+    /// Tiles and List were tried and set aside; flip this to bring them back.
     private static let showsLayoutSwitcher = false
-    private static let showsAskBox = false
+    private static let showsAskBox = true
     @AppStorage("windowLayout") private var layoutRaw = WindowLayout.classic.rawValue
     private var layout: WindowLayout {
         Self.showsLayoutSwitcher ? WindowLayout(rawValue: layoutRaw) ?? .classic : .classic
