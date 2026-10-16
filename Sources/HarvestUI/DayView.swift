@@ -215,22 +215,6 @@ private struct EntryRow: View {
 
                 Spacer(minLength: 8)
 
-                // Star on hover (always shown once it's a favorite).
-                if isHovered || isFavorite {
-                    Button {
-                        withAnimation(.snappy(duration: 0.2)) { tracker.favorites.toggle(entry.key) }
-                    } label: {
-                        Image(systemName: isFavorite ? "star.fill" : "star")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary))
-                            .frame(width: 24, height: 24)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
-                    .accessibilityLabel(isFavorite ? "Remove from Favorites" : "Add to Favorites")
-                }
-
                 Group {
                     if entry.isRunning {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
