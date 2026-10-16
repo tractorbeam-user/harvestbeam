@@ -12,6 +12,9 @@ struct TaskTile: View {
     var showsStar = true
     /// Set in Suggested: an × on hover removes the task from that list.
     var onRemove: (() -> Void)?
+    /// Favorites get a warm tint and an orange edge so they read as your own.
+    var isFavoriteStyle = false
+    @State private var isDropTarget = false
     @State private var isHovered = false
 
     private var isBusy: Bool { tracker.busyKey == task.key }
@@ -29,7 +32,22 @@ struct TaskTile: View {
         } label: {
             content
         }
-        .buttonStyle(TileButtonStyle(isRunning: isRunning, isSelected: isSelected, isHovered: isHovered))
+        .buttonStyle(TileButtonStyle(isRunning: isRunning, isSelected: isSelected || isDropTarget, isHovered: isHovered,
+                                     isFavoriteStyle: isFavoriteStyle))
+        // Drag any tile into Favorites; in Favorites, drop on a tile to put
+        // the dragged one before it.
+        .draggable(task.key.description) {
+            Text(task.projectNameParts.name + " · " + task.task.name)
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Capsule().fill(Color.harvestOrange))
+                .foregroundStyle(.white)
+        }
+        .dropDestination(for: String.self) { items, _ in
+            guard isFavoriteStyle, let key = items.first.flatMap(TaskKey.init) else { return false }
+            withAnimation(.snappy(duration: 0.2)) { tracker.favorites.place(key, before: task.key) }
+            return true
+        } isTargeted: { isDropTarget = isFavoriteStyle && $0 }
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
@@ -142,11 +160,21 @@ private struct TileButtonStyle: ButtonStyle {
     let isRunning: Bool
     let isSelected: Bool
     let isHovered: Bool
+    var isFavoriteStyle = false
 
     func makeBody(configuration: Configuration) -> some View {
         let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
         configuration.label
             .background(shape.fill(isRunning ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.tileBackground)))
+            .background(shape.fill(Color.harvestOrange.opacity(isFavoriteStyle && !isRunning ? 0.06 : 0)).blendMode(.normal))
+            .overlay(alignment: .leading) {
+                // An orange edge marks favorites.
+                if isFavoriteStyle && !isRunning {
+                    UnevenRoundedRectangle(cornerRadii: .init(topLeading: 11, bottomLeading: 11), style: .continuous)
+                        .fill(Color.harvestOrange)
+                        .frame(width: 4)
+                }
+            }
             .overlay(shape.strokeBorder(border, lineWidth: isSelected ? 2 : 1))
             .shadow(color: .black.opacity(isHovered ? 0.10 : 0.04), radius: isHovered ? 6 : 2, y: isHovered ? 2 : 1)
             .contentShape(shape)
@@ -158,6 +186,7 @@ private struct TileButtonStyle: ButtonStyle {
     private var border: Color {
         if isSelected { return .harvestOrange }
         if isRunning { return .clear }
+        if isFavoriteStyle { return Color.harvestOrange.opacity(isHovered ? 0.4 : 0.22) }
         return Color.primary.opacity(isHovered ? 0.16 : 0.07)
     }
 }

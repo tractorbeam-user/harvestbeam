@@ -28,6 +28,7 @@ struct TrackerView: View {
     @State private var isPlanning = false
     /// Search starts as an icon and opens into a field when you need it.
     @State private var isSearchOpen = false
+    @State private var favoritesTargeted = false
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
@@ -64,7 +65,7 @@ struct TrackerView: View {
         return [
             TaskSection(
                 id: "favorites", title: "Favorites", systemImage: "star.fill",
-                tasks: tracker.favoriteTasks, emptyHint: "Tap the star on any task to keep it here"
+                tasks: tracker.favoriteTasks, emptyHint: "Drag a task here, or star it, to keep it handy"
             ),
             TaskSection(id: "recent", title: "Recent", systemImage: "clock.arrow.circlepath", tasks: tracker.recentTasks),
             TaskSection(id: "suggested", title: "Suggested", systemImage: "sparkles", tasks: tracker.suggestedTasks),
@@ -198,13 +199,27 @@ struct TrackerView: View {
                                     task: task, isSelected: selection == task.key, showsStar: section.id != "favorites",
                                     onRemove: section.id == "suggested"
                                         ? { withAnimation(.snappy(duration: 0.2)) { tracker.hideSuggestion(task.key) } }
-                                        : nil
+                                        : nil,
+                                    isFavoriteStyle: section.id == "favorites"
                                 )
                                     .id(task.key)
                             }
                         }
                     }
                 }
+                // Drop anywhere in Favorites (even when empty) to add at the end.
+                .dropDestination(for: String.self) { items, _ in
+                    guard section.id == "favorites", let key = items.first.flatMap(TaskKey.init) else { return false }
+                    withAnimation(.snappy(duration: 0.2)) { tracker.favorites.place(key, before: nil) }
+                    return true
+                } isTargeted: { targeted in
+                    if section.id == "favorites" { favoritesTargeted = targeted }
+                }
+                .padding(section.id == "favorites" && favoritesTargeted ? 4 : 0)
+                .background(
+                    RoundedRectangle(cornerRadius: Metrics.tileCorner + 4, style: .continuous)
+                        .fill(Color.harvestOrange.opacity(section.id == "favorites" && favoritesTargeted ? 0.08 : 0))
+                )
             }
             if !isSearching {
                 Text("Search to find any of your \(tracker.tasks.count) tasks")

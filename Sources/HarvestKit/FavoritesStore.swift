@@ -56,6 +56,19 @@ public final class FavoritesStore {
         persist()
     }
 
+    /// Puts `key` just before `target` (or at the end when nil), starring it
+    /// if it isn't yet. Used by drag and drop.
+    public func place(_ key: TaskKey, before target: TaskKey?) {
+        guard key != target else { return }
+        keys.removeAll { $0 == key }
+        if let target, let index = keys.firstIndex(of: target) {
+            keys.insert(key, at: index)
+        } else {
+            keys.append(key)
+        }
+        persist()
+    }
+
     /// Moves a favorite one place earlier (-1) or later (+1).
     public func shift(_ key: TaskKey, by offset: Int) {
         guard let index = keys.firstIndex(of: key) else { return }
