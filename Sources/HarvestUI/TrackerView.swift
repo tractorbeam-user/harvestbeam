@@ -29,6 +29,8 @@ struct TrackerView: View {
     /// Search starts as an icon and opens into a field when you need it.
     @State private var isSearchOpen = false
     @State private var favoritesTargeted = false
+    @AppStorage("windowLayout") private var layoutRaw = WindowLayout.classic.rawValue
+    private var layout: WindowLayout { WindowLayout(rawValue: layoutRaw) ?? .classic }
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
@@ -118,6 +120,7 @@ struct TrackerView: View {
                 query = ""
                 selection = nil
                 isSearchOpen = false
+                if layout == .classic { Task { searchFocused = true } }
                 // Opening the window on a new day goes straight to it.
                 let today = LocalDate()
                 if today != lastToday {
@@ -136,6 +139,7 @@ struct TrackerView: View {
                     await tracker.refresh(force: true)
                 }
             }
+            .onChange(of: layoutRaw) { query = ""; isSearchOpen = false }
             .onChange(of: searchFocused) { _, focused in
                 if !focused && query.isEmpty { withAnimation(.snappy(duration: 0.2)) { isSearchOpen = false } }
             }
@@ -277,11 +281,31 @@ struct TrackerView: View {
         // Keyboard selection skips folded sections.
         let flat = sections.filter { isSearching || !collapsed.contains($0.id) }.flatMap(\.tasks)
         return VStack(spacing: 0) {
+            if layout == .classic {
+                // Ask first: the big box is always there, focused when the window opens.
+                searchField(flat, large: true)
+                    .padding(.horizontal, Metrics.padding)
+                    .padding(.top, 12)
+                    .padding(.bottom, 2)
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 22) {
-                        if !isSearching { DayView(selectedDay: $selectedDay) }
-                        content(sections)
+                        if isSearching {
+                            content(sections)
+                        } else {
+                            switch layout {
+                            case .classic:
+                                DayView(selectedDay: $selectedDay)
+                                content(sections)
+                            case .tiles:
+                                BigTilesView(openSearch: openSearch)
+                                DayView(selectedDay: $selectedDay)
+                            case .list:
+                                DayView(selectedDay: $selectedDay)
+                                StartListView()
+                            }
+                        }
                     }
                     .padding(.horizontal, Metrics.padding)
                     .padding(.vertical, isSearching ? 10 : Metrics.padding)
@@ -330,14 +354,16 @@ struct TrackerView: View {
         Task { searchFocused = true }
     }
 
-    private func searchField(_ flat: [TrackableTask]) -> some View {
+    /// The search field: small in the bottom bar, or `large` as the Classic
+    /// layout's "What are you working on?" box.
+    private func searchField(_ flat: [TrackableTask], large: Bool = false) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: large ? 15 : 13, weight: .medium))
                 .foregroundStyle(searchFocused ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.secondary))
-            TextField("Start something new…", text: $query)
+            TextField(large ? "What are you working on?" : "Start something new…", text: $query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14))
+                .font(.system(size: large ? 17 : 14))
                 .focusEffectDisabled()
                 .focused($searchFocused)
                 .onKeyPress(.downArrow) { moveSelection(by: isSearching ? 1 : columnCount, in: flat); return .handled }
@@ -368,19 +394,39 @@ struct TrackerView: View {
                     }
                 }
             // Clears the text, or closes search when it's already empty.
-            Button {
-                if query.isEmpty { closeSearch() } else { query = "" }
-            } label: {
-                Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+            if !large || !query.isEmpty {
+                Button {
+                    if query.isEmpty { closeSearch() } else { query = "" }
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .help(query.isEmpty ? "Close search" : "Clear search")
             }
-            .buttonStyle(.plain)
-            .help(query.isEmpty ? "Close search" : "Clear search")
+            if large {
+                // Dictate into the box, same as pressing fn twice.
+                Button {
+                    searchFocused = true
+                    #if os(macOS)
+                    DispatchQueue.main.async { NSApp.sendAction(Selector(("startDictation:")), to: nil, from: nil) }
+                    #endif
+                } label: {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.harvestOrange)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Color.harvestOrange.opacity(0.13)))
+                }
+                .buttonStyle(.plain)
+                .help("Dictate")
+            }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 30) // Same as the footer buttons, so opening search doesn't resize the bar.
-        .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color.panelBackground))
+        .padding(.horizontal, large ? 12 : 10)
+        // Small: the same height as the footer buttons, so opening search doesn't resize the bar.
+        .frame(height: large ? 46 : 30)
+        .background(RoundedRectangle(cornerRadius: large ? 14 : 15, style: .continuous).fill(large ? Color.tileBackground : Color.panelBackground))
         .overlay(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
+            RoundedRectangle(cornerRadius: large ? 14 : 15, style: .continuous)
                 .strokeBorder(searchFocused ? Color.harvestOrange.opacity(0.7) : Color.primary.opacity(0.1), lineWidth: searchFocused ? 1.5 : 1)
         )
     }
@@ -430,7 +476,9 @@ struct TrackerView: View {
                 .keyboardShortcut("p", modifiers: .command)
                 .popover(isPresented: $isPlanning, arrowEdge: .top) { PlanDayView(day: selectedDay) }
                 .padding(.trailing, 2)
-            if isSearchOpen || !query.isEmpty {
+            if layout == .classic {
+                Spacer()
+            } else if isSearchOpen || !query.isEmpty {
                 searchField(flat)
                     .padding(.trailing, 6)
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
@@ -439,6 +487,18 @@ struct TrackerView: View {
                 Spacer()
             }
 
+
+            // Layout switcher.
+            Picker("Layout", selection: $layoutRaw) {
+                ForEach(WindowLayout.allCases) { option in
+                    Image(systemName: option.systemImage).help(option.label).tag(option.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .padding(.trailing, 4)
+            .help("Layout: Classic, Tiles or List")
 
             FooterButton(systemImage: "arrow.up.forward.app", help: "Open Harvest") {
                 if let url = tracker.harvestWebURL { openURL(url) }
