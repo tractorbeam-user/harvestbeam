@@ -33,6 +33,8 @@ struct TrackerView: View {
     @AppStorage("collapsedSections") private var collapsedRaw = ""
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
     @State private var selectedDay = LocalDate()
+    /// The date when the window last checked, to notice a new day.
+    @State private var lastToday = LocalDate()
     @State private var gridWidth: CGFloat = 0
     @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.task.rawValue
     @AppStorage(MenuBarDisplay.lengthKey) private var menuBarLength = 28
@@ -115,6 +117,23 @@ struct TrackerView: View {
                 query = ""
                 selection = nil
                 isSearchOpen = false
+                // Opening the window on a new day goes straight to it.
+                let today = LocalDate()
+                if today != lastToday {
+                    selectedDay = today
+                    lastToday = today
+                }
+            }
+            // At midnight with the window open, follow along if you were on today.
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(30))
+                    let today = LocalDate()
+                    guard today != lastToday else { continue }
+                    if selectedDay == lastToday { selectedDay = today }
+                    lastToday = today
+                    await tracker.refresh(force: true)
+                }
             }
             .onChange(of: searchFocused) { _, focused in
                 if !focused && query.isEmpty { withAnimation(.snappy(duration: 0.2)) { isSearchOpen = false } }

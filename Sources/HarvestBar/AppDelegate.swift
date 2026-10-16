@@ -36,6 +36,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     func applicationDidFinishLaunching(_ notification: Notification) {
         MenuBarDisplay.register()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // A fixed name, so macOS remembers this item's place and visibility by
+        // it rather than by creation order.
+        statusItem.autosaveName = "HarvestbeamTimer"
+        statusItem.isVisible = true
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(statusItemClicked)
@@ -167,6 +171,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     /// The menu bar icon opens the window, or hides it whenever it's showing,
     /// even if another app is in front.
     @objc func controlClicked() {
+        // Nothing to pause or resume: open the window to pick something.
+        guard tracker.running != nil || tracker.pausedEntry != nil else {
+            showPanel()
+            return
+        }
         Task {
             if tracker.running != nil { await tracker.pause() } else { await tracker.resume() }
             lastTitle = nil
@@ -354,18 +363,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         } else if let paused {
             title = " " + TimeFormat.hoursMinutes(paused.elapsed())
         } else {
-            title = ""
+            // Nothing tracked yet today: the gray square and today's 0:00.
+            title = " " + TimeFormat.hoursMinutes(tracker.todaySeconds())
         }
-        let key = "\(tracker.running != nil)|\(paused?.id ?? 0)|\(title)"
+        let ready = tracker.phase == .ready
+        let key = "\(ready)|\(tracker.running != nil)|\(paused?.id ?? 0)|\(title)"
         guard key != lastTitle else { return }
         lastTitle = key
 
-        if tracker.running != nil || paused != nil {
+        if ready {
             let running = tracker.running != nil
             // A clear placeholder reserves the square's spot; the button sits on it.
             button.image = NSImage(size: NSSize(width: Self.controlWidth, height: 16))
             controlButton.image = Self.controlImage(running: running)
-            controlButton.toolTip = running ? "Pause timer" : "Resume timer"
+            controlButton.toolTip = running ? "Pause timer" : paused != nil ? "Resume timer" : "Start a timer"
             controlButton.isHidden = false
             button.attributedTitle = NSAttributedString(string: title, attributes: [
                 // No custom color: the menu bar's own text color stays legible on
@@ -373,7 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium),
             ])
             let task = (tracker.running ?? paused).map { tracker.task(for: $0) }
-            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)" }
+            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)" } ?? "Harvestbeam (⌥H)"
             button.layoutSubtreeIfNeeded()
             if let cell = button.cell as? NSButtonCell {
                 controlButton.frame = cell.imageRect(forBounds: button.bounds)
