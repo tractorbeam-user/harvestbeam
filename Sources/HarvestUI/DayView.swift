@@ -249,6 +249,11 @@ private struct EntryRow: View {
         .onHover { isHovered = $0 }
         #endif
         .contextMenu {
+            // A new timer today for the same project and task, leaving this entry alone.
+            Button(entry.spentDate == LocalDate() ? "Start a Fresh Timer" : "Start Again Today") {
+                Task { await tracker.addEntry(task: task, on: LocalDate(), notes: "", hours: nil) }
+            }
+            Divider()
             Button("Edit Entry") { isEditing = true }
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
             Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
