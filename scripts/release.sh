@@ -2,8 +2,10 @@
 # Builds Harvestbeam, wraps it in a disk image, publishes a GitHub Release and
 # adds it to appcast.xml so installed copies update themselves.
 #   scripts/release.sh 1.1.0 ["What's new, in light Markdown"]
-# Needs a clean, pushed main branch, the GitHub CLI (gh) signed in, and the
-# Sparkle private key in the login Keychain (see "Releasing" in the README).
+# Needs a clean checkout of main (or a branch that fast-forwards it, as in a
+# worktree), the GitHub CLI (gh) signed in, and the Sparkle private key in the
+# login Keychain (see "Releasing" in the README). Everything is pushed to main,
+# where installed copies read the appcast.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,7 +21,7 @@ if [[ -n "$(git status --porcelain)" ]]; then
   echo "Commit or stash your changes first." >&2
   exit 1
 fi
-git push origin HEAD
+git push origin HEAD:main
 
 VERSION="$VERSION" scripts/build-app.sh
 scripts/make-dmg.sh "$DMG"
@@ -64,5 +66,5 @@ PY
 
 git add appcast.xml
 git commit -m "release: Harvestbeam ${VERSION} in the appcast"
-git push origin HEAD
+git push origin HEAD:main
 echo "Released ${TAG}"
