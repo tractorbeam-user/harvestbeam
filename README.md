@@ -15,7 +15,7 @@ A small, native Harvest timer for the Mac menu bar, with the same app on iPhone 
 
 ## Install
 
-Download the latest `Harvestbeam-x.y.z.zip` from [Releases](https://github.com/tractorbeam-user/harvest-bar/releases), unzip it and drag **Harvestbeam** to Applications.
+Download the latest `Harvestbeam-x.y.z.zip` from [Releases](https://github.com/tractorbeam-user/harvestbeam/releases), unzip it and drag **Harvestbeam** to Applications.
 
 The first time, **right-click it and choose Open**. The app isn't signed with an Apple Developer ID, so macOS asks once. If macOS says it's damaged, run `xattr -dr com.apple.quarantine "/Applications/Harvestbeam.app"` in Terminal and open it again.
 
@@ -24,14 +24,15 @@ Click the timer icon in the menu bar, create a personal access token at [id.geth
 ## Releasing
 
 ```bash
-scripts/release.sh 1.1.0
+scripts/release.sh 1.1.0 "**New:** Start Again Today from any entry.
+- Fixed a crash when a project had no tasks."
 ```
 
 From a clean `main`, this pushes, builds the app with that version, wraps it in a branded disk image (`scripts/make-dmg.sh`) and publishes a GitHub Release with install notes. Then it signs the disk image with Sparkle's `sign_update`, adds the release to [`appcast.xml`](appcast.xml) and commits and pushes that to `main`. It needs the GitHub CLI (`gh`) signed in and the update signing key (below).
 
 ### Updates
 
-The Mac app updates itself with [Sparkle](https://sparkle-project.org). It checks `appcast.xml` on `main` (raw.githubusercontent.com) once a day, and **Check for Updates…** in the app menu or Preferences → General checks right away. The feed URL and public key are set in `scripts/build-app.sh`; the build number, which only goes up (it's the commit count), is what Sparkle compares.
+The Mac app updates itself with [Sparkle](https://sparkle-project.org). It checks `appcast.xml` on `main` (raw.githubusercontent.com) once a day, and **Check for Updates…** in the app menu or Preferences → General checks right away. Harvestbeam draws the update window itself (`Sources/HarvestBar/UpdatePrompt.swift`), with the release notes from the second argument to `release.sh` (light Markdown, optional). The repo has to be public for other people's copies to reach the feed and the downloads. The feed URL and public key are set in `scripts/build-app.sh`; the build number, which only goes up (it's the commit count), is what Sparkle compares.
 
 Sparkle only installs updates signed with the private EdDSA key. It lives in the login Keychain of the Mac that ran `generate_keys` (a password item for `https://sparkle-project.org`, account `ed25519`), never in git, and `sign_update` reads it from there, so macOS may ask to allow access the first time. Keep a backup somewhere safe, like a password manager: without it, installed copies can never be updated again.
 

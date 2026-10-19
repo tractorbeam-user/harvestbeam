@@ -14,7 +14,7 @@ BUILD="${BUILD:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 APP="build/${APP_NAME}.app"
 # Sparkle reads updates from appcast.xml on main (scripts/release.sh adds to it)
 # and only installs ones signed with the private half of this key.
-FEED_URL="${FEED_URL:-https://raw.githubusercontent.com/tractorbeam-user/harvest-bar/main/appcast.xml}"
+FEED_URL="${FEED_URL:-https://raw.githubusercontent.com/tractorbeam-user/harvestbeam/main/appcast.xml}"
 SPARKLE_PUBLIC_KEY="y+DGD90Za+tNzS/KyDmBkCKFUwzGBoHzC25Q1U1ozac="
 
 # With only the Command Line Tools installed, the newest macOS SDK expects

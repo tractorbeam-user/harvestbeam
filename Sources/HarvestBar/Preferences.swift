@@ -139,7 +139,9 @@ struct GeneralPrefs: View {
                     Button("Check Now") { updates.checkForUpdates(nil) }
                         .disabled(!updates.canCheck)
                 }
-                Text("Harvestbeam looks for a new version on GitHub once a day and asks before installing it.")
+                Toggle("Install updates automatically", isOn: $updates.installsAutomatically)
+                    .disabled(!updates.checksAutomatically)
+                Text("Harvestbeam looks for a new version on GitHub once a day. Unless it installs them automatically, it asks first.")
                     .prefsNote()
             }
         }
@@ -284,7 +286,7 @@ struct SupportPrefs: View {
                 HStack {
                     Text("Harvestbeam \(version)")
                     Spacer()
-                    Link("Report a Problem…", destination: URL(string: "https://github.com/tractorbeam-user/harvest-bar/issues")!)
+                    Link("Report a Problem…", destination: URL(string: "https://github.com/tractorbeam-user/harvestbeam/issues")!)
                 }
                 Text("An unofficial client for the Harvest API.").prefsNote()
             }

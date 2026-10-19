@@ -67,7 +67,7 @@ targets:
         LSUIElement: true
         LSApplicationCategoryType: public.app-category.productivity
         # Same feed and key as scripts/build-app.sh.
-        SUFeedURL: https://raw.githubusercontent.com/tractorbeam-user/harvest-bar/main/appcast.xml
+        SUFeedURL: https://raw.githubusercontent.com/tractorbeam-user/harvestbeam/main/appcast.xml
         SUPublicEDKey: y+DGD90Za+tNzS/KyDmBkCKFUwzGBoHzC25Q1U1ozac=
         SUEnableAutomaticChecks: true
     settings:
