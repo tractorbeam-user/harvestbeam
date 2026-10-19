@@ -424,6 +424,23 @@ h1 {
 .firstrun li { counter-increment: step; display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline; }
 .firstrun li::before { content: counter(step); font-family: var(--mono); font-size: 11px; color: var(--orange); width: 20px; height: 20px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent); display: grid; place-items: center; }
 .firstrun b { font-weight: 600; }
+/* Changelog: major features only, newest first */
+.changelog { padding-block: 24px 40px; display: grid; justify-items: center; }
+.cl { width: 100%; max-width: 560px; }
+.cl h2 { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; margin: 0 0 6px; }
+.cl .sub { color: var(--muted); margin: 0 0 22px; font-size: 15px; }
+.cl ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.cl li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 18px; padding: 18px 0; border-top: 1px solid var(--line); }
+.cl li:last-child { border-bottom: 1px solid var(--line); }
+.cl .ver { font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; }
+.cl .ver small { display: block; font-weight: 400; font-size: 12.5px; color: var(--faint); margin-top: 2px; }
+.cl .ver .new { display: inline-block; font-size: 10.5px; font-weight: 600; color: var(--orange); background: var(--orange-soft); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px; }
+.cl h3 { font-family: var(--display); font-weight: 600; font-size: 16px; letter-spacing: -0.01em; margin: 0 0 6px; }
+.cl ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; display: grid; gap: 4px; }
+.cl ul li { display: list-item; padding: 0; border: 0; }
+.cl ul li::marker { color: var(--orange); }
+@media (max-width: 560px) { .cl li { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
+
 /* Feedback */
 .feedback { padding-block: 24px 96px; display: grid; justify-items: center; }
 .fb { width: 100%; max-width: 560px; background: var(--tile); border-radius: 22px; padding: 26px; display: grid; gap: 14px; }
@@ -474,6 +491,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     <a class="brand" href="#top"><span class="mark" aria-hidden="true"></span>Harvestbeam</a>
     <nav aria-label="Page">
       <a href="#features">Features</a>
+      <a href="#changelog">What's new</a>
       <a href="#feedback">Feedback</a>
       <a href="https://github.com/tractorbeam-user/harvestbeam">GitHub</a>
     </nav>
@@ -642,6 +660,40 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <p class="after">That's it. Updates install and open on their own after this.</p>
     </div>
   </section>
+  <section class="wrap changelog" id="changelog">
+    <div class="cl">
+      <h2>What's new</h2>
+      <p class="sub">The big things in each release. Installed copies update themselves.</p>
+      <!-- Major features only, newest first. Add an entry with each release. -->
+      <ol>
+        <li>
+          <div class="ver">1.1<span class="new">Latest</span><small>Oct 19, 2026</small></div>
+          <div>
+            <h3>A lighter look, and a better sense of your week</h3>
+            <ul>
+              <li>A cleaner, brighter window that matches this site</li>
+              <li>Short days earlier in the week get a gentle nudge to fill them in</li>
+              <li>Approved and invoiced time shows a lock and says why</li>
+              <li>Favorites from a star in the footer, and long names that slide into view</li>
+            </ul>
+          </div>
+        </li>
+        <li>
+          <div class="ver">1.0<small>Oct 19, 2026</small></div>
+          <div>
+            <h3>Harvestbeam's first release</h3>
+            <ul>
+              <li>A Harvest timer in the menu bar, with ⌥H from any app</li>
+              <li>Favorites, two-step search and Plan the Day in a sentence</li>
+              <li>Idle detection, reminders and Undo instead of "Are you sure?"</li>
+              <li>Updates itself, with a short welcome tour on first launch</li>
+            </ul>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
   <section class="wrap feedback" id="feedback">
     <form class="fb" id="fb" novalidate>
       <h2>Ideas or feedback?</h2>
