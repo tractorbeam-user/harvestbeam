@@ -10,12 +10,12 @@
 .dm-desk {
   --dw: 1040px; --dh: 680px;
   width: var(--dw); height: var(--dh); position: relative; overflow: hidden;
-  border-radius: 18px; border: 1px solid var(--line); transform-origin: top left;
+  border-radius: 18px; transform-origin: top left;
+  /* A soft sunrise over orange hills: white sky down to deep orange. */
   background:
-    radial-gradient(60% 70% at 18% 20%, #FFB27A 0%, transparent 60%),
-    radial-gradient(55% 65% at 85% 30%, #F2709C 0%, transparent 60%),
-    radial-gradient(70% 80% at 60% 95%, #7A5CFA 0%, transparent 65%),
-    linear-gradient(160deg, #FFD3A8, #E88B6A 55%, #6A4FD8);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1040 680' preserveAspectRatio='none'%3E%3Cpath d='M0 330 C160 280 300 300 430 330 S720 270 860 300 1000 330 1040 320 V680 H0Z' fill='%23FFE3CC'/%3E%3Cpath d='M0 400 C140 360 260 370 390 405 S640 350 790 380 960 420 1040 400 V680 H0Z' fill='%23FFC79E'/%3E%3Cpath d='M0 470 C180 430 330 455 470 480 S760 430 900 455 1010 480 1040 470 V680 H0Z' fill='%23FFA76A'/%3E%3Cpath d='M0 550 C150 520 320 540 470 565 S780 520 920 545 1020 565 1040 560 V680 H0Z' fill='%23FA8A3E'/%3E%3Cpath d='M0 620 C200 595 380 615 540 630 S840 600 1040 615 V680 H0Z' fill='%23F06A1C'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat,
+    radial-gradient(28% 34% at 30% 46%, #FFFFFF 0%, rgba(255, 255, 255, .7) 35%, transparent 70%),
+    linear-gradient(180deg, #FFFFFF 0%, #FFF6EE 30%, #FFE6D2 52%, #FFD2B0 70%);
   font-family: -apple-system, BlinkMacSystemFont, var(--body);
   font-size: 13px; color: var(--ink); user-select: none; -webkit-user-select: none;
   box-shadow: 0 40px 80px -40px rgba(40, 20, 0, .45);
@@ -44,7 +44,7 @@
 
 /* Desktop icons and dock, for the feel of a real desk */
 .dm-icons { position: absolute; right: 22px; top: 44px; display: grid; gap: 18px; justify-items: center; }
-.dm-icon { display: grid; justify-items: center; gap: 4px; color: #fff; font-size: 11px; text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+.dm-icon { display: grid; justify-items: center; gap: 4px; color: #5A3A22; font-size: 11px; font-weight: 500; }
 .dm-icon i { width: 44px; height: 36px; border-radius: 6px; background: linear-gradient(#7CC2FF, #3E8EEA); box-shadow: 0 2px 6px rgba(0, 0, 0, .2); position: relative; }
 .dm-icon i::before { content: ""; position: absolute; left: 0; top: -5px; width: 18px; height: 8px; border-radius: 3px 3px 0 0; background: #7CC2FF; }
 .dm-icon.doc i { width: 32px; height: 40px; border-radius: 3px; background: #fff; }
@@ -58,7 +58,7 @@
 
 /* The window */
 .dm-win { position: absolute; left: 330px; top: 38px; width: 420px; height: 592px; border-radius: 12px; overflow: hidden;
-  background: var(--paper); border: 1px solid rgba(0, 0, 0, .12); box-shadow: 0 30px 70px -20px rgba(0, 0, 0, .45), 0 0 0 .5px rgba(0, 0, 0, .1);
+  background: var(--paper); border: 0; box-shadow: 0 30px 70px -20px rgba(120, 50, 0, .45), 0 8px 20px -10px rgba(120, 50, 0, .25);
   display: flex; flex-direction: column; transition: opacity .18s, transform .18s; z-index: 4; }
 .dm-win.hidden { opacity: 0; transform: translateY(-8px) scale(.98); pointer-events: none; }
 .dm-tb.grab { cursor: grabbing; }
@@ -154,7 +154,7 @@
 .dm-sec.closed .hd .chev { transform: rotate(-90deg); }
 .dm-sec.closed .tiles { display: none; }
 .dm-sec .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.dm-tile { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 11px; min-height: 52px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; min-width: 0; position: relative; transition: border-color .15s; touch-action: none; }
+.dm-tile { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 11px; min-height: 52px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; min-width: 0; position: relative; transition: border-color .15s; touch-action: none; }
 .dm-tile:hover { border-color: color-mix(in srgb, var(--ink) 18%, transparent); }
 .dm-tile.run { background: var(--orange); border-color: transparent; color: #fff; }
 .dm-tile .info { flex: 1; min-width: 0; line-height: 1.3; }

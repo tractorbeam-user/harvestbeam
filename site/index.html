@@ -607,7 +607,6 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
           <div class="dm-dim"></div>
           <div id="dm-pops"></div>
         </div>
-        <div class="dm-dock" aria-hidden="true"><i style="background:linear-gradient(#5FB8FF,#2E7BE6)"></i><i style="background:linear-gradient(#FFFFFF,#E6E2DD)"></i><i style="background:linear-gradient(#7BE07B,#2FAE4F)"></i><i style="background:linear-gradient(#FFD25A,#F5A623)"></i><span class="sep"></span><i class="hb"></i></div>
       </div>
     </div>
     <p class="phone-note">Smaller here; it works best on a bigger screen.</p>
@@ -1092,6 +1091,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     if (!el || e.target.closest("button") || e.button !== 0) return;
     const r = el.getBoundingClientRect();
     drag = { el, x: e.clientX, y: e.clientY, grabX: e.clientX - r.left, grabY: e.clientY - r.top, moving: false };
+    e.preventDefault(); // no text selection or native drag in its place
     $("favs").setPointerCapture(e.pointerId);
   });
   // Where the dragged tile would land among the favorites: an index, the
@@ -1167,6 +1167,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     favDemo.splice(0, favDemo.length, ...order, ...rest);
     renderFavs();
   };
+  $("favs").addEventListener("dragstart", (e) => e.preventDefault());
   $("favs").addEventListener("pointerup", drop);
   $("favs").addEventListener("pointercancel", drop);
   renderFavs();

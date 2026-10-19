@@ -453,12 +453,15 @@
     if (!el || ev.button !== 0 || ev.target.closest("button")) return;
     drag = { el, k: el.dataset.tile, x: ev.clientX, y: ev.clientY, moving: false };
     dragMoved = false;
+    ev.preventDefault(); // no text selection or native drag in its place
   });
+  root.addEventListener("dragstart", (ev) => ev.preventDefault());
+  addEventListener("pointercancel", () => { if (drag) { drag.ghost?.remove(); $(".dm-dropline")?.remove(); drag.el.classList.remove("lift"); drag = null; } });
   addEventListener("pointermove", (ev) => {
     if (!drag) return;
     const win = $(".dm-win"), wr = win.getBoundingClientRect(), sc = wr.width / 420;
     if (!drag.moving) {
-      if (Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) < 5) return;
+      if (Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) < 4) return;
       drag.moving = dragMoved = true;
       const r = drag.el.getBoundingClientRect();
       drag.gx = (drag.x - r.left) / sc; drag.gy = (drag.y - r.top) / sc;
