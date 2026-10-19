@@ -508,12 +508,14 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   html { scroll-behavior: auto; }
 }
 </style>
+<link rel="stylesheet" href="demo.css">
 </head>
 <body>
 <header class="menubar" aria-label="A menu bar with Harvestbeam's timer">
   <div class="wrap">
     <a class="brand" href="#top"><span class="mark" aria-hidden="true"></span>Harvestbeam</a>
     <nav aria-label="Page">
+      <a href="#try">Try it</a>
       <a href="#features">Features</a>
       <a href="#changelog">What's new</a>
       <a href="#feedback">Feedback</a>
@@ -572,6 +574,43 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <div id="list"></div>
       </div>
     </div>
+  </section>
+
+  <section class="wrap try" id="try">
+    <h2 class="section-title">Try the whole app</h2>
+    <p class="lede-sm">This is Harvestbeam on a Mac, working with example projects. Search, start and pause timers, star and drag favorites, edit entries, plan a day. Nothing here touches a real Harvest account.</p>
+    <div class="dm-fit">
+      <div class="dm-desk" id="dm">
+        <div class="dm-mb" aria-label="Mac menu bar">
+          <span class="logo" aria-hidden="true"></span><b>Harvestbeam</b><span class="dim">File</span><span class="dim">Edit</span><span class="dim">Window</span><span class="dim">Help</span>
+          <span class="sp"></span>
+          <button class="dm-item on" id="dm-item" type="button" title="Click the square to pause or resume. Click the time to show or hide the window."><span class="dm-sq"></span><span class="t">0:00</span><span class="task"></span></button>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M4 8.6a6 6 0 0 1 8 0M6.5 11.2a2.4 2.4 0 0 1 3 0"/></svg>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+          <span id="dm-clock">Mon 9:41</span>
+        </div>
+        <div class="dm-icons" aria-hidden="true"><span class="dm-icon"><i></i>Clients</span><span class="dm-icon doc"><i></i>Brief.pdf</span><span class="dm-icon"><i></i>Invoices</span></div>
+        <div class="dm-win" role="application" aria-label="Harvestbeam window">
+          <div class="dm-tb"><span class="lights"><i title="Close"></i><i></i><i></i></span><span class="ttl" id="dm-ttl"></span>
+            <span class="acts"><button type="button" data-tb="today" title="Go to today" aria-label="Go to today"><svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="10" rx="2"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"/></svg></button><button type="button" data-tb="summary" title="Time summary" aria-label="Time summary"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 7.2v4M8 4.9v.1"/></svg></button></span></div>
+          <label class="dm-ask"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input id="dm-ask" type="text" placeholder="What are you working on?" autocomplete="off" spellcheck="false" aria-label="Search projects and tasks"><kbd>⌥H</kbd></label>
+          <div class="dm-scroll"></div>
+          <div id="dm-toast"></div>
+          <div class="dm-foot">
+            <button class="dm-fb" type="button" data-foot="new" title="New time entry" aria-label="New time entry"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></button>
+            <button class="dm-fb" type="button" data-foot="plan" title="Plan your day in plain words" aria-label="Plan your day"><svg viewBox="0 0 16 16"><path d="M7 1.5 8.3 6 12.5 7.3 8.3 8.6 7 13 5.7 8.6 1.5 7.3 5.7 6Z M12.5 1.5v3M11 3h3"/></svg></button>
+            <button class="dm-fb" type="button" data-foot="favmenu" title="Favorites" aria-label="Favorites"><svg viewBox="0 0 16 16"><path d="m8 2 1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3l-3.7 2 .8-4.1L2 6.3l4.2-.5Z"/></svg></button>
+            <span class="sp"></span>
+            <button class="dm-fb" type="button" title="Open Harvest" aria-label="Open Harvest"><svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6.5 9.5 10 6M7 6h3v3"/></svg></button>
+            <button class="dm-fb" type="button" data-foot="gear" title="Settings" aria-label="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6 5 5M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4"/></svg></button>
+          </div>
+          <div class="dm-dim"></div>
+          <div id="dm-pops"></div>
+        </div>
+        <div class="dm-dock" aria-hidden="true"><i style="background:linear-gradient(#5FB8FF,#2E7BE6)"></i><i style="background:linear-gradient(#FFFFFF,#E6E2DD)"></i><i style="background:linear-gradient(#7BE07B,#2FAE4F)"></i><i style="background:linear-gradient(#FFD25A,#F5A623)"></i><span class="sep"></span><i class="hb"></i></div>
+      </div>
+    </div>
+    <p class="phone-note">Smaller here; it works best on a bigger screen.</p>
   </section>
 
   <section class="wrap features" id="features">
@@ -1192,5 +1231,6 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   requestAnimationFrame(frame);
 })();
 </script>
+<script src="demo.js" defer></script>
 </body>
 </html>
