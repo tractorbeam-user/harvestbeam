@@ -415,6 +415,71 @@ h1 {
 .rs .t.sug { border-style: dashed; }
 .rs .t .x { position: absolute; top: 3px; right: 6px; color: var(--faint); font-size: 11px; line-height: 1; }
 
+/* Interactive bento pieces */
+.mini button { font: inherit; color: inherit; cursor: pointer; }
+.mstrip .mbar { border: 0; cursor: pointer; }
+.mstrip .mbar:hover { background: color-mix(in srgb, var(--orange) 16%, transparent); }
+.mstrip .mbar .sq { transition: background .2s; }
+.mstrip .mbar.off .sq { background: var(--faint); }
+.wk button { border: 0; background: none; padding: 4px 0; border-radius: 8px; color: var(--muted); position: relative; font-size: 11px; }
+.wk button:hover:not(.sel) { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.wk .short b { color: #854F0B; }
+.nudge { transition: opacity .2s, transform .2s; }
+.nudge.gone { opacity: 0; transform: translateY(-4px); pointer-events: none; }
+.nudge button { border: 0; }
+.nudge .x { background: none; color: #854F0B; padding: 0 2px; font-size: 11px; }
+.notif .nbtn { border: 0; background: var(--orange); color: #fff; font-weight: 600; font-size: 11.5px; padding: 4px 10px; border-radius: 99px; margin-left: 4px; }
+.notif .nbtn[hidden] { display: none; }
+.srch { display: grid; gap: 7px; width: 250px; }
+.srch .box { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0 9px; height: 30px; }
+.srch .box:focus-within { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
+.srch .box svg { width: 12px; height: 12px; fill: none; stroke: var(--muted); stroke-width: 2; flex: none; }
+.srch input { border: 0; outline: 0; background: none; font: inherit; font-size: 12.5px; color: var(--ink); width: 100%; font-family: var(--mono); }
+.srch .out { display: flex; flex-wrap: wrap; gap: 5px; min-height: 26px; align-items: center; }
+.srch .out button { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 3px 9px; font-weight: 500; font-size: 11.5px; }
+.srch .out button.task { background: var(--orange-soft); border-color: transparent; color: var(--orange); }
+.srch .out button:hover { border-color: var(--orange); }
+.srch .out .msg { color: var(--muted); font-size: 11.5px; }
+.srch .out .done { color: var(--orange); font-weight: 600; font-size: 12px; }
+.foot button.b { border: 0; background: none; }
+.foot button.b.on { background: var(--orange-soft); }
+.foot .menu { transition: opacity .15s, transform .15s; }
+.foot .menu.closed { opacity: 0; transform: translateX(-4px); pointer-events: none; }
+.foot .menu button { border: 0; background: none; display: flex; align-items: center; gap: 6px; padding: 1px 8px 1px 3px; border-radius: 5px; white-space: nowrap; text-align: left; font-size: 11.5px; }
+.foot .menu button:hover { background: var(--orange-soft); }
+.foot .menu button.on { background: var(--orange); color: #fff; }
+.rs .t { padding-right: 20px; }
+.rs .t .st, .rs .t .x { position: absolute; top: 3px; right: 4px; border: 0; background: none; color: var(--faint); font-size: 12px; line-height: 1; padding: 2px; }
+.rs .t .st.on { color: var(--orange); }
+.rs .t.out { opacity: 0; transform: scale(.9); transition: opacity .2s, transform .2s; }
+.toast button.act { border: 0; background: none; padding: 0; }
+.toast button.act:hover { text-decoration: underline; }
+.again .chip { border: 1px solid var(--line); }
+.again .chip.run { background: var(--orange); color: #fff; border-color: transparent; }
+.marq button.pl { border: 0; }
+.marq { transition: background .2s, color .2s; }
+.marq.run { background: var(--orange); border-color: transparent; color: #fff; }
+.marq.run small { color: rgba(255, 255, 255, .82); }
+.marq.run .pl { background: #fff; color: var(--orange); }
+.undo { display: grid; justify-items: center; gap: 8px; }
+.urow { display: inline-flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 7px 6px 12px; white-space: nowrap; }
+.urow .nm { font-weight: 600; }
+.urow .del { border: 0; background: color-mix(in srgb, var(--ink) 6%, transparent); width: 22px; height: 22px; border-radius: 50%; font-size: 10px; color: var(--muted); }
+.urow .del:hover { background: #A32D2D; color: #fff; }
+.urow[hidden], .undo .toast[hidden] { display: none; }
+.sync button.dev { cursor: pointer; }
+.sync button.dev:hover { border-color: var(--orange); }
+.sync.off .dot { animation: none; opacity: 0; }
+.sync.off .num { color: var(--muted); }
+.rows2 { position: relative; }
+.rows2 button.pl { border: 0; }
+.rows2 .why { display: block; padding: 7px 12px; font-size: 11px; color: var(--muted); background: var(--orange-soft); border-top: 1px solid var(--line); white-space: normal; }
+.rows2 .why[hidden] { display: none; }
+button.key { border: 1px solid transparent; background: none; border-radius: 10px; padding: 6px 10px; }
+button.key:hover { border-color: var(--line); background: var(--surface); }
+button.key path { transition: transform .25s; transform-origin: 10.5px 7px; }
+button.key.open path { transform: translateY(-2px) rotate(-20deg); }
+
 /* Start again today */
 .again { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .again .day { color: var(--muted); }
@@ -577,8 +642,8 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   </section>
 
   <section class="wrap try" id="try">
-    <h2 class="section-title">Try the whole app</h2>
-    <p class="lede-sm">This is Harvestbeam on a Mac, working with example projects. Search, start and pause timers, star and drag favorites, edit entries, plan a day. Nothing here touches a real Harvest account.</p>
+    <h2 class="section-title">Go on, click around</h2>
+    <p class="lede-sm">That's the real app below. Type “acme” and press Return, drag a favorite somewhere better, right-click an entry, or tell ✦ how your day's going to go.</p>
     <div class="dm-fit">
       <div class="dm-desk" id="dm">
         <div class="dm-mb" aria-label="Mac menu bar">
@@ -592,7 +657,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <div class="dm-icons" aria-hidden="true"><span class="dm-icon"><i></i>Clients</span><span class="dm-icon doc"><i></i>Brief.pdf</span><span class="dm-icon"><i></i>Invoices</span></div>
         <div class="dm-win" role="application" aria-label="Harvestbeam window">
           <div class="dm-tb"><span class="lights"><i title="Close"></i><i></i><i></i></span><span class="ttl" id="dm-ttl"></span>
-            <span class="acts"><button type="button" data-tb="today" title="Go to today" aria-label="Go to today"><svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="10" rx="2"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"/></svg></button><button type="button" data-tb="summary" title="Time summary" aria-label="Time summary"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 7.2v4M8 4.9v.1"/></svg></button></span></div>
+            <span class="acts"><button type="button" data-tb="today" title="Go to today" aria-label="Go to today"><svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="10" rx="2"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"/></svg></button><button type="button" data-tb="summary" title="Time summary" aria-label="Time summary"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r=".95" fill="currentColor" stroke="none"/></svg></button></span></div>
           <label class="dm-ask"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input id="dm-ask" type="text" placeholder="What are you working on?" autocomplete="off" spellcheck="false" aria-label="Search projects and tasks"><kbd>⌥H</kbd></label>
           <div class="dm-scroll"></div>
           <div id="dm-toast"></div>
@@ -648,59 +713,59 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   <section class="wrap more" aria-label="More features">
     <div class="grid">
       <div class="spec w4">
-        <div class="mini"><span class="mstrip" aria-hidden="true"><span class="sp"></span><span class="mbar"><span class="sq"><svg viewBox="0 0 10 10"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg></span><span class="num">1:24</span> Design</span><svg class="hide-xs" viewBox="0 0 16 16"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M4 8.6a6 6 0 0 1 8 0M6.5 11.2a2.4 2.4 0 0 1 3 0"/></svg><svg class="hide-xs" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span class="clock num">Mon 9:41</span></span></div>
+        <div class="mini"><span class="mstrip" id="b-mb"><span class="sp"></span><button class="mbar" type="button" data-b="mb-item" title="Click the square to pause; click the text to change how much shows"><span class="sq" data-b="mb-sq"><svg viewBox="0 0 10 10"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg></span><span class="num" data-b="mb-time">1:24</span><span data-b="mb-task"> Design</span></button><svg class="hide-xs" viewBox="0 0 16 16"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M4 8.6a6 6 0 0 1 8 0M6.5 11.2a2.4 2.4 0 0 1 3 0"/></svg><svg class="hide-xs" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span class="clock num" data-b="clock">Mon 9:41</span></span></div>
         <div class="txt"><h3>A menu bar like Harvest's own</h3><p>Orange while a timer runs, gray when it's stopped. Click the square to pause, the time to open the window, and choose how much text shows.</p></div>
       </div>
       <div class="spec">
-        <div class="mini"><span class="stack"><span class="wk" aria-hidden="true"><span><b>M</b>8:05</span><span><b>T</b>7:45</span><span><b>W</b>8:20</span><span class="short"><b>T</b>3:10</span><span class="sel"><b>F</b>2:40</span></span><span class="nudge"><span><b>Thursday</b> only has <span class="num">3:10</span></span><span class="go">Open</span></span></span></div>
+        <div class="mini"><span class="stack" id="b-sd"><span class="wk"><button type="button" data-d="0"><b>M</b>8:05</button><button type="button" data-d="1"><b>T</b>7:45</button><button type="button" data-d="2"><b>W</b>8:20</button><button type="button" class="short" data-d="3"><b>T</b>3:10</button><button type="button" class="sel" data-d="4"><b>F</b>2:40</button></span><span class="nudge" data-b="nudge"><span><b>Thursday</b> only has <span class="num">3:10</span></span><button type="button" class="go" data-b="open">Open</button><button type="button" class="x" data-b="dismiss" aria-label="Dismiss">✕</button></span></span></div>
         <div class="txt"><h3>Short days, caught early</h3><p>A day well under your usual hours gets a dot and a gentle note while you still remember it. Off in a click if you'd rather not.</p></div>
       </div>
 
       <div class="spec">
-        <div class="mini"><span class="notif"><span class="ic"><i></i></span><span>Nothing tracked yet<small>It's 10:00. Start a timer?</small></span></span></div>
+        <div class="mini"><span class="notif" id="b-rm"><span class="ic"><i></i></span><span data-b="rm-text">Nothing tracked yet<small>It's 10:00. Start a timer?</small></span><button type="button" class="nbtn" data-b="rm-go">Start</button></span></div>
         <div class="txt"><h3>Reminders you choose</h3><p>A nudge if nothing's running by a set time, or when a timer has run longer than you meant.</p></div>
       </div>
       <div class="spec">
-        <div class="mini"><span class="crumbs"><span class="q mono">acme</span><span class="arr">→</span><span class="chip">Brand Refresh</span><span class="arr">→</span><span class="chip on">Design</span></span></div>
+        <div class="mini"><span class="srch" id="b-sr"><span class="box"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg><input type="text" value="acme" aria-label="Try a search" spellcheck="false"></span><span class="out" data-b="sr-out"></span></span></div>
         <div class="txt"><h3>Search in two steps</h3><p>Projects first, grouped by client, then that project's tasks. Codes match too.</p></div>
       </div>
       <div class="spec">
-        <div class="mini"><span class="foot" aria-hidden="true"><span class="b"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></span><span class="b on"><svg viewBox="0 0 16 16"><path d="m8 2 1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3l-3.7 2 .8-4.1L2 6.3l4.2-.5Z"/></svg></span><span class="menu"><span><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg>Context · Strategy</span><span><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg>Website · Design</span></span></span></div>
+        <div class="mini"><span class="foot" id="b-ff"><span class="b"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></span><button type="button" class="b on" data-b="ff-star" aria-label="Favorites"><svg viewBox="0 0 16 16"><path d="m8 2 1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3l-3.7 2 .8-4.1L2 6.3l4.2-.5Z"/></svg></button><span class="menu" data-b="ff-menu"><button type="button" class="on" data-i="0"><svg viewBox="0 0 10 10"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg>Context · Strategy</button><button type="button" data-i="1"><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg>Website · Design</button><button type="button" data-i="2"><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg>Brand · Meetings</button></span></span></div>
         <div class="txt"><h3>Favorites from the footer</h3><p>A star next to search lists your favorites, so any of them starts without scrolling.</p></div>
       </div>
 
             <div class="spec">
-        <div class="mini"><span class="rs" aria-hidden="true"><span class="lbl"><svg viewBox="0 0 12 12"><path d="M6 2.5v3.5l2 1.3"/><circle cx="6" cy="6" r="4.5"/></svg>Recent</span><span class="row"><span class="t"><b>Brand Refresh</b><span>Meetings</span></span><span class="t"><b>Mobile App</b><span>Development</span></span></span><span class="lbl"><svg viewBox="0 0 12 12"><path d="M6 1.5 7 5l3.5 1L7 7l-1 3.5L5 7 1.5 6 5 5Z"/></svg>Suggested</span><span class="row"><span class="t sug"><b>Data Platform</b><span>Meetings</span><i class="x">×</i></span><span class="t sug"><b>Internal</b><span>Admin</span><i class="x">×</i></span></span></span></div>
+        <div class="mini"><span class="rs" id="b-rs"><span class="lbl"><svg viewBox="0 0 12 12"><path d="M6 2.5v3.5l2 1.3"/><circle cx="6" cy="6" r="4.5"/></svg>Recent</span><span class="row"><span class="t"><b>Brand Refresh</b><span>Meetings</span><button type="button" class="st" data-b="star" aria-label="Star">☆</button></span><span class="t"><b>Mobile App</b><span>Development</span><button type="button" class="st" data-b="star" aria-label="Star">☆</button></span></span><span class="lbl"><svg viewBox="0 0 12 12"><path d="M6 1.5 7 5l3.5 1L7 7l-1 3.5L5 7 1.5 6 5 5Z"/></svg>Suggested</span><span class="row" data-b="sug"></span></span></div>
         <div class="txt"><h3>Recent and Suggested</h3><p>What you tracked lately sits below Favorites, and tasks you often use come up as suggestions. Not useful? Dismiss it.</p></div>
       </div>
 <div class="spec">
-        <div class="mini"><span class="toast">Away for <b class="num">0:42</b><span class="sep"></span><span class="act">Remove</span><span class="act dim">Keep</span></span></div>
+        <div class="mini"><span class="toast" id="b-idle"><span data-b="idle-text">Away for <b class="num">0:42</b></span><span class="sep"></span><button type="button" class="act" data-b="idle-rm">Remove</button><button type="button" class="act dim" data-b="idle-keep">Keep</button></span></div>
         <div class="txt"><h3>Idle time, handled</h3><p>Step away with a timer running and it asks, when you're back, whether to keep the gap.</p></div>
       </div>
       <div class="spec">
-        <div class="mini"><span class="again"><span class="day">Last Tuesday</span><span class="chip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg>Start Again Today</span></span></div>
+        <div class="mini"><span class="again" id="b-ag"><span class="day" data-b="ag-day">Last Tuesday</span><button type="button" class="chip" data-b="ag-go"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg><span>Start Again Today</span></button></span></div>
         <div class="txt"><h3>Pick up where you left off</h3><p>Right-click any past entry to start the same project and task again today.</p></div>
       </div>
 
       <div class="spec">
-        <div class="mini"><span class="marq" aria-hidden="true"><span class="clip"><span>[DAF-DP-01] Website Design and Development</span><small>Product Design</small></span><span class="pl"><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg></span></span></div>
+        <div class="mini"><span class="marq" id="b-ln"><span class="clip"><span>[DAF-DP-01] Website Design and Development</span><small>Product Design</small></span><button type="button" class="pl" data-b="ln-go" aria-label="Start"><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg></button></span></div>
         <div class="txt"><h3>Long names, readable</h3><p>Hover a tile or entry and a name that doesn't fit slides across to show the rest.</p></div>
       </div>
       <div class="spec">
-        <div class="mini"><span class="toast">Entry deleted<span class="sep"></span><span class="act">Undo</span><kbd class="mono">⌘Z</kbd></span></div>
+        <div class="mini"><span class="undo" id="b-un"><span class="urow" data-b="un-row"><span class="nm">Brand Refresh</span><span class="num">1:15</span><button type="button" class="del" data-b="un-del" aria-label="Delete">✕</button></span><span class="toast" data-b="un-toast" hidden>Entry deleted<span class="sep"></span><button type="button" class="act" data-b="un-undo">Undo</button><kbd class="mono">⌘Z</kbd></span></span></div>
         <div class="txt"><h3>Undo, not "Are you sure?"</h3><p>Deleting asks nothing and offers Undo. Double-click any entry to edit it.</p></div>
       </div>
       <div class="spec">
-        <div class="mini"><span class="sync" aria-label="The same running timer on the web and on your Mac"><span class="dev">Web</span><span class="num">0:42</span><span class="link"><span class="dot"></span></span><span class="dev">Mac</span><span class="num">0:42</span></span></div>
+        <div class="mini"><span class="sync" id="b-sy"><button type="button" class="dev" data-b="sy-web" title="Start or stop on the web">Web</button><span class="num" data-b="sy-a">0:42</span><span class="link"><span class="dot"></span></span><span class="dev">Mac</span><span class="num" data-b="sy-b">0:42</span></span></div>
         <div class="txt"><h3>In step with Harvest</h3><p>Start a timer on the web or your phone and the same one shows up here within a minute.</p></div>
       </div>
 
       <div class="spec w4">
-        <div class="mini"><span class="rows2" aria-hidden="true"><span><span class="nm">Website Redesign</span><span class="num">2:15</span><span class="pl"><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg></span></span><span class="locked"><span class="nm">Brand Refresh</span><span class="tag">Invoiced</span><span class="num">3:30</span><span class="pl lk"><svg viewBox="0 0 16 16" ><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span></span></span></div>
+        <div class="mini"><span class="rows2" id="b-lk"><span><span class="nm">Website Redesign</span><span class="num" data-b="lk-t">2:15</span><button type="button" class="pl" data-b="lk-go" aria-label="Start"><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg></button></span><span class="locked"><span class="nm">Brand Refresh</span><span class="tag">Invoiced</span><span class="num">3:30</span><button type="button" class="pl lk" data-b="lk-why" aria-label="Why it's locked"><svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></button></span><span class="why" data-b="lk-pop" hidden>On invoice #1042, so it can't change. An admin can take it off the invoice.</span></span></div>
         <div class="txt"><h3>Locked, and it says why</h3><p>Approved or invoiced time shows a lock instead of play, and a click explains who can change it.</p></div>
       </div>
       <div class="spec">
-        <div class="mini"><span class="key"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Keychain<span class="mono dots">••••3f9a</span></span></div>
+        <div class="mini"><button type="button" class="key" id="b-kc"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path data-b="kc-shackle" d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Keychain<span class="mono dots" data-b="kc-dots">••••3f9a</span></button></div>
         <div class="txt"><h3>Your token stays put</h3><p>Stored in your Keychain and only ever sent to Harvest.</p></div>
       </div>
     </div>
@@ -1233,5 +1298,6 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
 })();
 </script>
 <script src="demo.js" defer></script>
+<script src="bento.js" defer></script>
 </body>
 </html>

@@ -155,6 +155,7 @@
 .dm-sec .hd .chev { stroke: var(--faint); transition: transform .15s; width: 9px; height: 9px; }
 .dm-sec.closed .hd .chev { transform: rotate(-90deg); }
 .dm-sec.closed .tiles { display: none; }
+.dm-sec.closed .hd { margin-bottom: 0; }
 .dm-sec .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dm-tile { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 11px; min-height: 52px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; min-width: 0; position: relative; transition: border-color .15s; touch-action: none; }
 .dm-tile:hover { border-color: color-mix(in srgb, var(--ink) 18%, transparent); }
@@ -178,17 +179,24 @@
 .dm-hint { border: 0; background: none; font: inherit; font-size: 11.5px; color: var(--faint); cursor: pointer; justify-self: center; padding: 4px 8px; }
 .dm-hint:hover { color: var(--orange); }
 
-/* Search results */
-.dm-res { display: grid; gap: 1px; padding: 4px; }
-.dm-res .grp { font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 10px 3px; }
-.dm-r { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
-.dm-r.task { padding-left: 26px; }
-.dm-r.sel { background: var(--orange-soft); }
-.dm-r .nm { font-weight: 600; }
-.dm-r .cd { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
-.dm-r svg { width: 9px; height: 9px; fill: none; stroke: var(--faint); stroke-width: 2; transition: transform .15s; }
-.dm-r.open svg { transform: rotate(90deg); }
-.dm-r mark { background: none; color: var(--orange); }
+/* Search results, as the app draws them: one line each, the selected row
+   solid orange, a chevron or play icon at the right. */
+.dm-res { display: grid; gap: 0; padding: 5px; }
+.dm-res .grp { font-size: 11px; font-weight: 600; color: var(--muted); padding: 10px 10px 3px; }
+.dm-res .grp:first-child { padding-top: 2px; }
+.dm-r { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.dm-r.task { margin-left: 16px; }
+.dm-r .lb { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-r .ic { width: 14px; display: grid; place-items: center; color: var(--orange); opacity: 0; flex: none; }
+.dm-r svg.ic { height: 10px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .15s; }
+.dm-r .ic svg { width: 9px; height: 9px; fill: currentColor; }
+.dm-r .fv { color: var(--orange); font-size: 10px; }
+.dm-r:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.dm-r:hover .ic, .dm-r.open .ic, .dm-r.on .ic, .dm-r.sel .ic { opacity: 1; }
+.dm-r.open svg.ic { transform: rotate(90deg); }
+.dm-r.on { background: var(--orange-soft); }
+.dm-r.sel { background: var(--orange); color: #fff; }
+.dm-r.sel .ic, .dm-r.sel .fv { color: #fff; }
 
 /* Toast and footer */
 .dm-toast { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: color-mix(in srgb, var(--ink) 5%, var(--paper)); font-size: 12.5px; flex: none; }
@@ -202,17 +210,23 @@
 /* Popovers, with the window dimmed behind them */
 .dm-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .18); z-index: 10; opacity: 0; pointer-events: none; transition: opacity .15s; }
 .dm-dim.on { opacity: 1; pointer-events: auto; }
-.dm-pop { position: absolute; z-index: 11; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .35); padding: 14px; width: 300px; display: grid; gap: 10px; }
-.dm-pop h4 { margin: 0; font-size: 13px; font-weight: 600; text-align: center; }
-.dm-pop label { font-size: 11.5px; color: var(--muted); display: grid; gap: 4px; }
-.dm-pop input, .dm-pop select, .dm-pop textarea { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; width: 100%; }
-.dm-pop textarea { min-height: 64px; resize: none; }
-.dm-pop input:focus, .dm-pop select:focus, .dm-pop textarea:focus { outline: none; border-color: var(--orange); }
-.dm-pop .row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.dm-pop { position: absolute; z-index: 11; background: var(--surface); border-radius: 12px; box-shadow: 0 0 0 .5px rgba(0, 0, 0, .14), 0 16px 36px -10px rgba(0, 0, 0, .35); padding: 12px; width: 280px; display: grid; gap: 8px; font-size: 12.5px; }
+.dm-pop::before { content: ""; position: absolute; left: calc(var(--ax, 50%) - 7px); top: -6px; width: 14px; height: 14px; background: var(--surface); transform: rotate(45deg); border-radius: 2px; box-shadow: -.5px -.5px 0 rgba(0, 0, 0, .14); }
+.dm-pop.up::before { top: auto; bottom: -6px; box-shadow: .5px .5px 0 rgba(0, 0, 0, .14); }
+.dm-pop > * { position: relative; }
+.dm-pop h4 { margin: 0 0 2px; font-size: 12.5px; font-weight: 600; text-align: center; }
+.dm-pop label { font-size: 11px; color: var(--muted); display: grid; gap: 3px; }
+.dm-pop .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 6px; }
+.dm-pop input, .dm-pop select, .dm-pop textarea { font: inherit; font-size: 12.5px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; width: 100%; min-width: 0; height: 26px; }
+.dm-pop select { padding-right: 4px; }
+.dm-pop textarea { height: auto; min-height: 44px; resize: none; line-height: 1.4; }
+.dm-pop input:focus, .dm-pop select:focus, .dm-pop textarea:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 2px var(--orange-soft); }
+.dm-pop .row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; margin-top: 2px; }
 .dm-pop .row .l { margin-right: auto; }
-.dm-pop button.b { border: 0; font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 8px; cursor: pointer; background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
-.dm-pop button.b.pri { background: var(--orange); color: #fff; }
-.dm-pop button.b.del { background: none; color: #A32D2D; padding-left: 0; }
+.dm-pop .row .tm { width: 64px; text-align: center; font-variant-numeric: tabular-nums; margin-right: auto; }
+.dm-pop button.b { border: 0; font: inherit; font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 6px; cursor: pointer; background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); }
+.dm-pop button.b.pri { background: var(--orange); color: #fff; font-weight: 600; }
+.dm-pop button.b.del { background: none; color: #A32D2D; padding: 4px 4px; }
 .dm-pop .why { display: flex; gap: 10px; }
 .dm-pop .why svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--orange); stroke-width: 1.7; margin-top: 1px; }
 .dm-pop .why p { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
@@ -229,6 +243,8 @@
 .dm-menu { position: absolute; z-index: 11; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 14px 34px -10px rgba(0, 0, 0, .35); padding: 5px; min-width: 210px; display: grid; }
 .dm-menu button { border: 0; background: none; font: inherit; font-size: 13px; text-align: left; padding: 5px 10px; border-radius: 6px; cursor: pointer; color: var(--ink); display: flex; gap: 8px; align-items: center; }
 .dm-menu button:hover { background: var(--orange); color: #fff; }
+.dm-menu button.danger { color: #C03A2B; }
+.dm-menu button.danger:hover { background: #C03A2B; color: #fff; }
 .dm-menu button svg { width: 9px; height: 9px; fill: currentColor; }
 .dm-menu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
 .dm-menu .ck { width: 12px; display: inline-block; }
@@ -237,3 +253,21 @@
 /* Phones: the desk scales down as a whole (see demo.js); the caption says so. */
 .try .phone-note { display: none; color: var(--faint); font-size: 13px; margin-top: 10px; }
 @media (max-width: 720px) { .try .phone-note { display: block; } }
+
+/* The entry editor, laid out like the app's: project and task in one box,
+   notes beside a big hours field, Favorite opposite the buttons. */
+.dm-ed { width: 340px; padding: 14px; gap: 10px; }
+.dm-ed h4 { font-size: 13px; margin-bottom: 2px; }
+.dm-ed .grp { display: grid; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.dm-ed .grp select { border: 0; border-radius: 0; background: transparent; height: 32px; padding: 0 8px; font-size: 13px; }
+.dm-ed .grp select + select { border-top: 1px solid var(--line); margin-left: 10px; padding-left: 0; width: calc(100% - 10px); }
+.dm-ed .grp select:focus { box-shadow: none; background: var(--orange-soft); }
+.dm-ed .nh { display: flex; gap: 10px; }
+.dm-ed .nh textarea { flex: 1; min-height: 50px; padding: 8px 10px; font-size: 13px; border-radius: 8px; }
+.dm-ed .nh .hrs { width: 84px; height: 50px; flex: none; text-align: right; font-size: 22px; font-weight: 300; font-variant-numeric: tabular-nums; border-radius: 8px; padding: 0 10px; }
+.dm-ed .row { margin-top: 4px; }
+.dm-ed .row .sp { flex: 1; }
+.dm-ed .fav { border: 0; background: none; font: inherit; font-size: 12px; font-weight: 500; color: var(--muted); padding: 5px 8px; margin-left: -8px; border-radius: 6px; cursor: pointer; }
+.dm-ed .fav:hover, .dm-ed .fav.on { color: var(--orange); }
+.dm-ed .fav:hover { background: var(--orange-soft); }
+.dm-ed button.b { border-radius: 99px; padding: 5px 14px; font-size: 12.5px; }

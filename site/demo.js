@@ -154,11 +154,6 @@
     S.query = ""; S.picked = null; S.sel = 0; $("#dm-ask").value = "";
     startTask(key(r.i, r.t));
   }
-  const mark = (text) => {
-    let out = esc(text);
-    S.query.trim().split(/\s+/).filter(Boolean).forEach((w) => { out = out.replace(new RegExp(`(${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig"), "<mark>$1</mark>"); });
-    return out;
-  };
 
   // Rendering
   function tile(k, kind) {
@@ -193,8 +188,9 @@
       return `<div class="dm-card dm-res">${rows.map((r) => {
         if (r.type === "grp") return `<div class="grp">${esc(r.label)}</div>`;
         n++;
-        if (r.type === "proj") { const p = P[r.i]; return `<div class="dm-r${S.sel === n ? " sel" : ""}${S.picked === r.i ? " open" : ""}" data-r="${n}"><svg viewBox="0 0 10 10"><path d="M3.5 2 6.5 5 3.5 8"/></svg><span class="nm">${mark(p.name)}</span>${p.code ? `<span class="cd">${mark(p.code)}</span>` : ""}</div>`; }
-        return `<div class="dm-r task${S.sel === n ? " sel" : ""}" data-r="${n}">${mark(r.t)}</div>`;
+        if (r.type === "proj") { const p = P[r.i]; return `<div class="dm-r${S.sel === n ? " sel" : ""}${S.picked === r.i ? " open" : ""}" data-r="${n}"><span class="lb">${esc(p.code ? `[${p.code}] ${p.name}` : p.name)}</span><svg class="ic" viewBox="0 0 10 10"><path d="M3.5 2 6.5 5 3.5 8"/></svg></div>`; }
+        const rr = running(), on = rr && rr.k === key(r.i, r.t), fav = S.favorites.includes(key(r.i, r.t));
+        return `<div class="dm-r task${S.sel === n ? " sel" : ""}${on ? " on" : ""}" data-r="${n}"><span class="lb">${esc(r.t)}</span>${fav ? '<span class="fv">★</span>' : ""}<span class="ic">${on ? PAUSE : PLAY}</span></div>`;
       }).join("")}</div>`;
     }
     const ws = weekStart(S.selected);
@@ -252,35 +248,34 @@
   function closePop() { S.pop = null; renderPop(); }
   function renderPop() {
     const host = $("#dm-pops");
-    $(".dm-dim").classList.toggle("on", !!S.pop && !["favmenu", "gear"].includes(S.pop?.kind));
+    $(".dm-dim").classList.toggle("on", !!S.pop && !["favmenu", "gear", "ctx"].includes(S.pop?.kind));
     if (!S.pop) { host.innerHTML = ""; return; }
     const { kind } = S.pop;
     const win = $(".dm-win").getBoundingClientRect(), sc = win.width / 420 || 1;
-    const at = (el, w = 300, below = true) => {
-      const r = el.getBoundingClientRect();
-      let left = (r.left - win.left) / sc + r.width / sc / 2 - w / 2;
-      left = Math.max(10, Math.min(420 - w - 10, left));
-      return below ? `left:${left}px;top:${(r.bottom - win.top) / sc + 8}px` : `left:${left}px;bottom:${(win.bottom - r.top) / sc + 8}px`;
+    let place = null;
+    const at = (el, w = 280, below = true) => {
+      const r = el.getBoundingClientRect(), cx = (r.left - win.left) / sc + r.width / sc / 2;
+      const left = Math.max(10, Math.min(420 - w - 10, cx - w / 2));
+      place = { top: (r.top - win.top) / sc, bottom: (r.bottom - win.top) / sc, ax: cx - left, below };
+      return below ? `left:${left}px;top:${place.bottom + 10}px;--ax:${cx - left}px` : `left:${left}px;bottom:${592 - place.top + 10}px;--ax:${cx - left}px`;
     };
-    const projOpts = (sel) => P.map((p, i) => `<option value="${i}"${i === sel ? " selected" : ""}>${esc(p.client)} · ${esc(p.name)}</option>`).join("");
+    const projOpts = (sel) => P.map((p, i) => `<option value="${i}"${i === sel ? " selected" : ""}>${esc(p.code ? `[${p.code}] ${p.name}` : p.name)} (${esc(p.client)})</option>`).join("");
     const taskOpts = (i, sel) => P[i].tasks.map((t) => `<option${t === sel ? " selected" : ""}>${esc(t)}</option>`).join("");
     let html = "";
     if (kind === "lock") {
       const e = S.entries.find((x) => x.id === S.pop.id);
       const inv = e.lock === "invoiced";
       html = `<div class="dm-pop" style="${at(S.pop.anchor)}"><div class="why">${inv ? '<svg viewBox="0 0 16 16"><path d="M4 1.5h5.5L12 4v10.5H4Z M6 7h4M6 9.5h4"/></svg>' : '<svg viewBox="0 0 16 16"><path d="m3 8.5 3 3 7-7"/></svg>'}<div><b>${inv ? "Invoiced" : "Approved"}</b><p>${inv ? "This time is on invoice #1042, so Harvest won't let it change. To edit it, ask an admin to take it off the invoice." : "This timesheet has been approved, so Harvest won't let it change. To edit it, ask whoever approved it to unapprove it."}</p></div></div><div class="row"><button class="b" data-again="${e.id}">Start Again Today</button><button class="b pri" data-close>OK</button></div></div>`;
-    } else if (kind === "edit") {
-      const e = S.entries.find((x) => x.id === S.pop.id), pi = +e.k.split(":")[0];
-      html = `<div class="dm-pop" style="${at(S.pop.anchor)}"><h4>Edit Entry</h4>
-        <label>Project<select data-f="p">${projOpts(pi)}</select></label><label>Task<select data-f="t">${taskOpts(pi, taskOf(e.k))}</select></label>
-        <label>Notes<textarea data-f="n" placeholder="What you worked on">${esc(e.notes)}</textarea></label><label>Time<input data-f="h" value="${hm(elapsed(e))}" ${e.running ? "disabled" : ""}></label>
-        <div class="row"><button class="b del l" data-del="${e.id}">Delete</button><button class="b" data-close>Cancel</button><button class="b pri" data-save="${e.id}">Save</button></div></div>`;
-    } else if (kind === "new") {
-      const pi = S.pop.p ?? 0;
-      html = `<div class="dm-pop" style="${at(S.pop.anchor, 300, false)}"><h4>New Entry · ${esc(dayTitle(S.selected))}</h4>
-        <label>Project<select data-f="p">${projOpts(pi)}</select></label><label>Task<select data-f="t">${taskOpts(pi)}</select></label>
-        <label>Notes<textarea data-f="n" placeholder="What you're working on"></textarea></label><label>Time<input data-f="h" placeholder="Leave empty to start a timer"></label>
-        <div class="row"><button class="b" data-close>Cancel</button><button class="b pri" data-create>${S.selected === today ? "Start Timer" : "Save"}</button></div></div>`;
+    } else if (kind === "edit" || kind === "new") {
+      const e = kind === "edit" ? S.entries.find((x) => x.id === S.pop.id) : null;
+      const pi = e ? +e.k.split(":")[0] : (S.pop.p ?? 0), tk = e ? taskOf(e.k) : P[pi].tasks[0];
+      const isToday = (e ? e.day : S.selected) === today, starts = !e && isToday;
+      const fav = S.favorites.includes(key(pi, tk));
+      const title = (e ? "Edit Time Entry" : "New Time Entry") + (isToday ? "" : ` · ${dayTitle(e ? e.day : S.selected)}`);
+      html = `<div class="dm-pop dm-ed" style="${at(S.pop.anchor, 340, kind === "edit")}"><h4>${esc(title)}</h4>
+        <div class="grp"><select data-f="p" aria-label="Project">${projOpts(pi)}</select><select data-f="t" aria-label="Task">${taskOpts(pi, tk)}</select></div>
+        <div class="nh"><textarea data-f="n" rows="2" placeholder="Notes (optional)" aria-label="Notes">${esc(e ? e.notes : "")}</textarea><input class="hrs" data-f="h" value="${e ? hm(elapsed(e)) : ""}" placeholder="0:00" aria-label="Hours" title="${starts ? "h:mm or decimal. Leave empty to start a timer." : "h:mm or decimal"}"></div>
+        <div class="row"><button class="fav${fav ? " on" : ""}" data-edfav>${fav ? "★" : "☆"} Favorite</button><span class="sp"></span><button class="b" data-close>Cancel</button>${e ? `<button class="b pri" data-save="${e.id}">Save Entry</button>` : `<button class="b pri" data-create>${starts ? "Start Timer" : "Save Entry"}</button>`}</div></div>`;
     } else if (kind === "plan") {
       const props = S.pop.props || [];
       html = `<div class="dm-pop" style="${at(S.pop.anchor, 320, false)};width:320px"><h4>What are you working on today?</h4>
@@ -292,6 +287,13 @@
       html = `<div class="dm-menu" style="${at(S.pop.anchor, 220, false)}">${S.favorites.length ? S.favorites.map((k) => `<button data-start="${esc(k)}">${r && r.k === k ? PAUSE : PLAY}${esc(proj(k).name)} · ${esc(taskOf(k))}</button>`).join("") : '<div class="muted">Star a task to add it here</div>'}</div>`;
     } else if (kind === "gear") {
       html = `<div class="dm-menu" style="${at(S.pop.anchor, 230, false)}"><button data-nudges><span class="ck">${S.nudges ? "✓" : ""}</span>Point Out Short Days</button><button data-restore><span class="ck"></span>Show Removed Suggestions</button><div class="sep"></div><button data-reset><span class="ck"></span>Reset the Demo</button><button data-quit><span class="ck"></span>Close Window</button></div>`;
+    } else if (kind === "ctx") {
+      const e = S.entries.find((x) => x.id === S.pop.id), fav = S.favorites.includes(e.k), wr = win;
+      const x = Math.min(420 - 220, (S.pop.x - wr.left) / sc), y = Math.min(592 - 190, (S.pop.y - wr.top) / sc);
+      const items = [`<button data-ctx="again">${e.day === today ? "Start a Fresh Timer" : "Start Again Today"}</button>`, '<div class="sep"></div>'];
+      if (e.lock) items.push(`<button data-ctx="why">Why Is This ${e.lock === "invoiced" ? "Invoiced" : "Approved"}?</button>`, `<button data-ctx="fav">${fav ? "Remove from Favorites" : "Add to Favorites"}</button>`);
+      else items.push('<button data-ctx="edit">Edit Entry</button>', `<button data-ctx="fav">${fav ? "Remove from Favorites" : "Add to Favorites"}</button>`, `<button data-ctx="toggle">${e.running ? "Stop Timer" : "Start Timer"}</button>`, '<button data-ctx="del" class="danger">Delete Entry</button>');
+      html = `<div class="dm-menu" style="left:${x}px;top:${y}px">${items.join("")}</div>`;
     } else if (kind === "summary") {
       const y = today - 1, m = ddate(today).getMonth();
       const month = S.entries.reduce((t, e) => (ddate(e.day).getMonth() === m ? t + elapsed(e) : t), 0);
@@ -299,6 +301,15 @@
       html = `<div class="dm-pop" style="${at(S.pop.anchor)};padding:12px 0 0"><h4>Time Summary</h4><div class="sum"><div><small>Hours Today</small><b>${hm(secsOn(today))}</b></div><div><small>Hours Yesterday</small><b>${hm(secsOn(y))}</b></div><div><small>Hours This Week</small><b>${hm(wk)}</b></div><div><small>Hours This Month</small><b>${hm(month)}</b></div></div></div>`;
     }
     host.innerHTML = html;
+    // Keep it inside the window: open upward when there's no room below.
+    const el = host.firstElementChild;
+    if (el && place && el.classList.contains("dm-pop")) {
+      if (!place.below) el.classList.add("up");
+      else if (place.bottom + 10 + el.offsetHeight > 584) {
+        el.classList.add("up");
+        el.style.top = `${Math.max(8, place.top - 10 - el.offsetHeight)}px`;
+      }
+    }
     host.querySelector("textarea, input:not([disabled])")?.focus({ preventScroll: true });
   }
 
@@ -348,7 +359,7 @@
   });
 
   root.addEventListener("click", (ev) => {
-    const t = ev.target.closest("[data-r],[data-toggle],[data-lock],[data-day],[data-shift],[data-dismiss],[data-star],[data-hide],[data-fold],[data-tile],[data-new],[data-focus],[data-undo],[data-close],[data-save],[data-del],[data-create],[data-suggest],[data-addplan],[data-start],[data-nudges],[data-restore],[data-reset],[data-quit],[data-again],[data-foot],[data-tb],#dm-item,.dm-dim,.lights i");
+    const t = ev.target.closest("[data-edfav],[data-ctx],[data-r],[data-toggle],[data-lock],[data-day],[data-shift],[data-dismiss],[data-star],[data-hide],[data-fold],[data-tile],[data-new],[data-focus],[data-undo],[data-close],[data-save],[data-del],[data-create],[data-suggest],[data-addplan],[data-start],[data-nudges],[data-restore],[data-reset],[data-quit],[data-again],[data-foot],[data-tb],#dm-item,.dm-dim,.lights i");
     if (S.pop && !ev.target.closest(".dm-pop,.dm-menu") && !(t && t.dataset.foot === S.pop.kind)) {
       closePop();
       if (!t || t.classList.contains("dm-dim")) return;
@@ -375,6 +386,16 @@
     if (d.focus !== undefined) return ask.focus();
     if (d.undo !== undefined) { S.entries.push(S.undo.e); S.undo = null; return render(); }
     if (d.close !== undefined) return closePop();
+    if (d.ctx) {
+      const e = S.entries.find((x) => x.id === S.pop.id), anchor = root.querySelector(`[data-entry="${e.id}"] .hrs`);
+      closePop();
+      if (d.ctx === "again") { if (e.day === today) { stopRunning(); S.entries.push({ id: S.idCount++, day: today, k: e.k, secs: 0, notes: "", lock: null, order: S.idCount, running: true, startedAt: Date.now() }); return render(); } return startTask(e.k); }
+      if (d.ctx === "edit") return openPop("edit", { id: e.id, anchor });
+      if (d.ctx === "why") return openPop("lock", { id: e.id, anchor });
+      if (d.ctx === "fav") { const i = S.favorites.indexOf(e.k); i >= 0 ? S.favorites.splice(i, 1) : S.favorites.push(e.k); return render(); }
+      if (d.ctx === "toggle") return toggleEntry(e.id);
+      if (d.ctx === "del") { const i = S.entries.indexOf(e); if (e.running) stopRunning(); S.entries.splice(i, 1); S.undo = { e }; render(); clearTimeout(S.undoTimer); S.undoTimer = setTimeout(() => { S.undo = null; render(); }, 8000); return; }
+    }
     if (d.again) { const e = S.entries.find((x) => x.id === +d.again); closePop(); return startTask(e.k); }
     if (d.start) { closePop(); return startTask(d.start); }
     if (d.foot) {
@@ -386,6 +407,12 @@
     const pop = $("#dm-pops");
     const f = (n) => pop.querySelector(`[data-f="${n}"]`);
     const parseH = (v) => { v = v.trim(); if (!v) return null; if (v.includes(":")) { const [h, m] = v.split(":"); return (+h || 0) * 3600 + (+m || 0) * 60; } return parseFloat(v) * 3600 || null; };
+    if (t.matches("[data-edfav]")) {
+      const k = key(+f("p").value, f("t").value), i = S.favorites.indexOf(k);
+      i >= 0 ? S.favorites.splice(i, 1) : S.favorites.push(k);
+      t.classList.toggle("on", i < 0); t.textContent = `${i < 0 ? "★" : "☆"} Favorite`;
+      return render();
+    }
     if (d.save) {
       const e = S.entries.find((x) => x.id === +d.save);
       e.k = key(+f("p").value, f("t").value); e.notes = f("n").value.trim();
@@ -416,11 +443,23 @@
     if (d.reset !== undefined) { S = seed(); ask.value = ""; return render(); }
     if (d.quit !== undefined) { S.open = false; closePop(); return render(); }
   });
+  root.addEventListener("input", (ev) => {
+    if (ev.target.dataset.f === "h" && S.pop?.kind === "new" && S.selected === today) {
+      const b = $("#dm-pops [data-create]"); if (b) b.textContent = ev.target.value.trim() ? "Save Entry" : "Start Timer";
+    }
+  });
   root.addEventListener("change", (ev) => {
     if (ev.target.dataset.f === "p") {
       const t = $('#dm-pops [data-f="t"]');
       t.innerHTML = P[+ev.target.value].tasks.map((x) => `<option>${esc(x)}</option>`).join("");
     }
+  });
+  root.addEventListener("contextmenu", (ev) => {
+    const row = ev.target.closest("[data-entry]");
+    if (!row) return;
+    ev.preventDefault();
+    const e = S.entries.find((x) => x.id === +row.dataset.entry);
+    openPop("ctx", { id: e.id, anchor: row, x: ev.clientX, y: ev.clientY });
   });
   root.addEventListener("dblclick", (ev) => {
     const row = ev.target.closest("[data-entry]");
