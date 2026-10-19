@@ -424,6 +424,27 @@ h1 {
 .firstrun li { counter-increment: step; display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline; }
 .firstrun li::before { content: counter(step); font-family: var(--mono); font-size: 11px; color: var(--orange); width: 20px; height: 20px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent); display: grid; place-items: center; }
 .firstrun b { font-weight: 600; }
+/* Feedback */
+.feedback { padding-block: 24px 96px; display: grid; justify-items: center; }
+.fb { width: 100%; max-width: 560px; background: var(--tile); border-radius: 22px; padding: 26px; display: grid; gap: 14px; }
+.fb h2 { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; margin: 0; }
+.fb .sub { color: var(--muted); margin: -8px 0 4px; font-size: 15px; }
+.fb .kinds { display: flex; gap: 6px; flex-wrap: wrap; border: 0; padding: 0; margin: 0; }
+.fb .kinds legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.fb .kinds input { position: absolute; opacity: 0; pointer-events: none; }
+.fb .kinds label { font-size: 13px; font-weight: 500; padding: 5px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); cursor: pointer; transition: background .15s, color .15s; }
+.fb .kinds input:checked + label { background: var(--orange); color: #fff; border-color: transparent; }
+.fb .kinds input:focus-visible + label { outline: 2px solid var(--orange); outline-offset: 2px; }
+.fb textarea, .fb input[type="email"] { font: inherit; font-size: 15px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; width: 100%; transition: border-color .15s, box-shadow .15s; }
+.fb textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+.fb textarea:focus, .fb input[type="email"]:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
+.fb ::placeholder { color: var(--faint); }
+.fb .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fb .row .button { border: 0; cursor: pointer; font: inherit; font-weight: 600; }
+.fb .note { font-size: 13px; color: var(--faint); }
+.fb .err { font-size: 13px; color: #A32D2D; }
+.fb .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
 footer { border-top: 1px solid var(--line); padding-block: 28px 40px; font-size: 13px; color: var(--faint); }
 footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
 
@@ -453,6 +474,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     <a class="brand" href="#top"><span class="mark" aria-hidden="true"></span>Harvestbeam</a>
     <nav aria-label="Page">
       <a href="#features">Features</a>
+      <a href="#feedback">Feedback</a>
       <a href="https://github.com/tractorbeam-user/harvestbeam">GitHub</a>
     </nav>
     <span class="spacer"></span>
@@ -620,12 +642,33 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <p class="after">That's it. Updates install and open on their own after this.</p>
     </div>
   </section>
+  <section class="wrap feedback" id="feedback">
+    <form class="fb" id="fb" novalidate>
+      <h2>Ideas or feedback?</h2>
+      <p class="sub">Something you'd like Harvestbeam to do, or something that got in your way. It all gets read.</p>
+      <fieldset class="kinds">
+        <legend>What kind of note is this?</legend>
+        <input type="radio" name="kind" id="k-idea" value="Idea" checked><label for="k-idea">Idea</label>
+        <input type="radio" name="kind" id="k-bug" value="Bug"><label for="k-bug">Something's broken</label>
+        <input type="radio" name="kind" id="k-other" value="Feedback"><label for="k-other">Other feedback</label>
+      </fieldset>
+      <label class="sr" for="fb-text">Your note</label>
+      <textarea id="fb-text" name="text" placeholder="It'd be great if Harvestbeam could…"></textarea>
+      <label class="sr" for="fb-email">Your email, if you'd like a reply</label>
+      <input type="email" id="fb-email" name="email" placeholder="you@company.com (optional, for a reply)" autocomplete="email">
+      <div class="err" id="fb-err" role="alert" hidden></div>
+      <div class="row">
+        <button class="button" type="submit">Send to support</button>
+        <span class="note">Opens your email app with this filled in, addressed to support@tractorbeam.com.</span>
+      </div>
+    </form>
+  </section>
 </main>
 
 <footer>
   <div class="wrap">
     <span>Harvestbeam is an unofficial client for the Harvest API, not made or endorsed by Harvest.</span>
-    <a class="textlink" href="https://github.com/tractorbeam-user/harvestbeam">Source on GitHub</a>
+    <span><a class="textlink" href="#feedback">Send feedback</a> · <a class="textlink" href="https://github.com/tractorbeam-user/harvestbeam">Source on GitHub</a></span>
   </div>
 </footer>
 
@@ -837,6 +880,22 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       if (capsVisible) pressDemo();
     }), { threshold: 0.6 }).observe(document.querySelector(".caps"));
   }
+
+  // Feedback: no server here, so the form writes the email and hands it to
+  // the visitor's mail app, addressed to support.
+  const fb = $("fb"), fbText = $("fb-text"), fbErr = $("fb-err");
+  fbText.addEventListener("input", () => { fbErr.hidden = true; });
+  fb.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const text = fbText.value.trim();
+    if (!text) { fbErr.textContent = "Write a few words first."; fbErr.hidden = false; fbText.focus(); return; }
+    const kind = fb.querySelector('input[name="kind"]:checked').value;
+    const email = $("fb-email").value.trim();
+    const first = text.split("\n")[0].slice(0, 60);
+    const subject = `Harvestbeam ${kind.toLowerCase()}: ${first}${text.length > first.length ? "…" : ""}`;
+    const body = `${text}\n\n—\n${kind} from the Harvestbeam site${email ? `\nReply to: ${email}` : ""}\n${navigator.userAgent}`;
+    location.href = `mailto:support@tractorbeam.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  });
 
   // Plan Day: type the sentence when it scrolls into view, then show the matches.
   const sentence = "Context design all morning, an hour on the website build, then the Acme call";
