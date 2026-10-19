@@ -424,43 +424,55 @@ h1 {
 .firstrun li { counter-increment: step; display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline; }
 .firstrun li::before { content: counter(step); font-family: var(--mono); font-size: 11px; color: var(--orange); width: 20px; height: 20px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent); display: grid; place-items: center; }
 .firstrun b { font-weight: 600; }
-/* Changelog: major features only, newest first */
-.changelog { padding-block: 24px 40px; display: grid; justify-items: center; }
-.cl { width: 100%; max-width: 560px; }
-.cl h2 { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; margin: 0 0 6px; }
-.cl .sub { color: var(--muted); margin: 0 0 22px; font-size: 15px; }
-.cl ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
-.cl li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 18px; padding: 18px 0; border-top: 1px solid var(--line); }
-.cl li:last-child { border-bottom: 1px solid var(--line); }
-.cl .ver { font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; }
-.cl .ver small { display: block; font-weight: 400; font-size: 12.5px; color: var(--faint); margin-top: 2px; }
-.cl .ver .new { display: inline-block; font-size: 10.5px; font-weight: 600; color: var(--orange); background: var(--orange-soft); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px; }
-.cl h3 { font-family: var(--display); font-weight: 600; font-size: 16px; letter-spacing: -0.01em; margin: 0 0 6px; }
-.cl ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; display: grid; gap: 4px; }
-.cl ul li { display: list-item; padding: 0; border: 0; }
+/* What's new: a full-width band of its own, heading on the left, releases
+   on the right. Major features only, newest first. */
+.band { background: var(--tile); border-block: 1px solid var(--line); }
+.changelog { padding-block: 88px; display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 56px; align-items: start; }
+.changelog .intro { position: sticky; top: 72px; }
+.changelog .intro .sub { color: var(--muted); margin: 0 0 18px; font-size: 15.5px; }
+.changelog .section-title { margin-bottom: 12px; }
+.cl ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.cl > ol > li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 20px; padding: 22px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+.cl .ver { font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 22px; letter-spacing: -0.01em; line-height: 1.1; }
+.cl .ver small { display: block; font-weight: 400; font-size: 12.5px; color: var(--faint); margin-top: 6px; letter-spacing: 0; }
+.cl .ver .new { display: inline-block; font-family: var(--body); font-size: 10.5px; font-weight: 600; letter-spacing: 0; color: var(--orange); background: var(--orange-soft); border-radius: 6px; padding: 2px 7px; margin-top: 8px; }
+.cl h3 { font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: -0.015em; margin: 0 0 8px; }
+.cl ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; display: grid; gap: 5px; }
 .cl ul li::marker { color: var(--orange); }
-@media (max-width: 560px) { .cl li { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
 
-/* Feedback */
-.feedback { padding-block: 24px 96px; display: grid; justify-items: center; }
-.fb { width: 100%; max-width: 560px; background: var(--tile); border-radius: 22px; padding: 26px; display: grid; gap: 14px; }
-.fb h2 { font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: -0.02em; margin: 0; }
-.fb .sub { color: var(--muted); margin: -8px 0 4px; font-size: 15px; }
+/* Feedback: back on the page background, an orange-tinted card with the
+   pitch on the left and the form on the right. */
+.feedback { padding-block: 96px 104px; }
+.fbwrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 48px; align-items: center; background: color-mix(in srgb, var(--orange) 7%, var(--paper)); border: 1px solid color-mix(in srgb, var(--orange) 14%, transparent); border-radius: 28px; padding: 44px; }
+.fbwrap .pitch h2 { font-family: var(--display); font-weight: 600; font-size: clamp(28px, 3.4vw, 38px); letter-spacing: -0.03em; line-height: 1.05; margin: 0 0 12px; }
+.fbwrap .pitch p { color: var(--muted); margin: 0; font-size: 16px; max-width: 34ch; }
+.fbwrap .pitch .mailto { display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; font-size: 14px; color: var(--ink); }
+.fbwrap .pitch .mailto svg { width: 15px; height: 15px; fill: none; stroke: var(--orange); stroke-width: 1.7; }
+.fb { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 22px; display: grid; gap: 12px; box-shadow: 0 24px 50px -30px rgba(40, 20, 0, .35); }
 .fb .kinds { display: flex; gap: 6px; flex-wrap: wrap; border: 0; padding: 0; margin: 0; }
 .fb .kinds legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .fb .kinds input { position: absolute; opacity: 0; pointer-events: none; }
-.fb .kinds label { font-size: 13px; font-weight: 500; padding: 5px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); cursor: pointer; transition: background .15s, color .15s; }
+.fb .kinds label { font-size: 13px; font-weight: 500; padding: 5px 12px; border-radius: 999px; background: var(--tile); border: 1px solid var(--line); cursor: pointer; transition: background .15s, color .15s; }
 .fb .kinds input:checked + label { background: var(--orange); color: #fff; border-color: transparent; }
 .fb .kinds input:focus-visible + label { outline: 2px solid var(--orange); outline-offset: 2px; }
-.fb textarea, .fb input[type="email"] { font: inherit; font-size: 15px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; width: 100%; transition: border-color .15s, box-shadow .15s; }
+.fb textarea, .fb input[type="email"] { font: inherit; font-size: 15px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; width: 100%; transition: border-color .15s, box-shadow .15s; }
 .fb textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 .fb textarea:focus, .fb input[type="email"]:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
 .fb ::placeholder { color: var(--faint); }
 .fb .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .fb .row .button { border: 0; cursor: pointer; font: inherit; font-weight: 600; }
-.fb .note { font-size: 13px; color: var(--faint); }
+.fb .note { font-size: 12.5px; color: var(--faint); }
 .fb .err { font-size: 13px; color: #A32D2D; }
 .fb .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (max-width: 900px) {
+  .changelog { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-block: 64px; }
+  .changelog .intro { position: static; }
+  .fbwrap { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 28px; }
+}
+@media (max-width: 560px) {
+  .cl > ol > li { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 18px; }
+  .fbwrap { padding: 18px; border-radius: 22px; }
+}
 
 footer { border-top: 1px solid var(--line); padding-block: 28px 40px; font-size: 13px; color: var(--faint); }
 footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
@@ -660,14 +672,18 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <p class="after">That's it. Updates install and open on their own after this.</p>
     </div>
   </section>
-  <section class="wrap changelog" id="changelog">
-    <div class="cl">
-      <h2>What's new</h2>
-      <p class="sub">The big things in each release. Installed copies update themselves.</p>
-      <!-- Major features only, newest first. Add an entry with each release. -->
+  <div class="band">
+    <section class="wrap changelog" id="changelog">
+      <div class="intro">
+        <h2 class="section-title">What's new</h2>
+        <p class="sub">The big things in each release. Installed copies update themselves.</p>
+        <a class="textlink" href="https://github.com/tractorbeam-user/harvestbeam/releases">Every release on GitHub →</a>
+      </div>
+      <div class="cl">
+        <!-- Major features only, newest first. Add an entry with each release. -->
       <ol>
         <li>
-          <div class="ver">1.1<span class="new">Latest</span><small>Oct 19, 2026</small></div>
+          <div class="ver">1.1<small>Oct 19, 2026</small><span class="new">Latest</span></div>
           <div>
             <h3>A lighter look, and a better sense of your week</h3>
             <ul>
@@ -691,29 +707,35 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
           </div>
         </li>
       </ol>
-    </div>
-  </section>
+      </div>
+    </section>
+  </div>
 
   <section class="wrap feedback" id="feedback">
-    <form class="fb" id="fb" novalidate>
-      <h2>Ideas or feedback?</h2>
-      <p class="sub">Something you'd like Harvestbeam to do, or something that got in your way. It all gets read.</p>
-      <fieldset class="kinds">
-        <legend>What kind of note is this?</legend>
-        <input type="radio" name="kind" id="k-idea" value="Idea" checked><label for="k-idea">Idea</label>
-        <input type="radio" name="kind" id="k-bug" value="Bug"><label for="k-bug">Something's broken</label>
-        <input type="radio" name="kind" id="k-other" value="Feedback"><label for="k-other">Other feedback</label>
-      </fieldset>
-      <label class="sr" for="fb-text">Your note</label>
-      <textarea id="fb-text" name="text" placeholder="It'd be great if Harvestbeam could…"></textarea>
-      <label class="sr" for="fb-email">Your email, if you'd like a reply</label>
-      <input type="email" id="fb-email" name="email" placeholder="you@company.com (optional, for a reply)" autocomplete="email">
-      <div class="err" id="fb-err" role="alert" hidden></div>
-      <div class="row">
-        <button class="button" type="submit">Send to support</button>
-        <span class="note">Opens your email app with this filled in, addressed to support@tractorbeam.com.</span>
+    <div class="fbwrap">
+      <div class="pitch">
+        <h2>Ideas or feedback?</h2>
+        <p>Something you'd like Harvestbeam to do, or something that got in your way. Every note gets read.</p>
+        <span class="mailto"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m2.5 4.5 5.5 4 5.5-4"/></svg>support@tractorbeam.com</span>
       </div>
-    </form>
+      <form class="fb" id="fb" novalidate>
+        <fieldset class="kinds">
+          <legend>What kind of note is this?</legend>
+          <input type="radio" name="kind" id="k-idea" value="Idea" checked><label for="k-idea">Idea</label>
+          <input type="radio" name="kind" id="k-bug" value="Bug"><label for="k-bug">Something's broken</label>
+          <input type="radio" name="kind" id="k-other" value="Feedback"><label for="k-other">Other feedback</label>
+        </fieldset>
+        <label class="sr" for="fb-text">Your note</label>
+        <textarea id="fb-text" name="text" placeholder="It'd be great if Harvestbeam could…"></textarea>
+        <label class="sr" for="fb-email">Your email, if you'd like a reply</label>
+        <input type="email" id="fb-email" name="email" placeholder="Your email, if you want a reply" autocomplete="email">
+        <div class="err" id="fb-err" role="alert" hidden></div>
+        <div class="row">
+          <button class="button" type="submit">Send to support</button>
+          <span class="note">Opens your email app with this filled in.</span>
+        </div>
+      </form>
+    </div>
   </section>
 </main>
 
