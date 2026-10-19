@@ -52,3 +52,31 @@ struct DayPlannerTests {
         #expect(plan.first?.task.key == tasks[0].key)
     }
 }
+
+struct DayPlannerReconcileTests {
+    let a = TrackableTask(project: NamedRef(id: 1, name: "TB Corporate"), client: nil, task: NamedRef(id: 1, name: "Product Design"))
+    let b = TrackableTask(project: NamedRef(id: 1, name: "TB Corporate"), client: nil, task: NamedRef(id: 2, name: "Design Execution"))
+
+    @Test func oneRequestIsOneEntryWithTheDurationTyped() {
+        let model = [PlannedEntry(task: a, hours: 2, notes: "tb corporate"), PlannedEntry(task: b, hours: nil, notes: "")]
+        let result = DayPlanner.reconcile(model, with: "add 10 min to tb corporate")
+        #expect(result.count == 1)
+        #expect(result[0].task == a)
+        #expect(abs((result[0].hours ?? 0) - 10.0 / 60) < 0.001)
+    }
+
+    @Test func hoursNobodySaidAreDropped() {
+        let model = [PlannedEntry(task: a, hours: 1, notes: "")]
+        #expect(DayPlanner.reconcile(model, with: "tb corporate design").first?.hours == nil)
+    }
+
+    @Test func eachClauseKeepsItsOwnDuration() {
+        let model = [PlannedEntry(task: a, hours: 5, notes: ""), PlannedEntry(task: b, hours: 5, notes: "")]
+        let result = DayPlanner.reconcile(model, with: "2h on product design, then 30 min of execution")
+        #expect(result.map(\.hours) == [2, 0.5])
+    }
+
+    @Test func addIsNotAKeyword() {
+        #expect(DayPlanner.keywords(in: "add 10 min to tb corporate") == ["tb", "corporate"])
+    }
+}

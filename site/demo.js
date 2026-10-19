@@ -179,13 +179,26 @@
       <div class="who"><div class="c">${esc(p.client)}</div><div class="p dm-mq"><span>${esc(p.code ? `[${p.code}] ${p.name}` : p.name)}</span></div><div class="k">${esc(taskOf(e.k))}</div>${e.notes ? `<div class="n">${esc(e.notes)}</div>` : ""}</div>
       <span class="hrs" ${e.running ? 'data-live="run"' : ""}>${hm(elapsed(e))}</span>${btn}</div>`;
   }
+  // "20 min on brand refresh": typing a duration offers to log it.
+  const quickPlan = () => (/\d+\s*(h|hr|hour|m|min)|an hour|half an hour|\d+:\d\d/i.test(S.query) ? plan(S.query) : []);
+  function quickRow(qp) {
+    if (!qp.length) return "";
+    const one = qp.length === 1, x = qp[0];
+    const title = one ? `Add ${hm(x.s)} to ${esc(P[x.p].name)}` : `Add ${qp.length} entries`;
+    const sub = one ? esc(x.t) + (S.selected === today ? "" : ` · ${esc(dayTitle(S.selected))}`) : qp.map((y) => `${esc(P[y.p].name)} ${hm(y.s)}`).join(" · ");
+    return `<div class="dm-qp${S.sel === -1 ? " sel" : ""}" data-qp><span class="pl">+</span><span class="w"><b>${title}</b><small>${sub}</small></span><span class="rt">⏎</span></div>`;
+  }
+  function addQuick() {
+    quickPlan().forEach((x) => S.entries.push({ id: S.idCount++, day: S.selected, k: key(x.p, x.t), secs: x.s, notes: "", lock: null, order: S.idCount }));
+    S.query = ""; S.sel = 0; S.picked = null; ask.value = ""; render(); rotate();
+  }
   function body() {
     const rows = results();
     if (S.query.trim()) {
-      const flat = pickable(rows);
-      if (!flat.length) return `<div class="dm-card dm-empty">No projects match “${esc(S.query)}”</div>`;
+      const flat = pickable(rows), qp = quickPlan();
+      if (!flat.length) return qp.length ? quickRow(qp) : `<div class="dm-card dm-empty">No projects match “${esc(S.query)}”</div>`;
       let n = -1;
-      return `<div class="dm-card dm-res">${rows.map((r) => {
+      return quickRow(qp) + `<div class="dm-card dm-res">${rows.map((r) => {
         if (r.type === "grp") return `<div class="grp">${esc(r.label)}</div>`;
         n++;
         if (r.type === "proj") { const p = P[r.i]; return `<div class="dm-r${S.sel === n ? " sel" : ""}${S.picked === r.i ? " open" : ""}" data-r="${n}"><span class="lb">${esc(p.code ? `[${p.code}] ${p.name}` : p.name)}</span><svg class="ic" viewBox="0 0 10 10"><path d="M3.5 2 6.5 5 3.5 8"/></svg></div>`; }
@@ -344,11 +357,13 @@
 
   // Events
   const ask = $("#dm-ask");
-  ask.addEventListener("input", () => { S.query = ask.value; S.picked = null; S.sel = 0; render(); });
+  ask.addEventListener("input", () => { S.query = ask.value; S.picked = null; S.sel = quickPlan().length ? -1 : 0; render(); rotate(); });
   ask.addEventListener("keydown", (ev) => {
     const flat = pickable(results());
+    const floor = quickPlan().length ? -1 : 0;
     if (ev.key === "ArrowDown" && flat.length) { S.sel = Math.min(flat.length - 1, S.sel + 1); ev.preventDefault(); render(); }
-    else if (ev.key === "ArrowUp" && flat.length) { S.sel = Math.max(0, S.sel - 1); ev.preventDefault(); render(); }
+    else if (ev.key === "ArrowUp") { S.sel = Math.max(floor, S.sel - 1); ev.preventDefault(); render(); }
+    else if (ev.key === "Enter" && S.sel === -1 && floor === -1) { ev.preventDefault(); addQuick(); }
     else if (ev.key === "Enter" && flat[S.sel]) { ev.preventDefault(); pick(flat[S.sel]); }
     else if (ev.key === "Escape") {
       ev.preventDefault();
@@ -359,7 +374,7 @@
   });
 
   root.addEventListener("click", (ev) => {
-    const t = ev.target.closest("[data-edfav],[data-ctx],[data-r],[data-toggle],[data-lock],[data-day],[data-shift],[data-dismiss],[data-star],[data-hide],[data-fold],[data-tile],[data-new],[data-focus],[data-undo],[data-close],[data-save],[data-del],[data-create],[data-suggest],[data-addplan],[data-start],[data-nudges],[data-restore],[data-reset],[data-quit],[data-again],[data-foot],[data-tb],#dm-item,.dm-dim,.lights i");
+    const t = ev.target.closest("[data-qp],[data-edfav],[data-ctx],[data-r],[data-toggle],[data-lock],[data-day],[data-shift],[data-dismiss],[data-star],[data-hide],[data-fold],[data-tile],[data-new],[data-focus],[data-undo],[data-close],[data-save],[data-del],[data-create],[data-suggest],[data-addplan],[data-start],[data-nudges],[data-restore],[data-reset],[data-quit],[data-again],[data-foot],[data-tb],#dm-item,.dm-dim,.lights i");
     if (S.pop && !ev.target.closest(".dm-pop,.dm-menu") && !(t && t.dataset.foot === S.pop.kind)) {
       closePop();
       if (!t || t.classList.contains("dm-dim")) return;
@@ -371,7 +386,13 @@
       if (sq) { const r = running(); if (r) stopRunning(); else { const last = [...S.entries].filter((e) => e.day === today).sort((a, b) => b.order - a.order)[0]; if (last) toggleEntry(last.id); } return render(); }
       S.open = !S.open; render(); if (S.open) ask.focus({ preventScroll: true }); return;
     }
-    if (t.matches(".lights i")) { S.open = false; return render(); }
+    if (t.matches(".lights i")) {
+      const i = [...t.parentElement.children].indexOf(t), win = $(".dm-win");
+      if (i === 2) { win.classList.toggle("zoomed"); return; }
+      if (i === 1) { win.classList.add("min"); setTimeout(() => { S.open = false; win.classList.remove("min"); render(); }, 320); return; }
+      S.open = false; return render();
+    }
+    if (d.qp !== undefined) return addQuick();
     if (d.r !== undefined) return pick(pickable(results())[+d.r]);
     if (d.toggle) return toggleEntry(+d.toggle);
     if (d.lock) return openPop("lock", { id: +d.lock, anchor: t });
@@ -563,6 +584,28 @@
     const up = () => { tb.classList.remove("grab"); removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
     addEventListener("pointermove", move); addEventListener("pointerup", up);
   });
+
+  // The ask box's placeholder rotates through things you can type.
+  const ph = $(".dm-ask .ph");
+  const examples = ["What are you working on?", "20 min on Brand Refresh", "Search a project, client or code", "An hour of design for Acme", "30 min on the Northwind call"];
+  let phIndex = 0, phTimer = null;
+  function rotate() {
+    ph.style.display = ask.value ? "none" : "";
+    clearTimeout(phTimer);
+    if (ask.value || reduce) return;
+    phTimer = setTimeout(() => {
+      ph.classList.add("out");
+      setTimeout(() => {
+        phIndex = (phIndex + 1) % examples.length;
+        ph.textContent = examples[phIndex];
+        ph.classList.remove("out"); ph.classList.add("in");
+        void ph.offsetWidth; // let the start position apply before easing in
+        ph.classList.remove("in");
+        rotate();
+      }, 300);
+    }, phIndex === 0 ? 3200 : 2600);
+  }
+  rotate();
 
   // Scale the whole desk to fit narrow screens.
   const fit = $(".dm-fit") || root.parentElement, desk = root;

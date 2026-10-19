@@ -71,18 +71,34 @@
       { n: "Data Platform", c: "NW-DATA", cl: "Northwind", t: ["Development", "Meetings"] },
     ];
     let open = null;
+    // "20 min on brand refresh": a duration plus a project logs it.
+    const said = () => {
+      const v = input.value.toLowerCase(), m = v.match(/(\d+)\s*(m|min|h|hr|hour)/) || (v.includes("an hour") ? ["", "1", "h"] : null);
+      if (!m) return null;
+      const p = projects.find((x) => x.n.toLowerCase().split(" ").some((w) => w.length > 3 && v.includes(w)) || v.includes(x.c.toLowerCase()));
+      if (!p) return null;
+      const mins = m[2].startsWith("h") ? +m[1] * 60 : +m[1];
+      return { p, t: v.includes("meet") || v.includes("call") ? "Meetings" : p.t[0], mins };
+    };
     const draw = () => {
       const w = input.value.trim().toLowerCase();
+      const plan = said();
+      if (plan) {
+        out.innerHTML = `<button type="button" class="add" data-add>+ Add ${Math.floor(plan.mins / 60)}:${String(plan.mins % 60).padStart(2, "0")} to ${plan.p.n}</button>`;
+        return;
+      }
       if (open) {
         out.innerHTML = `<span class="msg">${open.n} →</span>` + open.t.map((t) => `<button type="button" class="task" data-t="${t}">${t}</button>`).join("");
         return;
       }
       const hits = w ? projects.filter((p) => `${p.n} ${p.c} ${p.cl}`.toLowerCase().includes(w)) : [];
-      out.innerHTML = hits.length ? hits.map((p, i) => `<button type="button" data-p="${projects.indexOf(p)}">${p.n}</button>`).join("") : `<span class="msg">${w ? "No projects match" : "Try acme, web or nw"}</span>`;
+      out.innerHTML = hits.length ? hits.map((p, i) => `<button type="button" data-p="${projects.indexOf(p)}">${p.n}</button>`).join("") : `<span class="msg">${w ? "No projects match" : "Try acme, or 20 min on web"}</span>`;
     };
     input.addEventListener("input", () => { open = null; draw(); });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { const b = out.querySelector("button"); if (b) b.click(); } });
     out.addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.add !== undefined) { const plan = said(); out.innerHTML = `<span class="done">✓ Logged to ${plan.p.n} · ${plan.t}</span>`; later(2200, () => { input.value = "acme"; draw(); }); return; }
       if (b.dataset.p) { open = projects[+b.dataset.p]; return draw(); }
       out.innerHTML = `<span class="done">▶ ${open.n} · ${b.dataset.t}</span>`;
       open = null;

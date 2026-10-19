@@ -75,8 +75,8 @@ enum DebugSnapshots {
 
             if let field = firstTextField(in: window.contentView!) {
                 window.makeFirstResponder(field)
-                field.stringValue = "de"
-                field.currentEditor()?.string = "de"
+                field.stringValue = "10 min on website"
+                field.currentEditor()?.string = "10 min on website"
                 NotificationCenter.default.post(name: NSControl.textDidChangeNotification, object: field)
                 (field.currentEditor() as? NSTextView)?.didChangeText()
             }
@@ -162,7 +162,7 @@ enum DebugSnapshots {
 
     private static func firstTextField(in view: NSView) -> NSTextField? {
         if let field = view as? NSTextField, field.isEditable, !(field is NSSecureTextField),
-           (field.placeholderString ?? field.placeholderAttributedString?.string ?? "").hasPrefix("Start something") {
+           ["", "Start something new…"].contains(field.placeholderString ?? field.placeholderAttributedString?.string ?? "") {
             return field
         }
         for sub in view.subviews {

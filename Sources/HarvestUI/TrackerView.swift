@@ -53,6 +53,8 @@ struct TrackerView: View {
     @FocusState private var searchFocused: Bool
 
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
+    /// "10 min on tb corporate": what typing a duration in the ask box would add.
+    private var quickPlan: [PlannedEntry] { isSearching ? tracker.quickPlan(query) : [] }
 
     private func sections() -> [TaskSection] {
         if isSearching {
@@ -60,7 +62,10 @@ struct TrackerView: View {
             // below it, like an accordion.
             var seen = Set<Int>()
             var tasks: [TrackableTask] = []
+            // The best 40 projects are plenty, and keep a one-letter search
+            // from building hundreds of rows on every keystroke.
             for match in Self.groupedByClient(tracker.search(query)) where seen.insert(match.project.id).inserted {
+                if seen.count > 40 { break }
                 tasks.append(match.projectRow)
                 if match.project.id == pickedProject {
                     tasks += tracker.tasks.filter { $0.project.id == match.project.id }.sorted { $0.task.name < $1.task.name }
@@ -109,8 +114,20 @@ struct TrackerView: View {
     /// Search results as a compact list, otherwise the tile sections.
     @ViewBuilder private func content(_ sections: [TaskSection]) -> some View {
         if isSearching {
-            SearchResultsList(tasks: sections.first?.tasks ?? [], selection: selection, query: query,
-                              pickedProject: pickedProject, pick: pick)
+            #if os(macOS)
+            let plan = quickPlan
+            if !plan.isEmpty {
+                QuickPlanRow(entries: plan, day: selectedDay, isSelected: selection == nil) { addQuickPlan(plan) }
+            }
+            let planOnly = !plan.isEmpty && (sections.first?.tasks.isEmpty ?? true)
+            #else
+            let planOnly = false
+            #endif
+            // With an "Add …" row up top, "No projects match" is just noise.
+            if !planOnly {
+                SearchResultsList(tasks: sections.first?.tasks ?? [], selection: selection, query: query,
+                                  pickedProject: pickedProject, pick: pick)
+            }
         } else {
             tileGrid(sections)
         }
@@ -121,7 +138,7 @@ struct TrackerView: View {
         platformBody(sections)
             .onChange(of: query) {
                 pickedProject = nil
-                selection = isSearching ? sections.first?.tasks.first?.key : nil
+                selection = isSearching && quickPlan.isEmpty ? sections.first?.tasks.first?.key : nil
             }
             .onChange(of: tracker.focusRequest, initial: true) {
                 query = ""
@@ -392,13 +409,21 @@ struct TrackerView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: large ? 14 : 13, weight: .medium))
                 .foregroundStyle(searchFocused ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.secondary))
-            TextField(large ? "What are you working on?" : "Start something new…", text: $query)
+            TextField(large ? "" : "Start something new…", text: $query)
                 .textFieldStyle(.plain)
                 .font(.system(size: large ? 15 : 13))
                 .focusEffectDisabled()
                 .focused($searchFocused)
+                .overlay(alignment: .leading) {
+                    if large && query.isEmpty { RotatingPrompt(examples: askExamples).allowsHitTesting(false) }
+                }
                 .onKeyPress(.downArrow) { moveSelection(by: isSearching ? 1 : columnCount, in: flat); return .handled }
-                .onKeyPress(.upArrow) { moveSelection(by: isSearching ? -1 : -columnCount, in: flat); return .handled }
+                .onKeyPress(.upArrow) {
+                    // From the first result, up goes back to the "Add …" row.
+                    if isSearching, !quickPlan.isEmpty, selection == flat.first?.key { selection = nil; return .handled }
+                    moveSelection(by: isSearching ? -1 : -columnCount, in: flat)
+                    return .handled
+                }
                 .onKeyPress(.rightArrow) {
                     guard selection != nil else { return .ignored }
                     moveSelection(by: 1, in: flat)
@@ -410,6 +435,8 @@ struct TrackerView: View {
                     return .handled
                 }
                 .onSubmit {
+                    let plan = quickPlan
+                    if selection == nil, !plan.isEmpty { return addQuickPlan(plan) }
                     guard let key = selection ?? (isSearching ? flat.first?.key : nil),
                           let task = flat.first(where: { $0.key == key }) else { return }
                     pick(task)
@@ -493,6 +520,31 @@ struct TrackerView: View {
         pickedProject = nil
         selection = nil
         Task { await tracker.toggle(task) }
+    }
+
+    /// What the ask box suggests you can type: a search, then a few entries
+    /// built from your own recent work.
+    private var askExamples: [String] {
+        let recent = tracker.recentTasks.prefix(3)
+        var out = ["What are you working on?"]
+        let minutes = ["10 min", "an hour", "30 min"]
+        for (i, task) in recent.enumerated() {
+            out.append("\(minutes[i % minutes.count]) on \(task.projectNameParts.name)")
+            if i == 0 { out.append("Search a project, client or code") }
+        }
+        if out.count == 1 { out += ["10 min on Website Redesign", "Search a project, client or code"] }
+        return out
+    }
+
+    private func addQuickPlan(_ plan: [PlannedEntry]) {
+        let day = selectedDay
+        query = ""
+        selection = nil
+        Task {
+            for entry in plan {
+                await tracker.addEntry(task: entry.task, on: day, notes: entry.notes, hours: entry.hours ?? 0)
+            }
+        }
     }
 
     private func backToProjects() {
@@ -939,5 +991,87 @@ extension TrackableTask {
     var projectRow: TrackableTask {
         TrackableTask(project: project, projectCode: projectCode, client: client,
                       task: NamedRef(id: Self.projectRowTaskID, name: ""))
+    }
+}
+
+/// The ask box's placeholder: "What are you working on?", then examples that
+/// fade and rise into place every few seconds, so you learn you can type
+/// "10 min on TB Corporate" here as well as search.
+private struct RotatingPrompt: View {
+    let examples: [String]
+    @State private var index = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Text(examples.isEmpty ? "" : examples[index % examples.count])
+            .font(.system(size: 15))
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .id(index)
+            .transition(reduceMotion ? .opacity : .asymmetric(
+                insertion: .opacity.combined(with: .offset(y: 8)),
+                removal: .opacity.combined(with: .offset(y: -8))))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .clipped()
+            .task(id: examples) {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(index == 0 ? 3.2 : 2.6))
+                    withAnimation(.easeInOut(duration: 0.35)) { index += 1 }
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+/// Above the search results when what you typed says how long: "Add 0:10 ·
+/// TB Corporate · Product Design". Return (or a click) adds it.
+private struct QuickPlanRow: View {
+    let entries: [PlannedEntry]
+    let day: LocalDate
+    let isSelected: Bool
+    let add: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: add) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.harvestOrange))
+                VStack(alignment: .leading, spacing: 1) {
+                    if entries.count == 1, let entry = entries.first {
+                        Text("Add \(TimeFormat.hoursMinutes((entry.hours ?? 0) * 3600)) to \(entry.task.projectNameParts.name)")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(entry.task.task.name + (day == LocalDate() ? "" : " · \(day.dayTitle(today: LocalDate()))"))
+                            .font(.system(size: 11.5))
+                            .opacity(0.75)
+                    } else {
+                        Text("Add \(entries.count) entries")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(entries.map { "\($0.task.projectNameParts.name) \(TimeFormat.hoursMinutes(($0.hours ?? 0) * 3600))" }.joined(separator: " · "))
+                            .font(.system(size: 11.5))
+                            .opacity(0.75)
+                    }
+                }
+                .lineLimit(1)
+                Spacer(minLength: 6)
+                Text("⏎")
+                    .font(.system(size: 12, weight: .medium))
+                    .opacity(isSelected ? 0.9 : 0)
+            }
+            .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.harvestOrange : isHovered ? Color.orangeSoft : Color.tileBackground))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(isSelected ? Color.clear : Color.hairline))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        #if os(macOS)
+        .onHover { isHovered = $0 }
+        #endif
+        .accessibilityHint("Adds the time entry")
     }
 }

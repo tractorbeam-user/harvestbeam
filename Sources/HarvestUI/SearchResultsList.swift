@@ -22,7 +22,8 @@ struct SearchResultsList: View {
                 .frame(maxWidth: .infinity, minHeight: 64)
         } else {
             let projects = tasks.filter(\.isProjectRow)
-            VStack(alignment: .leading, spacing: 1) {
+            // Lazy, so only the rows on screen are built.
+            LazyVStack(alignment: .leading, spacing: 1) {
                 ForEach(tasks) { task in
                     if task.isProjectRow {
                         let index = projects.firstIndex { $0.key == task.key } ?? 0

@@ -46,7 +46,7 @@ public enum DayPlanner {
         if #available(macOS 26.0, iOS 26.0, *), modelAvailable {
             let shortlist = candidates(for: text, search: search, familiar: familiar)
             if !shortlist.isEmpty, let entries = try? await planWithModel(text, candidates: shortlist), !entries.isEmpty {
-                return (entries, .onDeviceModel)
+                return (reconcile(entries, with: text), .onDeviceModel)
             }
         }
         #endif
@@ -100,6 +100,7 @@ public enum DayPlanner {
         "a", "an", "the", "on", "in", "for", "of", "to", "with", "at", "some", "more", "my", "and", "then",
         "work", "working", "worked", "doing", "do", "did", "today", "all", "morning", "afternoon", "day",
         "hour", "hours", "hr", "hrs", "h", "min", "mins", "minute", "minutes", "half", "about", "around", "i", "i'm", "im",
+        "add", "log", "put", "track", "spent", "spend", "spending", "just", "another", "extra",
     ]
 
     /// The words in a clause worth searching for.
@@ -108,6 +109,25 @@ public enum DayPlanner {
             .split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "-" })
             .map(String.init)
             .filter { !fillers.contains($0) && Double($0) == nil && $0.count > 1 }
+    }
+
+    /// Squares the model's answer with what the person typed: no more entries
+    /// than pieces of work they described, and durations read from their own
+    /// words. "add 10 min to tb corporate" is one 0:10 entry, whatever the
+    /// model made of it.
+    static func reconcile(_ proposed: [PlannedEntry], with text: String) -> [PlannedEntry] {
+        let parts = clauses(text)
+        guard !parts.isEmpty else { return proposed }
+        var entries = Array(proposed.prefix(parts.count))
+        guard entries.count == parts.count else { return entries }
+        for (i, clause) in parts.enumerated() {
+            if let said = hours(in: clause) {
+                entries[i].hours = said
+            } else if !mentionsDuration(clause) {
+                entries[i].hours = nil
+            }
+        }
+        return entries
     }
 
     // MARK: Keyword fallback
@@ -196,6 +216,17 @@ public enum DayPlanner {
 }
 
 extension TimeTracker {
+    /// For the ask box: when the text says how long ("10 min on tb corporate"),
+    /// the entries it describes, matched by keyword so it's instant. Empty when
+    /// the text is just a search.
+    public func quickPlan(_ text: String) -> [PlannedEntry] {
+        guard DayPlanner.hours(in: text) != nil else { return [] }
+        let index = searchIndex
+        let scores = usage
+        let starred = favorites.set
+        return DayPlanner.planWithKeywords(text) { Array(index.search($0, usage: scores, favorites: starred).prefix(20)) }
+    }
+
     /// Plans the text against this account's tasks.
     public func planDay(_ text: String) async -> (entries: [PlannedEntry], engine: DayPlanner.Engine) {
         let index = searchIndex
