@@ -327,6 +327,45 @@ h1 {
 .key { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
 .key svg { width: 15px; height: 15px; fill: none; stroke: var(--orange); stroke-width: 1.6; }
 .key .dots { color: var(--muted); letter-spacing: .04em; font-weight: 400; }
+/* Locked entry */
+.lockrow { display: inline-flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 7px 6px 11px; color: var(--muted); white-space: nowrap; }
+.lockrow .num { font-weight: 500; }
+.lockrow .lk { width: 24px; height: 24px; border-radius: 50%; background: var(--tile); display: grid; place-items: center; }
+.lockrow .lk svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.lockrow .why { font-size: 11px; font-weight: 600; color: var(--orange); background: var(--orange-soft); border-radius: 6px; padding: 1px 6px; }
+/* Short day */
+.nudge { display: inline-flex; align-items: center; gap: 10px; background: #FAEEDA; color: #633806; border-radius: 10px; padding: 6px 6px 6px 11px; white-space: nowrap; }
+.nudge b { font-weight: 600; }
+.nudge .go { background: #fff; border-radius: 99px; padding: 2px 9px; font-weight: 600; font-size: 11.5px; }
+:root[data-theme="dark"] .nudge { background: rgba(239, 159, 39, .16); color: #FAC775; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .nudge { background: rgba(239, 159, 39, .16); color: #FAC775; } }
+.nudge .go { color: #633806; }
+/* Reminder notification */
+.notif { display: inline-flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 7px 12px 7px 8px; white-space: nowrap; box-shadow: 0 8px 20px -14px rgba(40, 20, 0, .4); }
+.notif .ic { width: 22px; height: 22px; border-radius: 6px; background: var(--orange); display: grid; place-items: center; }
+.notif .ic i { width: 10px; height: 8px; background: #fff; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.notif small { display: block; color: var(--muted); font-size: 11px; line-height: 1.2; }
+.notif span { line-height: 1.25; font-weight: 500; }
+/* Long names slide on hover */
+.marq { position: relative; width: 170px; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 7px 11px; white-space: nowrap; font-weight: 600;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 14px), transparent); }
+.marq span { display: inline-block; animation: marq 6s ease-in-out infinite; }
+.marq small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
+@keyframes marq { 0%, 22% { transform: translateX(0); } 55%, 75% { transform: translateX(-118px); } 100% { transform: translateX(0); } }
+/* Favorites from the footer */
+.foot { display: inline-flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 4px; position: relative; }
+.foot .b { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: var(--muted); }
+.foot .b svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.foot .b.on { background: var(--orange-soft); color: var(--orange); }
+.foot .menu { display: grid; gap: 1px; margin-left: 6px; font-size: 11.5px; }
+.foot .menu span { display: flex; align-items: center; gap: 6px; padding: 1px 8px 1px 2px; border-radius: 5px; white-space: nowrap; }
+.foot .menu span:first-child { background: var(--orange); color: #fff; }
+.foot .menu svg { width: 7px; height: 7px; fill: currentColor; }
+/* Start again today */
+.again { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.again .day { color: var(--muted); }
+.again .chip svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.8; vertical-align: -1px; margin-right: 4px; }
+
 .grid h3 { font-family: var(--display); font-size: 16px; letter-spacing: -0.01em; margin: 0 0 4px; font-weight: 600; }
 .grid p { margin: 0; color: var(--muted); font-size: 14.5px; }
 
@@ -482,6 +521,30 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <div class="spec">
         <div class="mini"><span class="key"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Keychain<span class="mono dots">••••••••3f9a</span></span></div>
         <h3>Your token stays put</h3><p>Stored in your Keychain and only ever sent to Harvest.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="lockrow">Brand Refresh <span class="num">3:30</span><span class="why">Invoiced</span><span class="lk"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span></span></div>
+        <h3>Locked, and it says why</h3><p>Approved or invoiced time shows a lock instead of play, and a click explains who can change it.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="nudge"><span><b>Thursday</b> only has <span class="num">3:10</span></span><span class="go">Open</span></span></div>
+        <h3>Short days, caught early</h3><p>A day well under your usual hours gets a gentle note while you still remember it. Off in a click if you'd rather not.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="notif"><span class="ic"><i></i></span><span>Nothing tracked yet<small>It's 10:00. Start a timer?</small></span></span></div>
+        <h3>Reminders you choose</h3><p>A nudge if nothing's running by a set time, or when a timer has run longer than you meant.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="marq" aria-hidden="true"><span>[DAF-DP-01] Website Design and Development</span><small>Product Design</small></span></div>
+        <h3>Long names, readable</h3><p>Hover a tile or entry and a name that doesn't fit slides across to show the rest.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="foot" aria-hidden="true"><span class="b"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></span><span class="b on"><svg viewBox="0 0 16 16"><path d="m8 2 1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3l-3.7 2 .8-4.1L2 6.3l4.2-.5Z"/></svg></span><span class="menu"><span><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg>Context · Strategy</span><span><svg viewBox="0 0 10 10"><path d="M2.5 1.2v7.6L8.8 5z"/></svg>Website · Design</span></span></span></div>
+        <h3>Favorites from the footer</h3><p>A star next to search lists your favorites, so any of them starts without scrolling.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="again"><span class="day">Last Tuesday</span><span class="chip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg>Start Again Today</span></span></div>
+        <h3>Pick up where you left off</h3><p>Right-click any past entry to start the same project and task again today.</p>
       </div>
     </div>
   </section>
