@@ -403,6 +403,18 @@ h1 {
 .foot .menu span { display: flex; align-items: center; gap: 6px; padding: 1px 8px 1px 2px; border-radius: 5px; white-space: nowrap; }
 .foot .menu span:first-child { background: var(--orange); color: #fff; }
 .foot .menu svg { width: 7px; height: 7px; fill: currentColor; }
+/* Recent and Suggested */
+.rs { display: grid; gap: 5px; width: 240px; font-size: 11.5px; }
+.mini > .rs { transform: none; }
+.rs .lbl { font-size: 9.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.rs .lbl svg { width: 10px; height: 10px; fill: none; stroke: var(--orange); stroke-width: 1.8; }
+.rs .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.rs .t { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 4px 8px; line-height: 1.35; min-width: 0; position: relative; }
+.rs .t b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs .t span { color: var(--muted); font-size: 10.5px; }
+.rs .t.sug { border-style: dashed; }
+.rs .t .x { position: absolute; top: 3px; right: 6px; color: var(--faint); font-size: 11px; line-height: 1; }
+
 /* Start again today */
 .again { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .again .day { color: var(--muted); }
@@ -619,11 +631,15 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <div class="txt"><h3>Favorites from the footer</h3><p>A star next to search lists your favorites, so any of them starts without scrolling.</p></div>
       </div>
 
-      <div class="spec w3">
+            <div class="spec">
+        <div class="mini"><span class="rs" aria-hidden="true"><span class="lbl"><svg viewBox="0 0 12 12"><path d="M6 2.5v3.5l2 1.3"/><circle cx="6" cy="6" r="4.5"/></svg>Recent</span><span class="row"><span class="t"><b>Brand Refresh</b><span>Meetings</span></span><span class="t"><b>Mobile App</b><span>Development</span></span></span><span class="lbl"><svg viewBox="0 0 12 12"><path d="M6 1.5 7 5l3.5 1L7 7l-1 3.5L5 7 1.5 6 5 5Z"/></svg>Suggested</span><span class="row"><span class="t sug"><b>Data Platform</b><span>Meetings</span><i class="x">×</i></span><span class="t sug"><b>Internal</b><span>Admin</span><i class="x">×</i></span></span></span></div>
+        <div class="txt"><h3>Recent and Suggested</h3><p>What you tracked lately sits below Favorites, and tasks you often use come up as suggestions. Not useful? Dismiss it.</p></div>
+      </div>
+<div class="spec">
         <div class="mini"><span class="toast">Away for <b class="num">0:42</b><span class="sep"></span><span class="act">Remove</span><span class="act dim">Keep</span></span></div>
         <div class="txt"><h3>Idle time, handled</h3><p>Step away with a timer running and it asks, when you're back, whether to keep the gap.</p></div>
       </div>
-      <div class="spec w3">
+      <div class="spec">
         <div class="mini"><span class="again"><span class="day">Last Tuesday</span><span class="chip"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg>Start Again Today</span></span></div>
         <div class="txt"><h3>Pick up where you left off</h3><p>Right-click any past entry to start the same project and task again today.</p></div>
       </div>
