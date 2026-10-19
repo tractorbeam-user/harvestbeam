@@ -47,6 +47,9 @@
   --display: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --body: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  /* Times and totals, set like the app's: SF Pro Rounded on a Mac (Safari),
+     the system face elsewhere, always with even-width digits. */
+  --num: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -62,7 +65,7 @@
 }
 
 * { box-sizing: border-box; }
-html { padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+html { padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); scroll-behavior: smooth; scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 48px); }
 body { margin: 0; }
 img { max-width: 100%; }
 [hidden] { display: none !important; }
@@ -83,6 +86,7 @@ a { color: inherit; }
   padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.num { font-family: var(--num); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 
 /* Menu bar */
 .menubar {
@@ -163,13 +167,13 @@ h1 {
 .lights { display: flex; gap: 6px; }
 .lights i { width: 11px; height: 11px; border-radius: 50%; background: rgba(255,255,255,.4); }
 .titlebar .day { font-weight: 600; }
-.titlebar .week { margin-left: auto; font-family: var(--mono); font-size: 12px; opacity: .9; }
+.titlebar .week { margin-left: auto; font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 500; font-size: 12.5px; opacity: .85; }
 .pane { padding: 14px; display: grid; gap: 14px; }
 .timer { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: var(--tile); }
 .timer .what { min-width: 0; flex: 1; }
 .timer .name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .timer .sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.timer .clock { font-family: var(--mono); font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.timer .clock { font-family: var(--num); font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .play {
   width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--orange); color: #fff;
   display: grid; place-items: center; cursor: pointer; flex: none; transition: transform .12s, background .2s;
@@ -245,7 +249,10 @@ h1 {
 
 .favs { width: 100%; max-width: 300px; display: grid; gap: 10px; font-size: 12px; align-content: start; }
 .stage.scroller { place-items: start center; padding: 0 20px; }
-.stage.scroller .favs { height: 100%; overflow-y: auto; padding-block: 22px; scrollbar-width: thin; overscroll-behavior: contain; }
+.stage.scroller .favs { height: 100%; overflow-y: auto; padding-block: 22px; scrollbar-width: none; overscroll-behavior: contain;
+  -webkit-mask-image: linear-gradient(transparent, #000 18px, #000 calc(100% - 18px), transparent);
+          mask-image: linear-gradient(transparent, #000 18px, #000 calc(100% - 18px), transparent); }
+.stage.scroller .favs::-webkit-scrollbar { display: none; }
 .favs .set { position: relative; }
 .dropline { position: absolute; width: 3px; border-radius: 2px; background: var(--orange); pointer-events: none; transform: translateX(-50%); transition: left .12s, top .12s; }
 .favs .label { display: flex; justify-content: space-between; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -258,7 +265,10 @@ h1 {
 .fav button { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border: 0; background: none; padding: 0; cursor: pointer; color: var(--faint); font-size: 13px; line-height: 20px; border-radius: 6px; }
 .fav button:hover { background: var(--tile); color: var(--ink); }
 .fav button.on { color: var(--orange); }
-.fav.lifting { z-index: 3; cursor: grabbing; transition: none; pointer-events: none; box-shadow: 0 14px 30px -12px rgba(40, 20, 0, .35); }
+.fav.lifting { opacity: .35; transition: none; }
+/* The tile under the pointer while dragging: fixed to the page, so the
+   card's rounded edge never crops it. */
+.fav.ghost { position: fixed; z-index: 40; margin: 0; font-size: 12px; cursor: grabbing; pointer-events: none; transition: none; box-shadow: 0 14px 30px -12px rgba(40, 20, 0, .35); }
 .fav.new { animation: pop .35s cubic-bezier(.2,.9,.3,1.3); }
 @keyframes pop { from { transform: scale(.85); opacity: 0; } }
 .favs .empty-set { grid-column: 1 / -1; color: var(--faint); font-size: 11px; padding: 10px; text-align: center; border: 1px dashed var(--line); border-radius: 11px; }
@@ -274,7 +284,7 @@ h1 {
 .plan .row.in { opacity: 1; transform: none; }
 .plan .row .t { font-weight: 600; }
 .plan .row .p { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.plan .row .h { margin-left: auto; font-family: var(--mono); }
+.plan .row .h { margin-left: auto; font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 500; }
 .plan .note { color: var(--muted); font-size: 11.5px; display: flex; gap: 6px; align-items: center; }
 
 /* Idle */
@@ -307,9 +317,12 @@ h1 {
 .toast .act { color: var(--orange); font-weight: 600; }
 .toast .act.dim { color: color-mix(in srgb, var(--paper) 70%, transparent); font-weight: 500; }
 .toast kbd { font-size: 11px; color: color-mix(in srgb, var(--paper) 60%, transparent); }
-.sync { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--muted); }
-.sync .mono { color: var(--ink); }
-.sync .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); animation: pulse 2s ease-in-out infinite; }
+.sync { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; color: var(--muted); }
+.sync .num { color: var(--ink); font-weight: 500; }
+.sync .dev { font-size: 11px; font-weight: 600; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+.sync .link { position: relative; width: 34px; height: 1px; background: color-mix(in srgb, var(--orange) 40%, transparent); margin: 0 2px; }
+.sync .dot { position: absolute; top: -3px; left: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); animation: travel 2.4s ease-in-out infinite; }
+@keyframes travel { 0% { left: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { left: calc(100% - 7px); opacity: 0; } }
 @keyframes pulse { 50% { opacity: .35; } }
 .key { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
 .key svg { width: 15px; height: 15px; fill: none; stroke: var(--orange); stroke-width: 1.6; }
@@ -344,6 +357,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
+  html { scroll-behavior: auto; }
 }
 </style>
 </head>
@@ -358,13 +372,13 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     <span class="spacer"></span>
     <button class="item" id="bar-item" type="button" title="Click the square to pause or resume. Click the time to show or hide the window.">
       <span class="square" id="bar-square"><svg viewBox="0 0 10 10" class="g g-pause"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg><svg viewBox="0 0 10 10" class="g g-play"><path d="M2.8 1.2v7.6L8.8 5z"/></svg></span>
-      <span class="mono" id="bar-time">1:24</span>
+      <span class="num" id="bar-time">1:24</span>
       <span class="task" id="bar-task"><span id="bar-task-text">Design</span></span>
     </button>
     <span class="sys">
       <svg class="hide-sm" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M4 8.6a6 6 0 0 1 8 0M6.5 11.2a2.4 2.4 0 0 1 3 0"/></svg>
       <svg class="hide-sm" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
-      <span class="mono" id="bar-clock">Mon 9:41</span>
+      <span class="num" id="bar-clock">Mon 9:41</span>
     </span>
   </div>
 </header>
@@ -446,7 +460,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   <section class="wrap more" aria-label="More features">
     <div class="grid">
       <div class="spec">
-        <div class="mini"><span class="mbar"><span class="sq"><svg viewBox="0 0 10 10"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg></span><span class="mono">1:24</span> Design</span></div>
+        <div class="mini"><span class="mbar"><span class="sq"><svg viewBox="0 0 10 10"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg></span><span class="num">1:24</span> Design</span></div>
         <h3>A menu bar like Harvest's own</h3><p>Orange while a timer runs, gray when it's stopped. You choose how much text shows.</p>
       </div>
       <div class="spec">
@@ -454,12 +468,12 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <h3>Search in two steps</h3><p>Projects first, grouped by client, then that project's tasks. Codes and clients match too.</p>
       </div>
       <div class="spec">
-        <div class="mini"><span class="toast">Away for <b class="mono">0:42</b><span class="sep"></span><span class="act">Remove</span><span class="act dim">Keep</span></span></div>
+        <div class="mini"><span class="toast">Away for <b class="num">0:42</b><span class="sep"></span><span class="act">Remove</span><span class="act dim">Keep</span></span></div>
         <h3>Idle time, handled</h3><p>Step away with a timer running and it asks, when you're back, whether to keep the gap.</p>
       </div>
       <div class="spec">
-        <div class="mini"><span class="sync"><span class="dot"></span>Started on the web <span class="mono">9:02</span><span class="arr">→</span>here <span class="mono">9:03</span></span></div>
-        <h3>In step with Harvest</h3><p>It checks every minute, so timers from the web or your phone show up here.</p>
+        <div class="mini"><span class="sync" aria-label="The same running timer on the web and on your Mac"><span class="dev">Web</span><span class="num">0:42</span><span class="link"><span class="dot"></span></span><span class="dev">Mac</span><span class="num">0:42</span></span></div>
+        <h3>In step with Harvest</h3><p>Start a timer on the web or your phone and the same one shows up here within a minute.</p>
       </div>
       <div class="spec">
         <div class="mini"><span class="toast">Entry deleted<span class="sep"></span><span class="act">Undo</span><kbd class="mono">⌘Z</kbd></span></div>
@@ -681,6 +695,35 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   });
   addEventListener("blur", () => { capOpt.classList.remove("down"); capH.classList.remove("down"); });
 
+  // Until you try it, the keys show themselves being pressed: ⌥ goes down,
+  // then H, both light up, then let go. Stops for good once you press ⌥H.
+  let triedIt = false, demoTimer = null, capsVisible = false, demoRunning = false;
+  addEventListener("keydown", (ev) => { if (ev.altKey && ev.code === "KeyH") { triedIt = true; clearTimeout(demoTimer); } });
+  const wait = (ms) => new Promise((r) => { demoTimer = setTimeout(r, ms); });
+  async function pressDemo() {
+    if (demoRunning) return;
+    demoRunning = true;
+    const steps = [
+      [700, () => capOpt.classList.add("down")],
+      [260, () => capH.classList.add("down")],
+      [90, () => { capOpt.classList.add("lit"); capH.classList.add("lit"); }],
+      [520, () => capH.classList.remove("down")],
+      [110, () => capOpt.classList.remove("down")],
+      [900, () => { capOpt.classList.remove("lit"); capH.classList.remove("lit"); }],
+      [1400, () => {}],
+    ];
+    while (capsVisible && !triedIt) {
+      for (const [ms, act] of steps) { await wait(ms); if (triedIt) break; act(); }
+    }
+    demoRunning = false;
+  }
+  if (!reduce && "IntersectionObserver" in window) {
+    new IntersectionObserver((es) => es.forEach((e) => {
+      capsVisible = e.isIntersecting;
+      if (capsVisible) pressDemo();
+    }), { threshold: 0.6 }).observe(document.querySelector(".caps"));
+  }
+
   // Plan Day: type the sentence when it scrolls into view, then show the matches.
   const sentence = "Context design all morning, an hour on the website build, then the Acme call";
   const said = $("said"), rows = [...document.querySelectorAll(".plan .row")];
@@ -740,10 +783,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   // star it, as in the app.
   let drag = null;
   const follow = (e) => {
-    const el = drag.el;
-    el.style.transform = "none";
-    const r = el.getBoundingClientRect();
-    el.style.transform = `translate(${e.clientX - drag.grabX - r.left}px, ${e.clientY - drag.grabY - r.top}px) scale(1.04)`;
+    drag.ghost.style.transform = `translate(${e.clientX - drag.grabX}px, ${e.clientY - drag.grabY}px) scale(1.04)`;
   };
   $("favs").addEventListener("pointerdown", (e) => {
     const el = e.target.closest(".fav");
@@ -796,6 +836,11 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
     if (!drag.moving) {
       if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
       drag.moving = true;
+      const r = drag.el.getBoundingClientRect();
+      drag.ghost = drag.el.cloneNode(true);
+      drag.ghost.classList.add("ghost");
+      Object.assign(drag.ghost.style, { left: "0", top: "0", width: r.width + "px", height: r.height + "px" });
+      document.body.appendChild(drag.ghost);
       drag.el.classList.add("lifting");
     }
     drag.spot = dropSpot(e);
@@ -804,8 +849,9 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   });
   const drop = () => {
     if (!drag) return;
-    const { el, moving, spot } = drag;
+    const { el, moving, spot, ghost } = drag;
     if (moving) showSpot(null);
+    ghost?.remove();
     drag = null;
     if (!moving) return;
     el.classList.remove("lifting");
