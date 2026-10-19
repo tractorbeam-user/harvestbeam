@@ -7,6 +7,19 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam 1.2.0</title>
+      <pubDate>Mon, 19 Oct 2026 22:19:11 +0000</pubDate>
+      <sparkle:version>76</sparkle:version>
+      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[**Just say it:** type “10 min on TB Corporate” in the ask box and press Return to log it.
+- The ask box shows examples of what you can type, a new one every few seconds.
+- Plan the Day reads durations from your own words, one entry per thing you said.
+- Faster search, even with thousands of tasks.]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.2.0</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.2.0/Harvestbeam-1.2.0.dmg" type="application/octet-stream" sparkle:edSignature="NOdGZ1j3Cqqa99KgqV1P5bb90K3IUZYBKDxeA4jLNwwD1j3KG+o2X8jmAf10/kUjZYuezBA05SSZYfqfn42DDQ==" length="8357796" />
+    </item>
+    <item>
       <title>Harvestbeam 1.1.0</title>
       <pubDate>Mon, 19 Oct 2026 19:54:38 +0000</pubDate>
       <sparkle:version>60</sparkle:version>
