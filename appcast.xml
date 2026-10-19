@@ -7,6 +7,21 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam 1.1.0</title>
+      <pubDate>Mon, 19 Oct 2026 19:54:38 +0000</pubDate>
+      <sparkle:version>60</sparkle:version>
+      <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[**New look:** a cleaner, lighter window that matches the website.
+- Locked entries show why they can't be edited (approved, invoiced or locked).
+- Short days earlier in the week get a gentle nudge, which you can turn off in Preferences.
+- Long names slide into view when you hover them.
+- A star in the footer starts any favorite, and favorites drag either way.
+- Clicking the menu bar icon no longer jumps into the search box; ⌥H still does.]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.1.0</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.1.0/Harvestbeam-1.1.0.dmg" type="application/octet-stream" sparkle:edSignature="fpI8LWECCCU9ggBss6+I/fZZAndFuhlHJ68vkOkc3l0ddF6/ac5YpkLLAIUjcSwViaYdtbCMNT4BPUM/CvSrDA==" length="8327831" />
+    </item>
+    <item>
       <title>Harvestbeam 1.0.0</title>
       <pubDate>Mon, 19 Oct 2026 18:16:35 +0000</pubDate>
       <sparkle:version>54</sparkle:version>
