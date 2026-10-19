@@ -42,7 +42,7 @@ enum DebugSnapshots {
 
             for (name, view) in [("general", AnyView(GeneralPrefs())), ("shortcuts", AnyView(ShortcutPrefs())),
                                  ("support", AnyView(SupportPrefs(resetLayout: {})))] {
-                let prefsWindow = makeWindow(view.environment(tracker).frame(width: 480, height: 560, alignment: .top), appearance: appearance)
+                let prefsWindow = makeWindow(view.environment(tracker).environment(Updates()).frame(width: 480, height: 560, alignment: .top), appearance: appearance)
                 prefsWindow.setContentSize(NSSize(width: 480, height: 560))
                 await settle()
                 write(prefsWindow, to: url.appendingPathComponent("8-prefs-\(name)-\(suffix).png"))
@@ -90,6 +90,43 @@ enum DebugSnapshots {
             window.close()
         }
         UserDefaults(suiteName: "HarvestBarDemo")?.removeObject(forKey: "favorites.v1")
+        await updateWindows(into: url)
+    }
+
+    /// The update window in each of its states.
+    private static func updateWindows(into url: URL) async {
+        if let icon = NSImage(contentsOfFile: "Resources/AppIcon.icns") { NSApp.applicationIconImage = icon }
+        let notes = UpdateDriver.markdownNotes(
+            "**New:** pick up where you left off with Start Again Today.\n- The menu bar timer stays readable in dark mode.\n- Fixed a crash when a project had no tasks."
+        )
+        let info = UpdateInfo(version: "1.0.1", current: "0.9.0", notes: notes)
+        let phases: [(String, UpdatePhase)] = [
+            ("1-checking", .checking),
+            ("2-found", .found(info)),
+            ("3-found-no-notes", .found(UpdateInfo(version: "1.0.1", current: "0.9.0", notes: nil))),
+            ("4-up-to-date", .upToDate("1.0.1")),
+            ("5-downloading", .downloading(received: 1_300_000, expected: 3_431_507)),
+            ("6-preparing", .preparing(0.6)),
+            ("7-installing", .installing),
+            ("8-ready", .ready(info)),
+            ("9-error", .failed(UpdateFailure(whileChecking: true, detail: "The network connection was lost."))),
+        ]
+        let updates = Updates()
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let suffix = appearance == .aqua ? "light" : "dark"
+            for (name, phase) in phases {
+                let prompt = UpdatePrompt()
+                prompt.version = "1.0.1"
+                prompt.phase = phase
+                let view = UpdateView().environment(prompt).environment(updates)
+                let window = makeWindow(view, appearance: appearance)
+                let size = window.contentView!.fittingSize
+                window.setContentSize(size)
+                await settle()
+                write(window, to: url.appendingPathComponent("9-update-\(name)-\(suffix).png"))
+                window.close()
+            }
+        }
     }
 
     private static func makeWindow(_ view: some View, appearance: NSAppearance.Name) -> NSWindow {

@@ -18,7 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     private var panel: TrackerPanel!
     private var hotKey: HotKey?
     private var reminders: Reminders?
-    private lazy var preferences = PreferencesWindowController(tracker: tracker) { [weak self] in
+    private let updates = Updates()
+    private lazy var preferences = PreferencesWindowController(tracker: tracker, updates: updates) { [weak self] in
         self?.resetPanelSize()
     }
     private var ticker: Timer?
@@ -101,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Preferences…", action: #selector(showPreferences), keyEquivalent: ",")
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(Updates.checkForUpdates(_:)), keyEquivalent: "").target = updates
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide Harvestbeam", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "Quit Harvestbeam", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
