@@ -17,7 +17,13 @@ A small, native Harvest timer for the Mac menu bar, with the same app on iPhone 
 
 Download the latest `Harvestbeam-x.y.z.dmg` from [Releases](https://github.com/tractorbeam-user/harvestbeam/releases), open it and drag **Harvestbeam** into Applications.
 
-The first time, **right-click it and choose Open**. The app isn't signed with an Apple Developer ID, so macOS asks once. If macOS says it's damaged, run `xattr -dr com.apple.quarantine "/Applications/Harvestbeam.app"` in Terminal and open it again.
+The app isn't signed with an Apple Developer ID, so macOS blocks it the first time:
+
+1. Open Harvestbeam. macOS says it can't verify it. Click **Done**.
+2. Open **System Settings → Privacy & Security**, scroll down to Security and click **Open Anyway** next to Harvestbeam.
+3. Confirm with your password (or Touch ID) and click **Open**.
+
+You only do this once. Updates install and open normally. If macOS ever says the app is damaged instead, run `xattr -dr com.apple.quarantine "/Applications/Harvestbeam.app"` in Terminal and open it again.
 
 The first launch opens a short welcome: where the timer lives, the ⌥H shortcut (try it right there), and connecting Harvest with a personal access token from [id.getharvest.com/developers](https://id.getharvest.com/developers). To see it again: `open /Applications/Harvestbeam.app --args --onboarding`.
 
@@ -43,7 +49,7 @@ Sparkle only installs updates signed with the private EdDSA key. It lives in the
 
 `SPARKLE_KEY_FILE=path scripts/release.sh 1.1.0` signs with an exported key file instead of the Keychain.
 
-The app is signed ad hoc, not with a Developer ID, which matters only for the first download: Gatekeeper quarantines the disk image, so people right-click → Open once. Updates installed by Sparkle aren't quarantined, so they open without that prompt. Sparkle trusts an update because of its EdDSA signature, not its code signature, which changes with every ad hoc build. That makes the private key the one thing that has to stay secret. Notarizing would need an Apple Developer account and a Developer ID certificate.
+The app is signed ad hoc, not with a Developer ID, which matters only for the first download: Gatekeeper quarantines the download, so people allow it once with **Open Anyway** in System Settings → Privacy & Security (right-click → Open no longer works for this since macOS 15). Updates installed by Sparkle aren't quarantined, so they open without that prompt. Sparkle trusts an update because of its EdDSA signature, not its code signature, which changes with every ad hoc build. That makes the private key the one thing that has to stay secret. Notarizing would need an Apple Developer account and a Developer ID certificate.
 
 ## Build it yourself
 

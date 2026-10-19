@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Harvestbeam is a menu bar timer for Harvest on the Mac. Press ⌥H anywhere, type a few letters, press Return.">
+<title>Harvestbeam</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23FA5D00'/%3E%3Cpath d='M16 8.5 23.5 21.5h-15z' fill='white'/%3E%3C/svg%3E">
+<style>
+/* Layout: a desktop at rest. A live menu bar runs across the top, the real
+   window sits beside the pitch, then one row of working vignettes, a short
+   list, and hours rising into the triangle. Swiss and quiet: one grotesk,
+   one orange, lots of air. */
+:root {
+  --paper: #FAF9F7;
+  --surface: #FFFFFF;
+  --tile: #F3F1EE;
+  --ink: #1C1916;
+  --muted: #6E6760;
+  --faint: #A49D96;
+  --line: rgba(28, 25, 22, 0.09);
+  --orange: #FA5D00;
+  --orange-ink: #FFFFFF;
+  --orange-soft: rgba(250, 93, 0, 0.1);
+  --bar: rgba(250, 249, 247, 0.86);
+  --display: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --body: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #151210; --surface: #1F1B18; --tile: #29241F; --ink: #EEE9E4; --muted: #A69E96; --faint: #6F6862;
+    --line: rgba(238, 233, 228, 0.1); --orange: #FF6614; --orange-soft: rgba(255, 102, 20, 0.14); --bar: rgba(21, 18, 16, 0.86);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #151210; --surface: #1F1B18; --tile: #29241F; --ink: #EEE9E4; --muted: #A69E96; --faint: #6F6862;
+  --line: rgba(238, 233, 228, 0.1); --orange: #FF6614; --orange-soft: rgba(255, 102, 20, 0.14); --bar: rgba(21, 18, 16, 0.86);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; border-radius: 6px; }
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Menu bar */
+.menubar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
+  background: var(--bar);
+  backdrop-filter: saturate(1.4) blur(18px);
+  -webkit-backdrop-filter: saturate(1.4) blur(18px);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px; font-weight: 500;
+}
+.menubar .wrap { display: flex; align-items: center; gap: 18px; height: 32px; }
+.menubar .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none; }
+.mark { width: 13px; height: 11px; background: var(--orange); clip-path: polygon(50% 0, 100% 100%, 0 100%); flex: none; }
+.menubar nav { display: flex; gap: 16px; color: var(--muted); }
+.menubar nav a { text-decoration: none; }
+.menubar nav a:hover { color: var(--ink); }
+.menubar .spacer { flex: 1; }
+.item { display: flex; align-items: center; gap: 7px; padding: 2px 7px 2px 3px; border-radius: 6px; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; }
+.item:hover { background: var(--line); }
+.square { width: 22px; height: 15px; border-radius: 4px; background: var(--orange); display: grid; place-items: center; flex: none; transition: background .2s; }
+.square.paused { background: var(--faint); }
+.square, .play { position: relative; }
+.square { transition: background .28s ease, transform .12s; }
+.square .g, .play .g { position: absolute; left: 50%; top: 50%; fill: #fff; transition: opacity .22s ease, transform .32s cubic-bezier(.3, 1.5, .5, 1); }
+.square .g { width: 8px; height: 8px; margin: -4px 0 0 -4px; }
+.play .g { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+.g-play { opacity: 0; transform: scale(.4) rotate(-30deg); }
+.paused .g-pause { opacity: 0; transform: scale(.4) rotate(30deg); }
+.paused .g-play { opacity: 1; transform: none; }
+.item:active .square { transform: scale(.88); }
+.item .task { display: inline-block; transition: max-width .34s cubic-bezier(.2, .8, .2, 1), opacity .2s, margin .34s; }
+.item .task.gone { max-width: 0 !important; opacity: 0; margin-left: -7px; }
+.item .task { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sys { display: flex; align-items: center; gap: 14px; color: var(--ink); }
+.sys svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+@media (max-width: 720px) {
+  .menubar nav, .sys .hide-sm { display: none; }
+  .item .task { max-width: 110px; }
+}
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 64px; align-items: center; padding-block: 88px 96px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+h1 {
+  font-family: var(--display); font-weight: 600;
+  font-size: clamp(40px, 5.6vw, 66px); line-height: 1.02; letter-spacing: -0.032em;
+  margin: 16px 0 22px; text-wrap: balance;
+}
+.lede { font-size: 18px; color: var(--muted); max-width: 30em; margin: 0; }
+.lede kbd, .inline-kbd { font-family: var(--mono); font-size: .85em; color: var(--ink); background: var(--tile); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin-top: 34px; }
+.button {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--orange); color: var(--orange-ink);
+  padding: 13px 22px; border-radius: 999px; text-decoration: none;
+  font-weight: 600; font-size: 15px; transition: transform .15s;
+}
+.button:hover { transform: translateY(-1px); }
+.button:active { transform: translateY(0) scale(.98); }
+.button svg { width: 16px; height: 16px; fill: currentColor; }
+.textlink { color: var(--muted); text-decoration: none; font-weight: 500; font-size: 15px; }
+.textlink:hover { color: var(--ink); }
+.fine { margin-top: 18px; font-size: 13px; color: var(--faint); }
+
+/* The window */
+.window {
+  background: var(--surface); border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 24px 60px -24px rgba(40, 20, 0, .28);
+  font-size: 13px; transition: transform .35s cubic-bezier(.2,.9,.3,1.2), opacity .25s;
+  position: relative; z-index: 2;
+  transform: translate(var(--dx, 0px), var(--dy, 0px));
+}
+.window.dragging { transition: opacity .25s; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 36px 80px -24px rgba(40, 20, 0, .36); }
+.window.hidden-win { transform: translate(var(--dx, 0px), calc(var(--dy, 0px) - 10px)) scale(.97); opacity: 0; pointer-events: none; }
+.titlebar { background: var(--orange); color: #fff; display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.window.dragging .titlebar { cursor: grabbing; }
+.lights { display: flex; gap: 6px; }
+.lights i { width: 11px; height: 11px; border-radius: 50%; background: rgba(255,255,255,.4); }
+.titlebar .day { font-weight: 600; }
+.titlebar .week { margin-left: auto; font-family: var(--mono); font-size: 12px; opacity: .9; }
+.pane { padding: 14px; display: grid; gap: 14px; }
+.timer { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: var(--tile); }
+.timer .what { min-width: 0; flex: 1; }
+.timer .name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timer .sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timer .clock { font-family: var(--mono); font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.play {
+  width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--orange); color: #fff;
+  display: grid; place-items: center; cursor: pointer; flex: none; transition: transform .12s, background .2s;
+}
+.play:active { transform: scale(.92); }
+.play.paused { background: var(--faint); }
+
+.ask {
+  display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 44px;
+  border-radius: 12px; background: var(--surface); border: 1px solid var(--line); transition: border-color .15s, box-shadow .15s;
+}
+.ask:focus-within { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
+.ask svg { width: 15px; height: 15px; stroke: var(--muted); fill: none; stroke-width: 2; flex: none; }
+.ask:focus-within svg { stroke: var(--orange); }
+.ask input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: 15px; color: var(--ink); }
+.ask input::placeholder { color: var(--faint); }
+.ask kbd { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.section-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.favpanel { background: var(--orange-soft); border-radius: 16px; padding: 10px 10px 10px; }
+.favpanel .section-label { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; margin: 2px 4px 8px; }
+.favpanel .section-label .star { color: var(--orange); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile {
+  display: flex; align-items: center; gap: 8px;
+  text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 9px 9px 9px 12px;
+  font: inherit; color: inherit; cursor: pointer; min-width: 0; transition: background .2s, color .2s, transform .12s;
+}
+.tile:active { transform: scale(.98); }
+.tile .info { min-width: 0; flex: 1; }
+.tile .c { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.tile .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .p { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .go { width: 30px; height: 30px; border-radius: 50%; background: var(--orange-soft); color: var(--orange); display: grid; place-items: center; flex: none; transition: background .2s; }
+.tile .go svg { width: 10px; height: 10px; fill: currentColor; }
+.tile:hover .go { background: color-mix(in srgb, var(--orange) 22%, transparent); }
+.tile.on { background: var(--orange); border-color: transparent; color: #fff; }
+.tile.on .c, .tile.on .p { color: rgba(255, 255, 255, .82); }
+.tile.on .go { background: #fff; color: var(--orange); }
+.results { display: grid; gap: 2px; }
+.result {
+  display: flex; align-items: baseline; gap: 8px; padding: 8px 10px; border-radius: 9px; border: 0; background: none;
+  font: inherit; color: inherit; text-align: left; cursor: pointer; min-width: 0;
+}
+.result .t { font-weight: 600; flex: none; }
+.result .p { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.result .c { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); flex: none; }
+.result.sel { background: var(--orange-soft); }
+.empty { color: var(--muted); padding: 10px; }
+.hint { color: var(--faint); font-size: 12px; text-align: center; }
+
+/* Features */
+.features { padding-block: 40px 0; }
+.section-title { font-family: var(--display); font-weight: 600; font-size: clamp(26px, 3vw, 34px); letter-spacing: -0.03em; line-height: 1.1; margin: 0 0 28px; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.card { display: grid; grid-template-rows: auto 1fr; gap: 18px; min-width: 0; }
+.card h3 { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -0.015em; margin: 0 0 6px; }
+.card p { color: var(--muted); margin: 0; font-size: 15px; }
+.stage {
+  background: var(--tile); border-radius: 18px; height: 280px; padding: 24px 20px;
+  display: grid; place-items: center; position: relative; overflow: hidden;
+}
+/* Keycaps */
+.caps { display: flex; gap: 14px; }
+.cap {
+  width: 76px; height: 76px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line);
+  display: grid; place-items: center; font-family: var(--body); font-size: 30px; font-weight: 500; color: var(--ink);
+  box-shadow: 0 6px 0 var(--line); transition: transform .1s, box-shadow .1s, background .2s, color .2s;
+}
+.cap.down { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
+.cap.lit { background: var(--orange); color: #fff; border-color: transparent; box-shadow: 0 6px 0 color-mix(in srgb, var(--orange) 70%, #000); }
+.cap.lit.down { box-shadow: 0 2px 0 color-mix(in srgb, var(--orange) 70%, #000); }
+.stage .caption { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; font-size: 13px; color: var(--muted); }
+
+.favs { width: 100%; max-width: 300px; display: grid; gap: 10px; font-size: 12px; align-content: start; }
+.stage.scroller { place-items: start center; padding: 0 20px; }
+.stage.scroller .favs { height: 100%; overflow-y: auto; padding-block: 22px; scrollbar-width: thin; overscroll-behavior: contain; }
+.favs .set { position: relative; }
+.dropline { position: absolute; width: 3px; border-radius: 2px; background: var(--orange); pointer-events: none; transform: translateX(-50%); transition: left .12s, top .12s; }
+.favs .label { display: flex; justify-content: space-between; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.favs .label span:last-child { font-family: var(--mono); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--faint); }
+.favs .set { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fav { position: relative; cursor: grab; touch-action: pan-y; user-select: none; -webkit-user-select: none; background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 7px 26px 7px 9px; min-width: 0; transition: transform .25s, opacity .25s; }
+.fav .p { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fav .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fav .c { font-family: var(--mono); font-size: 9.5px; color: var(--faint); }
+.fav button { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border: 0; background: none; padding: 0; cursor: pointer; color: var(--faint); font-size: 13px; line-height: 20px; border-radius: 6px; }
+.fav button:hover { background: var(--tile); color: var(--ink); }
+.fav button.on { color: var(--orange); }
+.fav.lifting { z-index: 3; cursor: grabbing; transition: none; pointer-events: none; box-shadow: 0 14px 30px -12px rgba(40, 20, 0, .35); }
+.fav.new { animation: pop .35s cubic-bezier(.2,.9,.3,1.3); }
+@keyframes pop { from { transform: scale(.85); opacity: 0; } }
+.favs .empty-set { grid-column: 1 / -1; color: var(--faint); font-size: 11px; padding: 10px; text-align: center; border: 1px dashed var(--line); border-radius: 11px; }
+
+/* Plan */
+.plan { width: 100%; max-width: 320px; background: var(--surface); border-radius: 14px; border: 1px solid var(--line); padding: 12px; font-size: 12px; display: grid; gap: 8px; }
+.plan .q { font-weight: 600; text-align: center; }
+.plan .said { background: var(--tile); border-radius: 10px; padding: 8px 10px; min-height: 54px; font-size: 12px; color: var(--ink); }
+.plan .said .caret { display: inline-block; width: 1.5px; height: 1em; background: var(--orange); vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.plan .rows { display: grid; gap: 6px; }
+.plan .row { display: flex; align-items: baseline; gap: 8px; padding: 5px 9px; border-radius: 9px; border: 1px solid var(--line); opacity: 0; transform: translateY(4px); transition: opacity .3s, transform .3s; }
+.plan .row.in { opacity: 1; transform: none; }
+.plan .row .t { font-weight: 600; }
+.plan .row .p { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.plan .row .h { margin-left: auto; font-family: var(--mono); }
+.plan .note { color: var(--muted); font-size: 11.5px; display: flex; gap: 6px; align-items: center; }
+
+/* Idle */
+.alert { width: 100%; max-width: 260px; background: var(--surface); border-radius: 16px; border: 1px solid var(--line); padding: 16px; text-align: center; box-shadow: 0 20px 50px -24px rgba(40, 20, 0, .3); }
+.alert .icon { width: 36px; height: 36px; border-radius: 11px; background: var(--orange); margin: 0 auto 12px; display: grid; place-items: center; }
+.alert .icon i { width: 18px; height: 15px; background: #fff; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.alert h3 { margin: 0 0 4px; font-size: 14px; }
+.alert p { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+.alert .btns { display: grid; gap: 6px; }
+.alert button { font: inherit; font-size: 12px; padding: 5px; border-radius: 8px; border: 1px solid var(--line); background: var(--tile); color: var(--ink); cursor: pointer; }
+.alert button.primary { background: var(--orange); color: #fff; border-color: transparent; }
+.alert .done { font-size: 12.5px; color: var(--muted); padding: 7px; }
+
+/* The rest */
+.more { padding-block: 72px 0; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px 20px; }
+.spec { display: grid; gap: 4px; min-width: 0; }
+.mini { height: 76px; background: var(--tile); border-radius: 14px; display: grid; place-items: center; margin-bottom: 14px; padding: 0 12px; overflow: hidden; font-size: 12.5px; }
+.mini .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.mbar { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; background: var(--surface); padding: 4px 9px 4px 5px; border-radius: 7px; border: 1px solid var(--line); }
+.mbar .sq { width: 20px; height: 14px; border-radius: 4px; background: var(--orange); display: grid; place-items: center; }
+.mbar .sq svg { width: 7px; height: 7px; fill: #fff; }
+.crumbs { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.crumbs .q { color: var(--muted); }
+.crumbs .arr, .sync .arr { color: var(--faint); }
+.chip { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; font-weight: 500; }
+.chip.on { background: var(--orange); color: #fff; border-color: transparent; }
+.toast { display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: var(--paper); padding: 7px 12px; border-radius: 10px; white-space: nowrap; }
+.toast .sep { width: 1px; height: 14px; background: color-mix(in srgb, var(--paper) 25%, transparent); }
+.toast .act { color: var(--orange); font-weight: 600; }
+.toast .act.dim { color: color-mix(in srgb, var(--paper) 70%, transparent); font-weight: 500; }
+.toast kbd { font-size: 11px; color: color-mix(in srgb, var(--paper) 60%, transparent); }
+.sync { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--muted); }
+.sync .mono { color: var(--ink); }
+.sync .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.key { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.key svg { width: 15px; height: 15px; fill: none; stroke: var(--orange); stroke-width: 1.6; }
+.key .dots { color: var(--muted); letter-spacing: .04em; font-weight: 400; }
+.grid h3 { font-family: var(--display); font-size: 16px; letter-spacing: -0.01em; margin: 0 0 4px; font-weight: 600; }
+.grid p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+/* Closing */
+.closing { padding-block: 120px 80px; text-align: center; display: grid; justify-items: center; }
+#beam { width: 100%; max-width: 360px; height: 316px; cursor: pointer; display: block; }
+.closing h2 { font-family: var(--display); font-weight: 600; font-size: clamp(32px, 4.4vw, 48px); letter-spacing: -0.035em; line-height: 1.05; margin: 24px 0 12px; text-wrap: balance; }
+.closing p { color: var(--muted); margin: 0 0 30px; }
+.req { margin-top: 18px; font-size: 13px; color: var(--faint); }
+.firstrun { margin-top: 56px; max-width: 460px; text-align: left; background: var(--tile); border-radius: 16px; padding: 20px 22px; font-size: 14px; }
+.firstrun h3 { font-family: var(--display); font-weight: 600; font-size: 16px; letter-spacing: -0.01em; margin: 0 0 4px; }
+.firstrun p { margin: 0; color: var(--muted); font-size: 14px; }
+.firstrun ol { margin: 12px 0; padding-left: 0; list-style: none; counter-reset: step; display: grid; gap: 8px; }
+.firstrun li { counter-increment: step; display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline; }
+.firstrun li::before { content: counter(step); font-family: var(--mono); font-size: 11px; color: var(--orange); width: 20px; height: 20px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent); display: grid; place-items: center; }
+.firstrun b { font-weight: 600; }
+footer { border-top: 1px solid var(--line); padding-block: 28px 40px; font-size: 13px; color: var(--faint); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 48px; padding-block: 56px 64px; }
+  .window { max-width: 420px; }
+  .cards { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+  .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="menubar" aria-label="A menu bar with Harvestbeam's timer">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="mark" aria-hidden="true"></span>Harvestbeam</a>
+    <nav aria-label="Page">
+      <a href="#features">Features</a>
+      <a href="https://github.com/tractorbeam-user/harvestbeam">GitHub</a>
+    </nav>
+    <span class="spacer"></span>
+    <button class="item" id="bar-item" type="button" title="Click the square to pause or resume. Click the time to show or hide the window.">
+      <span class="square" id="bar-square"><svg viewBox="0 0 10 10" class="g g-pause"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg><svg viewBox="0 0 10 10" class="g g-play"><path d="M2.8 1.2v7.6L8.8 5z"/></svg></span>
+      <span class="mono" id="bar-time">1:24</span>
+      <span class="task" id="bar-task"><span id="bar-task-text">Design</span></span>
+    </button>
+    <span class="sys">
+      <svg class="hide-sm" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 6a9.5 9.5 0 0 1 13 0M4 8.6a6 6 0 0 1 8 0M6.5 11.2a2.4 2.4 0 0 1 3 0"/></svg>
+      <svg class="hide-sm" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+      <span class="mono" id="bar-clock">Mon 9:41</span>
+    </span>
+  </div>
+</header>
+
+<main id="top">
+  <section class="wrap hero">
+    <div>
+      <div class="eyebrow">Menu bar app · macOS 14+ · Free</div>
+      <h1>A better Harvest timer for Mac</h1>
+      <p class="lede">Harvestbeam sits in the menu bar with today's hours. Press <kbd>⌥H</kbd> in any app, type a few letters of a project, press Return. The timer's running and you're back to work.</p>
+      <div class="actions">
+        <a class="button" href="https://github.com/tractorbeam-user/harvestbeam/releases/latest">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a.9.9 0 0 1 .9.9v6.9l2.3-2.3a.9.9 0 1 1 1.3 1.3L8.6 12.1a.9.9 0 0 1-1.2 0L3.5 8.2a.9.9 0 1 1 1.3-1.3l2.3 2.3V2.4a.9.9 0 0 1 .9-.9ZM2.5 13h11a.9.9 0 0 1 0 1.8h-11a.9.9 0 0 1 0-1.8Z"/></svg>
+          Download for Mac
+        </a>
+        <a class="textlink" href="#features">See what it does ↓</a>
+      </div>
+      <div class="fine">Free. macOS 14 or later. Updates itself. <a class="textlink" href="#first-open" style="font-size:13px">First time opening it?</a></div>
+    </div>
+
+    <div class="window" id="window" aria-label="The Harvestbeam window, working with example projects">
+      <div class="titlebar">
+        <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="day" id="win-day">Today</span>
+        <span class="week" id="win-week">Week 31:40</span>
+      </div>
+      <div class="pane">
+        <div class="timer">
+          <div class="what">
+            <div class="name" id="t-name">Design</div>
+            <div class="sub" id="t-sub">Website Redesign · Tractorbeam</div>
+          </div>
+          <div class="clock" id="t-clock">1:24:08</div>
+          <button class="play" id="t-play" type="button" aria-label="Pause timer"><svg viewBox="0 0 10 10" class="g g-pause"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg><svg viewBox="0 0 10 10" class="g g-play"><path d="M2.8 1.2v7.6L8.8 5z"/></svg></button>
+        </div>
+        <label class="ask" for="ask">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.6"/><path d="M10.5 10.5 14 14"/></svg>
+          <input id="ask" type="text" placeholder="What are you working on?" autocomplete="off" spellcheck="false">
+          <kbd>⌥H</kbd>
+        </label>
+        <div id="list"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap features" id="features">
+    <h2 class="section-title">What it does</h2>
+    <div class="cards">
+      <article class="card">
+        <div class="stage scroller">
+          <div class="favs" id="favs" aria-label="Favorites example: star a task to pin it"></div>
+        </div>
+        <div><h3>Favorites, one click away</h3><p>Star the tasks you live in and they stay pinned at the top as tiles, with the project code. Drag them into the order you like.</p></div>
+      </article>
+      <article class="card">
+        <div class="stage">
+          <div class="caps" aria-hidden="true"><div class="cap" id="cap-opt">⌥</div><div class="cap" id="cap-h">H</div></div>
+          <div class="caption" id="caps-caption">Try it: press ⌥H</div>
+        </div>
+        <div><h3>⌥H from any app</h3><p>Brings the window forward with search ready. Press it again to go back to what you were doing.</p></div>
+      </article>
+      <article class="card">
+        <div class="stage">
+          <div class="plan" aria-label="Plan Day example">
+            <div class="q">What are you working on today?</div>
+            <div class="said" id="said"></div>
+            <div class="rows">
+              <div class="row"><span class="t">Design</span><span class="p">Context Launch</span><span class="h">3:00</span></div>
+              <div class="row"><span class="t">Development</span><span class="p">Website Redesign</span><span class="h">1:00</span></div>
+              <div class="row"><span class="t">Meetings</span><span class="p">Brand Refresh</span><span class="h">0:30</span></div>
+            </div>
+          </div>
+        </div>
+        <div><h3>Plan the day in a sentence</h3><p>Type or dictate what's ahead and get the entries back. Matching runs on your Mac.</p></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap more" aria-label="More features">
+    <div class="grid">
+      <div class="spec">
+        <div class="mini"><span class="mbar"><span class="sq"><svg viewBox="0 0 10 10"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg></span><span class="mono">1:24</span> Design</span></div>
+        <h3>A menu bar like Harvest's own</h3><p>Orange while a timer runs, gray when it's stopped. You choose how much text shows.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="crumbs"><span class="q mono">acme</span><span class="arr">→</span><span class="chip">Brand Refresh</span><span class="arr">→</span><span class="chip on">Design</span></span></div>
+        <h3>Search in two steps</h3><p>Projects first, grouped by client, then that project's tasks. Codes and clients match too.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="toast">Away for <b class="mono">0:42</b><span class="sep"></span><span class="act">Remove</span><span class="act dim">Keep</span></span></div>
+        <h3>Idle time, handled</h3><p>Step away with a timer running and it asks, when you're back, whether to keep the gap.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="sync"><span class="dot"></span>Started on the web <span class="mono">9:02</span><span class="arr">→</span>here <span class="mono">9:03</span></span></div>
+        <h3>In step with Harvest</h3><p>It checks every minute, so timers from the web or your phone show up here.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="toast">Entry deleted<span class="sep"></span><span class="act">Undo</span><kbd class="mono">⌘Z</kbd></span></div>
+        <h3>Undo, not "Are you sure?"</h3><p>Deleting asks nothing and offers Undo. Double-click any entry to edit it.</p>
+      </div>
+      <div class="spec">
+        <div class="mini"><span class="key"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Keychain<span class="mono dots">••••••••3f9a</span></span></div>
+        <h3>Your token stays put</h3><p>Stored in your Keychain and only ever sent to Harvest.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap closing">
+    <canvas id="beam" aria-label="Time entries rising into the Harvestbeam triangle. Click to send more." role="img"></canvas>
+    <h2>Start tracking in a minute.</h2>
+    <p>Download, drag it into Applications, paste your token.</p>
+    <a class="button" href="https://github.com/tractorbeam-user/harvestbeam/releases/latest">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a.9.9 0 0 1 .9.9v6.9l2.3-2.3a.9.9 0 1 1 1.3 1.3L8.6 12.1a.9.9 0 0 1-1.2 0L3.5 8.2a.9.9 0 1 1 1.3-1.3l2.3 2.3V2.4a.9.9 0 0 1 .9-.9ZM2.5 13h11a.9.9 0 0 1 0 1.8h-11a.9.9 0 0 1 0-1.8Z"/></svg>
+      Download for Mac
+    </a>
+    <div class="req">macOS 14 or later · Updates itself · Needs a Harvest account</div>
+    <div class="firstrun" id="first-open">
+      <h3>Opening it the first time</h3>
+      <p>Harvestbeam isn't signed with an Apple Developer ID yet, so macOS asks you to allow it once.</p>
+      <ol>
+        <li>Open Harvestbeam. When macOS says it can't verify it, click <b>Done</b>.</li>
+        <li>Go to <b>System Settings → Privacy & Security</b> and scroll down.</li>
+        <li>Click <b>Open Anyway</b> next to Harvestbeam and confirm with your password.</li>
+      </ol>
+      <p class="after">That's it. Updates install and open on their own after this.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Harvestbeam is an unofficial client for the Harvest API, not made or endorsed by Harvest.</span>
+    <a class="textlink" href="https://github.com/tractorbeam-user/harvestbeam">Source on GitHub</a>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const PAUSE = '<rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/>';
+  const PLAY = '<path d="M2.5 1.2v7.6L8.8 5z"/>';
+
+  // Example projects, the same ones the app's demo mode uses.
+  const projects = [
+    { name: "Website Redesign", code: "TB-WEB", client: "Tractorbeam", tasks: ["Design", "Development", "Meetings", "QA & Testing"] },
+    { name: "Context Launch", code: "TB-CTX", client: "Tractorbeam", tasks: ["Strategy", "Development", "Meetings", "Project Management"] },
+    { name: "Brand Refresh", code: "ACME-BR", client: "Acme Co", tasks: ["Design", "Strategy", "Meetings"] },
+    { name: "Mobile App", code: "ACME-APP", client: "Acme Co", tasks: ["Design", "Development", "QA & Testing", "Project Management"] },
+    { name: "Data Platform", code: "NW-DATA", client: "Northwind", tasks: ["Development", "Meetings", "Project Management"] },
+    { name: "Internal", code: null, client: "Tractorbeam", tasks: ["Admin", "Meetings"] },
+  ];
+  const all = projects.flatMap((p) => p.tasks.map((t) => ({ task: t, project: p })));
+  const pick = (task, name) => all.find((e) => e.task === task && e.project.name === name);
+  const favorites = [pick("Design", "Website Redesign"), pick("Strategy", "Context Launch"), pick("Design", "Brand Refresh"), pick("Development", "Data Platform")];
+
+  const state = { current: favorites[0], seconds: 1 * 3600 + 24 * 60 + 8, running: true, week: 31 * 3600 + 40 * 60, sel: 0 };
+
+  const hm = (s) => `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}`;
+  const hms = (s) => `${hm(s)}:${String(s % 60).padStart(2, "0")}`;
+
+  function render() {
+    const { current: c, running } = state;
+    $("t-name").textContent = c.task;
+    $("t-sub").textContent = `${c.project.name} · ${c.project.client}`;
+    $("t-clock").textContent = hms(state.seconds);
+    $("t-play").classList.toggle("paused", !running);
+    $("t-play").setAttribute("aria-label", running ? "Pause timer" : "Resume timer");
+    $("bar-square").classList.toggle("paused", !running);
+    $("bar-time").textContent = hm(state.seconds);
+    // Paused, the item shows just the time, as in the app; the name slides away.
+    if (running) $("bar-task-text").textContent = c.task;
+    $("bar-task").classList.toggle("gone", !running);
+    $("win-week").textContent = `Week ${hm(state.week)}`;
+    const key = `${favorites.indexOf(c)}|${running}`;
+    if (!$("ask").value.trim() && render.key !== key) { render.key = key; renderList(); }
+  }
+
+  function start(entry) {
+    if (entry !== state.current) { state.current = entry; state.seconds = 0; }
+    state.running = true;
+    $("ask").value = "";
+    renderList();
+    render();
+  }
+
+  function tile(e, i) {
+    const on = e === state.current && state.running;
+    return `<button class="tile${on ? " on" : ""}" type="button" data-fav="${i}" aria-label="${on ? "Pause" : "Start"} ${e.task}, ${e.project.name}">
+      <span class="info">
+        ${e.project.code ? `<div class="c">${e.project.code}</div>` : ""}
+        <div class="t">${e.project.name}</div>
+        <div class="p">${e.task}</div>
+      </span>
+      <span class="go"><svg viewBox="0 0 10 10">${on ? PAUSE : PLAY}</svg></span></button>`;
+  }
+
+  function matches(q) {
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    return all.filter((e) => {
+      const hay = `${e.task} ${e.project.name} ${e.project.code ?? ""} ${e.project.client}`.toLowerCase();
+      return words.every((w) => hay.includes(w));
+    }).slice(0, 6);
+  }
+
+  function renderList() {
+    const q = $("ask").value.trim();
+    const list = $("list");
+    if (!q) {
+      list.innerHTML = `<div class="favpanel"><div class="section-label"><span class="star">★</span> Favorites</div><div class="tiles">${favorites.map(tile).join("")}</div></div>`;
+      // The running tile pauses; any other starts.
+      list.querySelectorAll(".tile").forEach((el) => el.addEventListener("click", () => {
+        const e = favorites[+el.dataset.fav];
+        if (e === state.current && state.running) toggleRunning(); else start(e);
+      }));
+      return;
+    }
+    const found = matches(q);
+    state.sel = Math.min(state.sel, Math.max(found.length - 1, 0));
+    list.innerHTML = found.length
+      ? `<div class="section-label">Results</div><div class="results">${found.map((e, i) =>
+          `<button class="result${i === state.sel ? " sel" : ""}" type="button" data-i="${i}">
+             <span class="t">${e.task}</span><span class="p">${e.project.name} · ${e.project.client}</span>
+             <span class="c">${e.project.code ?? ""}</span></button>`).join("")}</div>
+         <div class="hint">↑↓ to choose · Return to start</div>`
+      : `<div class="empty">No projects match “${q.replace(/[<&]/g, "")}”. Try a client or a code, like “acme”.</div>`;
+    list.querySelectorAll(".result").forEach((el) => el.addEventListener("click", () => start(found[+el.dataset.i])));
+    list._found = found;
+  }
+
+  $("ask").addEventListener("input", () => { state.sel = 0; renderList(); });
+  $("ask").addEventListener("keydown", (ev) => {
+    const found = $("list")._found || [];
+    if (!$("ask").value.trim()) return;
+    if (ev.key === "ArrowDown") { state.sel = Math.min(state.sel + 1, found.length - 1); renderList(); ev.preventDefault(); }
+    if (ev.key === "ArrowUp") { state.sel = Math.max(state.sel - 1, 0); renderList(); ev.preventDefault(); }
+    if (ev.key === "Enter" && found[state.sel]) start(found[state.sel]);
+    if (ev.key === "Escape") { $("ask").value = ""; renderList(); }
+  });
+
+  const toggleRunning = () => { state.running = !state.running; render(); };
+  $("t-play").addEventListener("click", toggleRunning);
+
+  // The menu bar item: the square pauses, the rest shows or hides the window.
+  $("bar-item").addEventListener("click", (ev) => {
+    if (ev.target.closest("#bar-square")) return toggleRunning();
+    const win = $("window");
+    win.classList.toggle("hidden-win");
+    if (!win.classList.contains("hidden-win")) win.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+  });
+
+  // Drag the window around by its title bar; double-click to put it back.
+  (() => {
+    const win = $("window"), bar = win.querySelector(".titlebar");
+    let dx = 0, dy = 0, start = null;
+    const place = () => { win.style.setProperty("--dx", dx + "px"); win.style.setProperty("--dy", dy + "px"); };
+    bar.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      start = { x: e.clientX - dx, y: e.clientY - dy };
+      bar.setPointerCapture(e.pointerId);
+      win.classList.add("dragging");
+    });
+    bar.addEventListener("pointermove", (e) => {
+      if (!start) return;
+      // Keep the title bar on screen so it can always be grabbed again.
+      const r = win.getBoundingClientRect();
+      const nx = e.clientX - start.x, ny = e.clientY - start.y;
+      const minX = dx - r.left - r.width + 80, maxX = dx + innerWidth - r.left - 80;
+      const minY = dy - r.top, maxY = dy + innerHeight - r.top - 44;
+      dx = Math.min(Math.max(nx, minX), maxX);
+      dy = Math.min(Math.max(ny, minY), maxY);
+      place();
+    });
+    const end = () => { start = null; win.classList.remove("dragging"); };
+    bar.addEventListener("pointerup", end);
+    bar.addEventListener("pointercancel", end);
+    bar.addEventListener("dblclick", () => { dx = 0; dy = 0; place(); });
+  })();
+
+  setInterval(() => {
+    if (state.running) { state.seconds++; state.week++; }
+    render();
+  }, 1000);
+
+  const now = new Date();
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const clockText = () => { const d = new Date(); return `${days[d.getDay()]} ${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  $("bar-clock").textContent = clockText();
+  setInterval(() => { $("bar-clock").textContent = clockText(); }, 15000);
+  $("win-day").textContent = `Today · ${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]}`;
+
+  renderList();
+  render();
+
+  // ⌥H on the page: keycaps press and light, and the window's search focuses.
+  const capOpt = $("cap-opt"), capH = $("cap-h");
+  addEventListener("keydown", (ev) => {
+    if (ev.key === "Alt") capOpt.classList.add("down");
+    if (ev.code === "KeyH") capH.classList.add("down");
+    if (ev.altKey && ev.code === "KeyH") {
+      ev.preventDefault();
+      capOpt.classList.add("lit"); capH.classList.add("lit");
+      $("caps-caption").textContent = "That works. In the app, from anywhere.";
+      const win = $("window");
+      win.classList.remove("hidden-win");
+      const r = win.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < innerHeight) $("ask").focus({ preventScroll: true });
+    }
+  });
+  addEventListener("keyup", (ev) => {
+    if (ev.key === "Alt") capOpt.classList.remove("down");
+    if (ev.code === "KeyH") capH.classList.remove("down");
+  });
+  addEventListener("blur", () => { capOpt.classList.remove("down"); capH.classList.remove("down"); });
+
+  // Plan Day: type the sentence when it scrolls into view, then show the matches.
+  const sentence = "Context design all morning, an hour on the website build, then the Acme call";
+  const said = $("said"), rows = [...document.querySelectorAll(".plan .row")];
+  let planned = false;
+  function plan() {
+    if (planned) return; planned = true;
+    if (reduce) { said.textContent = sentence; rows.forEach((r) => r.classList.add("in")); return; }
+    let i = 0;
+    const tick = () => {
+      said.innerHTML = sentence.slice(0, i).replace(/[<&]/g, "") + '<span class="caret"></span>';
+      if (i++ < sentence.length) return setTimeout(tick, 28 + Math.random() * 40);
+      rows.forEach((r, n) => setTimeout(() => r.classList.add("in"), 500 + n * 180));
+    };
+    tick();
+  }
+  // Complete at rest: if observers aren't available, show the finished state.
+  if ("IntersectionObserver" in window) {
+    said.textContent = sentence; rows.forEach((r) => r.classList.add("in"));
+    const io = new IntersectionObserver((es) => es.forEach((e) => {
+      if (e.isIntersecting && !planned) { rows.forEach((r) => r.classList.remove("in")); said.textContent = ""; plan(); io.disconnect(); }
+    }), { threshold: 0.6 });
+    io.observe(document.querySelector(".plan"));
+  } else plan();
+
+  // Favorites: star a recent task and it moves up into Favorites.
+  const favDemo = [
+    { e: pick("Design", "Website Redesign"), on: true },
+    { e: pick("Strategy", "Context Launch"), on: true },
+    { e: pick("Development", "Mobile App"), on: false },
+    { e: pick("Meetings", "Brand Refresh"), on: false },
+    { e: pick("Development", "Data Platform"), on: false },
+    { e: pick("Admin", "Internal"), on: false },
+  ];
+  let justStarred = null;
+  function renderFavs() {
+    const card = (f) => `<div class="fav${f === justStarred ? " new" : ""}" data-i="${favDemo.indexOf(f)}">
+        <div class="p">${f.e.project.name}</div><div class="t">${f.e.task}</div>
+        <div class="c">${f.e.project.code ? "[" + f.e.project.code + "]" : "&nbsp;"}</div>
+        <button type="button" class="${f.on ? "on" : ""}" data-i="${favDemo.indexOf(f)}" aria-label="${f.on ? "Unstar" : "Star"} ${f.e.task}, ${f.e.project.name}">${f.on ? "★" : "☆"}</button>
+      </div>`;
+    const on = favDemo.filter((f) => f.on), off = favDemo.filter((f) => !f.on);
+    $("favs").innerHTML = `
+      <div class="label"><span>★ Favorites</span><span>drag to reorder</span></div>
+      <div class="set favset">${on.length ? on.map(card).join("") : '<div class="empty-set">Star a task, or drag one here</div>'}</div>
+      ${off.length ? `<div class="label"><span>Recent</span><span></span></div><div class="set">${off.map(card).join("")}</div>` : ""}`;
+    justStarred = null;
+  }
+  $("favs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-i]"); if (!b) return;
+    const f = favDemo[+b.dataset.i];
+    f.on = !f.on;
+    if (f.on) { favDemo.splice(favDemo.indexOf(f), 1); favDemo.splice(favDemo.filter((x) => x.on && x !== f).length, 0, f); justStarred = f; }
+    renderFavs();
+  });
+
+  // Drag a favorite to reorder, or drag a recent task up into Favorites to
+  // star it, as in the app.
+  let drag = null;
+  const follow = (e) => {
+    const el = drag.el;
+    el.style.transform = "none";
+    const r = el.getBoundingClientRect();
+    el.style.transform = `translate(${e.clientX - drag.grabX - r.left}px, ${e.clientY - drag.grabY - r.top}px) scale(1.04)`;
+  };
+  $("favs").addEventListener("pointerdown", (e) => {
+    const el = e.target.closest(".fav");
+    if (!el || e.target.closest("button") || e.button !== 0) return;
+    const r = el.getBoundingClientRect();
+    drag = { el, x: e.clientX, y: e.clientY, grabX: e.clientX - r.left, grabY: e.clientY - r.top, moving: false };
+    $("favs").setPointerCapture(e.pointerId);
+  });
+  // Where the dragged tile would land among the favorites: an index, the
+  // orange line's spot, and the two tiles that part to make room.
+  function dropSpot(e) {
+    const favset = $("favs").querySelector(".favset");
+    const fr = favset.getBoundingClientRect();
+    if (e.clientX < fr.left - 12 || e.clientX > fr.right + 12 || e.clientY < fr.top - 12 || e.clientY > fr.bottom + 12) return null;
+    const tiles = [...favset.querySelectorAll(".fav")].filter((t) => t !== drag.el);
+    if (!tiles.length) return { index: 0, tiles, favset, fr };
+    const rects = tiles.map((t) => { t.style.transform = ""; return t.getBoundingClientRect(); });
+    let best = 0, bestD = Infinity;
+    rects.forEach((r, i) => {
+      const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    const r = rects[best];
+    const index = e.clientX > r.left + r.width / 2 ? best + 1 : best;
+    return { index, tiles, rects, favset, fr };
+  }
+  function showSpot(spot) {
+    const fav = $("favs");
+    let line = fav.querySelector(".dropline");
+    fav.querySelectorAll(".favset .fav").forEach((t) => { if (t !== drag.el) t.style.transform = ""; });
+    if (!spot || !spot.rects) { line?.remove(); return; }
+    if (!line) { line = document.createElement("div"); line.className = "dropline"; spot.favset.appendChild(line); }
+    const { index, tiles, rects, fr } = spot;
+    const before = rects[index - 1], after = rects[index];
+    const ref = after || before;
+    const sameRow = before && after && Math.abs(before.top - after.top) < 4;
+    // Between two tiles on a row; otherwise at the open edge of the one tile.
+    const x = sameRow ? (before.right + after.left) / 2 : after ? after.left - 3 : before.right + 3;
+    line.style.left = (x - fr.left) + "px";
+    line.style.top = (ref.top - fr.top + 6) + "px";
+    line.style.height = (ref.height - 12) + "px";
+    if (sameRow) {
+      tiles[index - 1].style.transform = "translateX(-6px)";
+      tiles[index].style.transform = "translateX(6px)";
+    } else if (after) tiles[index].style.transform = "translateX(6px)";
+    else tiles[index - 1].style.transform = "translateX(-6px)";
+  }
+  $("favs").addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    if (!drag.moving) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
+      drag.moving = true;
+      drag.el.classList.add("lifting");
+    }
+    drag.spot = dropSpot(e);
+    showSpot(drag.spot);
+    follow(e);
+  });
+  const drop = () => {
+    if (!drag) return;
+    const { el, moving, spot } = drag;
+    if (moving) showSpot(null);
+    drag = null;
+    if (!moving) return;
+    el.classList.remove("lifting");
+    el.style.transform = "";
+    if (!spot) return renderFavs();
+    const f = favDemo[+el.dataset.i];
+    const order = spot.tiles.map((x) => favDemo[+x.dataset.i]);
+    order.splice(spot.index, 0, f);
+    if (!f.on) { f.on = true; justStarred = f; }
+    const rest = favDemo.filter((x) => !order.includes(x));
+    favDemo.splice(0, favDemo.length, ...order, ...rest);
+    renderFavs();
+  };
+  $("favs").addEventListener("pointerup", drop);
+  $("favs").addEventListener("pointercancel", drop);
+  renderFavs();
+
+  // The beam: hours rising into the triangle. Hover slows it so you can read
+  // the entries near the pointer; a click sends a burst.
+  const canvas = $("beam"), ctx = canvas.getContext("2d");
+  const entries = ["0:15", "1:30", "0:45", "2:10", "0:25", "3:00", "1:05", "0:50", "4:15", "0:30", "1:45", "2:40", "0:10", "1:20", "6:00", "0:55"];
+  let W = 0, H = 0, dpr = 1, pointer = null, phase = 0, speed = 1, boost = 0, last = null, gulp = 0;
+  function size() {
+    dpr = devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    W = r.width; H = r.height;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+  }
+  size(); addEventListener("resize", size);
+  canvas.addEventListener("pointermove", (e) => { const r = canvas.getBoundingClientRect(); pointer = { x: e.clientX - r.left, y: e.clientY - r.top }; });
+  canvas.addEventListener("pointerleave", () => { pointer = null; });
+  canvas.addEventListener("click", () => { boost += 9; gulp = 1; });
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  function frame(t) {
+    const dt = last == null ? 0 : Math.min((t - last) / 1000, 0.1); last = t;
+    speed += ((pointer ? 0.3 : 1) - speed) * Math.min(dt * 4, 1);
+    boost *= Math.exp(-dt * 2.2);
+    gulp = Math.max(0, gulp - dt * 2.5);
+    if (!reduce) phase += dt * 0.055 * (speed + boost);
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const orange = css("--orange");
+    const triW = 108, triH = triW * 22 / 26, cx = W / 2;
+    // A little swell as a burst arrives, with headroom so it never clips.
+    const pad = 16, swell = gulp > 0 ? 1 + 0.08 * Math.sin(Math.PI * (1 - gulp)) : 1;
+    ctx.save();
+    ctx.translate(cx, pad + triH);
+    ctx.scale(swell, swell);
+    ctx.beginPath(); ctx.moveTo(0, -triH); ctx.lineTo(triW / 2, 0); ctx.lineTo(-triW / 2, 0); ctx.closePath();
+    ctx.fillStyle = orange; ctx.fill();
+    ctx.restore();
+
+    const top = triW * 0.8, bottom = Math.min(W, 300), beamTop = pad + triH + 4, beamH = H - beamTop - 6;
+    const rows = 7, cols = 4;
+    ctx.fillStyle = orange; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let row = 0; row < rows; row++) {
+      const raw = phase + row / rows, p = raw % 1, cycle = Math.floor(raw);
+      const width = bottom - (bottom - top) * p, scale = width / bottom;
+      const y = beamTop + beamH * (1 - p);
+      const fade = Math.min(p / 0.16, 1) * Math.min((1 - p) / 0.32, 1);
+      for (let col = 0; col < cols; col++) {
+        const seed = Math.abs(cycle * 131 + row * 17 + col * 29);
+        const x = cx + (col + 0.5 - cols / 2) * width / cols;
+        const near = pointer ? Math.max(0, 1 - Math.hypot(pointer.x - x, pointer.y - y) / 52) : 0;
+        ctx.globalAlpha = fade * Math.max(seed % 5 === 0 ? 0.95 : 0.4, near);
+        ctx.font = `500 ${15 * scale * (1 + 0.4 * near)}px "Geist Mono", ui-monospace, Menlo, monospace`;
+        ctx.fillText(entries[seed % entries.length], x, y);
+      }
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

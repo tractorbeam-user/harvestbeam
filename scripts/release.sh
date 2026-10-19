@@ -34,7 +34,7 @@ git tag -a "$TAG" -m "Harvestbeam ${VERSION}"
 git push origin "$TAG"
 
 NOTES="**Install:** download Harvestbeam-${VERSION}.dmg, open it and drag **Harvestbeam** into Applications.
-The first time, right-click it and choose **Open**. It isn't signed with an Apple Developer ID, so macOS asks once.
+**The first time you open it,** macOS says it can't verify Harvestbeam, because it isn't signed with an Apple Developer ID. Click **Done**, then open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Harvestbeam, and confirm with your password. You only do this once; updates open normally.
 Then sign in with a Harvest personal access token from https://id.getharvest.com/developers.
 Already installed? Harvestbeam offers this update itself, or choose **Check for Updates…** in Preferences."
 [[ -n "$RELEASE_NOTES" ]] && NOTES="${RELEASE_NOTES}
