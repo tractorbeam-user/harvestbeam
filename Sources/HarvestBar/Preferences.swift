@@ -44,12 +44,12 @@ extension Notification.Name {
 /// the toolbar, like Harvest's own.
 @MainActor
 final class PreferencesWindowController: NSWindowController {
-    init(tracker: TimeTracker, resetLayout: @escaping () -> Void) {
+    init(tracker: TimeTracker, updates: Updates, resetLayout: @escaping () -> Void) {
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
         tabs.canPropagateSelectedChildViewControllerTitle = false
         func tab(_ label: String, _ symbol: String, _ view: some View) -> NSTabViewItem {
-            let host = NSHostingController(rootView: view.environment(tracker).tint(.harvestOrange))
+            let host = NSHostingController(rootView: view.environment(tracker).environment(updates).tint(.harvestOrange))
             host.sizingOptions = [.preferredContentSize]
             let item = NSTabViewItem(viewController: host)
             item.label = label
@@ -79,6 +79,7 @@ final class PreferencesWindowController: NSWindowController {
 // MARK: General
 
 struct GeneralPrefs: View {
+    @Environment(Updates.self) private var updates
     @AppStorage(Prefs.showInDock) private var showInDock = false
     @AppStorage(Prefs.idleDetection) private var idleDetection = true
     @AppStorage(Prefs.idleMinutes) private var idleMinutes = 10
@@ -129,6 +130,18 @@ struct GeneralPrefs: View {
             }
             .onChange(of: remindNoTimer) { _, on in if on { Notifier.requestPermission() } }
             .onChange(of: remindLongTimer) { _, on in if on { Notifier.requestPermission() } }
+            Divider()
+            PrefsSection("Updates") {
+                @Bindable var updates = updates
+                HStack {
+                    Toggle("Check for updates automatically", isOn: $updates.checksAutomatically)
+                    Spacer()
+                    Button("Check Now") { updates.checkForUpdates(nil) }
+                        .disabled(!updates.canCheck)
+                }
+                Text("Harvestbeam looks for a new version on GitHub once a day and asks before installing it.")
+                    .prefsNote()
+            }
         }
     }
 

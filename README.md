@@ -27,7 +27,22 @@ Click the timer icon in the menu bar, create a personal access token at [id.geth
 scripts/release.sh 1.1.0
 ```
 
-From a clean `main`, this pushes, builds the app with that version, zips it and publishes a GitHub Release with install notes. It needs the GitHub CLI (`gh`) signed in.
+From a clean `main`, this pushes, builds the app with that version, wraps it in a branded disk image (`scripts/make-dmg.sh`) and publishes a GitHub Release with install notes. Then it signs the disk image with Sparkle's `sign_update`, adds the release to [`appcast.xml`](appcast.xml) and commits and pushes that to `main`. It needs the GitHub CLI (`gh`) signed in and the update signing key (below).
+
+### Updates
+
+The Mac app updates itself with [Sparkle](https://sparkle-project.org). It checks `appcast.xml` on `main` (raw.githubusercontent.com) once a day, and **Check for Updates…** in the app menu or Preferences → General checks right away. The feed URL and public key are set in `scripts/build-app.sh`; the build number, which only goes up (it's the commit count), is what Sparkle compares.
+
+Sparkle only installs updates signed with the private EdDSA key. It lives in the login Keychain of the Mac that ran `generate_keys` (a password item for `https://sparkle-project.org`, account `ed25519`), never in git, and `sign_update` reads it from there, so macOS may ask to allow access the first time. Keep a backup somewhere safe, like a password manager: without it, installed copies can never be updated again.
+
+```bash
+.build/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle-private-key   # export
+.build/artifacts/sparkle/Sparkle/bin/generate_keys -f sparkle-private-key   # import on another Mac
+```
+
+`SPARKLE_KEY_FILE=path scripts/release.sh 1.1.0` signs with an exported key file instead of the Keychain.
+
+The app is signed ad hoc, not with a Developer ID, which matters only for the first download: Gatekeeper quarantines the disk image, so people right-click → Open once. Updates installed by Sparkle aren't quarantined, so they open without that prompt. Sparkle trusts an update because of its EdDSA signature, not its code signature, which changes with every ad hoc build. That makes the private key the one thing that has to stay secret. Notarizing would need an Apple Developer account and a Developer ID certificate.
 
 ## Build it yourself
 
@@ -65,7 +80,7 @@ Pick your team under Signing for both targets, then run **HarvestBar-iOS** on yo
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `Sources/HarvestKit`    | Models, Harvest API client, Keychain, favorites, ranking (recent/suggested/search), `TimeTracker` state, demo data |
 | `Sources/HarvestUI`     | SwiftUI views shared by macOS and iOS                                                                              |
-| `Sources/HarvestBar`    | Mac menu bar app: status item, window, ⌥H                                                                          |
+| `Sources/HarvestBar`    | Mac menu bar app: status item, window, ⌥H, Sparkle updates                                                         |
 | `iOS`                   | iPhone/iPad app entry point                                                                                        |
 | `Tests/HarvestKitTests` | Ranking, search and decoding tests (run in Xcode, or with `swift test` once Xcode is installed)                    |
 

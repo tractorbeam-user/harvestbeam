@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sparkle update feed for the Mac app. scripts/release.sh adds an item per
+     release; installed copies read it from main (SUFeedURL in build-app.sh). -->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Harvestbeam</title>
+    <link>https://github.com/tractorbeam-user/harvest-bar</link>
+    <language>en</language>
+  </channel>
+</rss>
