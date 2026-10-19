@@ -271,7 +271,7 @@ struct SupportPrefs: View {
                 HStack {
                     Text("Harvestbeam \(version)")
                     Spacer()
-                    Link("Report a Problem…", destination: URL(string: "https://github.com/tractorbeam-user/harvest-bar/issues")!)
+                    Link("Report a Problem…", destination: URL(string: "https://github.com/tractorbeam-user/harvestbeam/issues")!)
                 }
                 Text("An unofficial client for the Harvest API.").prefsNote()
             }

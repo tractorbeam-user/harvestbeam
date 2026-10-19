@@ -404,6 +404,8 @@ struct TrackerView: View {
             if !large || !query.isEmpty {
                 Button {
                     if query.isEmpty { closeSearch() } else { query = "" }
+                    // The click took focus out of the box; it's still the place to type.
+                    if large { searchFocused = true }
                 } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
                 }

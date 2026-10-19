@@ -25,6 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     private var poller: Timer?
     private var lastTitle: String?
     private var hasPlacedPanel = false
+    private var onboarding: OnboardingWindowController?
+    /// The app that was in front before the window opened.
+    private var previousApp: NSRunningApplication?
 
     private static let frameName = "HarvestBarWindow"
     private static let keepOnTopKey = "keepOnTop"
@@ -78,8 +81,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
 
         Task {
             await tracker.refresh(force: true)
-            // First run: open the window so there's somewhere to paste a token.
-            if tracker.phase == .signedOut || tracker.isDemo { showPanel() }
+            let forced = CommandLine.arguments.contains("--onboarding")
+            if forced || (tracker.phase == .signedOut && !OnboardingWindowController.isCompleted) {
+                showOnboarding()
+            } else if tracker.phase == .signedOut || tracker.isDemo {
+                // Open the window so there's somewhere to paste a token.
+                showPanel()
+            }
         }
     }
 
@@ -201,9 +209,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
     }
 
+    /// The first-run welcome. When it's done, the tracker window takes over.
+    private func showOnboarding() {
+        let controller = OnboardingWindowController(
+            tracker: tracker,
+            shortcut: HotKey.Shortcut.load() == nil ? nil : UserDefaults.standard.string(forKey: Prefs.shortcutDisplay),
+            needsAccessibility: hotKey?.mode == .needsAccessibility
+        ) { [weak self] in
+            self?.onboarding = nil
+            self?.showPanel()
+        }
+        onboarding = controller
+        controller.show()
+    }
+
     /// ⌥H: bring the window forward, or hide it if it's already focused.
     @objc func togglePanel() {
-        if panel.isVisible && panel.isKeyWindow && NSApp.isActive {
+        // During the welcome, the shortcut is something to try out.
+        if let onboarding, onboarding.isVisible {
+            onboarding.shortcutPressed()
+            return
+        }
+        // In front with the window showing, even if a popover in it has focus:
+        // put it away.
+        if NSApp.isActive && panel.isVisible && !panel.isMiniaturized && panel.occlusionState.contains(.visible) {
             hidePanel()
         } else {
             showPanel()
@@ -214,6 +243,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         if !hasPlacedPanel {
             placeBelowStatusItem()
             hasPlacedPanel = true
+        }
+        // Remember where you were, to go straight back there on hide.
+        if let front = NSWorkspace.shared.frontmostApplication, front != .current {
+            previousApp = front
         }
         NSApp.unhide(nil)
         if panel.isMiniaturized { panel.deminiaturize(nil) }
@@ -231,6 +264,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         tracker.errorMessage = nil
         // Hand focus straight back to whatever you were working in.
         NSApp.hide(nil)
+        if let app = previousApp, !app.isTerminated { app.activate() }
+        previousApp = nil
     }
 
     static let defaultSize = NSSize(width: 440, height: 680)
@@ -405,5 +440,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
 final class TrackerPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    /// A click anywhere but a text field takes focus out of the field you were
+    /// typing in, like clicking off a field on a web page. The click itself
+    /// still goes through.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, firstResponder is NSText,
+           let hit = contentView?.hitTest(contentView!.convert(event.locationInWindow, from: nil)),
+           !Self.isInTextField(hit) {
+            makeFirstResponder(nil)
+        }
+        super.sendEvent(event)
+    }
+
+    private static func isInTextField(_ view: NSView) -> Bool {
+        sequence(first: view, next: \.superview).contains { $0 is NSTextField || $0 is NSTextView }
+    }
 }
 

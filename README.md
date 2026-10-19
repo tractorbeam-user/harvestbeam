@@ -15,11 +15,11 @@ A small, native Harvest timer for the Mac menu bar, with the same app on iPhone 
 
 ## Install
 
-Download the latest `Harvestbeam-x.y.z.zip` from [Releases](https://github.com/tractorbeam-user/harvest-bar/releases), unzip it and drag **Harvestbeam** to Applications.
+Download the latest `Harvestbeam-x.y.z.dmg` from [Releases](https://github.com/tractorbeam-user/harvestbeam/releases), open it and drag **Harvestbeam** into Applications.
 
 The first time, **right-click it and choose Open**. The app isn't signed with an Apple Developer ID, so macOS asks once. If macOS says it's damaged, run `xattr -dr com.apple.quarantine "/Applications/Harvestbeam.app"` in Terminal and open it again.
 
-Click the timer icon in the menu bar, create a personal access token at [id.getharvest.com/developers](https://id.getharvest.com/developers), and paste it in.
+The first launch opens a short welcome: where the timer lives, the ⌥H shortcut (try it right there), and connecting Harvest with a personal access token from [id.getharvest.com/developers](https://id.getharvest.com/developers). To see it again: `open /Applications/Harvestbeam.app --args --onboarding`.
 
 ## Releasing
 
@@ -27,7 +27,7 @@ Click the timer icon in the menu bar, create a personal access token at [id.geth
 scripts/release.sh 1.1.0
 ```
 
-From a clean `main`, this pushes, builds the app with that version, zips it and publishes a GitHub Release with install notes. It needs the GitHub CLI (`gh`) signed in.
+From a clean `main`, this pushes, builds the app with that version, wraps it in a branded disk image (`scripts/make-dmg.sh`) and publishes a GitHub Release with install notes. It needs the GitHub CLI (`gh`) signed in.
 
 ## Build it yourself
 

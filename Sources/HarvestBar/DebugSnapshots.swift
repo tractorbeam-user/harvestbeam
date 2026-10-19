@@ -49,6 +49,23 @@ enum DebugSnapshots {
                 prefsWindow.close()
             }
 
+            for step in OnboardingModel.Step.allCases {
+                let model = OnboardingModel(tracker: TimeTracker(service: nil, accountName: nil, favorites: tracker.favorites),
+                                            shortcut: "⌥H", needsAccessibility: false)
+                model.step = step
+                let size = OnboardingView.size
+                let welcome = makeWindow(OnboardingView().environment(model), appearance: appearance)
+                welcome.setContentSize(size)
+                await settle()
+                write(welcome, to: url.appendingPathComponent("9-onboarding-\(step.rawValue)-\(suffix).png"))
+                if step == .connect {
+                    model.showsTokenHelp = true
+                    await settle()
+                    write(welcome, to: url.appendingPathComponent("9-onboarding-3-help-\(suffix).png"))
+                }
+                welcome.close()
+            }
+
             if let field = firstTextField(in: window.contentView!) {
                 window.makeFirstResponder(field)
                 field.stringValue = "de"

@@ -32,9 +32,10 @@ func render(_ pixels: Int) -> Data {
     NSGradient(starting: NSColor(red: 0.97, green: 0.47, blue: 0.19, alpha: 1),
                ending: NSColor(red: 0.92, green: 0.30, blue: 0.14, alpha: 1))!.draw(in: shape, angle: -60)
 
-    // The Tractorbeam triangle (26 × 22), centered optically a touch low.
+    // The Tractorbeam triangle (26 × 22), set 8pt above the tile's center;
+    // picked by eye over versions set lower.
     let width = 400 * s, height = width * 22 / 26
-    let originX = 512 * s - width / 2, originY = 512 * s - height / 2 - 14 * s
+    let originX = 512 * s - width / 2, originY = 512 * s - height / 2 + 8 * s
     let triangle = NSBezierPath()
     triangle.move(to: NSPoint(x: originX + width / 2, y: originY + height))
     triangle.line(to: NSPoint(x: originX + width, y: originY))
