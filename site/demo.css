@@ -11,11 +11,13 @@
   --dw: 1040px; --dh: 680px;
   width: var(--dw); height: var(--dh); position: relative; overflow: hidden;
   border-radius: 18px; transform-origin: top left;
-  /* A soft sunrise over orange hills: white sky down to deep orange. */
+  /* A soft sunrise: white sky melting into warm orange, no hard edges. */
   background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1040 680' preserveAspectRatio='none'%3E%3Cpath d='M0 330 C160 280 300 300 430 330 S720 270 860 300 1000 330 1040 320 V680 H0Z' fill='%23FFE3CC'/%3E%3Cpath d='M0 400 C140 360 260 370 390 405 S640 350 790 380 960 420 1040 400 V680 H0Z' fill='%23FFC79E'/%3E%3Cpath d='M0 470 C180 430 330 455 470 480 S760 430 900 455 1010 480 1040 470 V680 H0Z' fill='%23FFA76A'/%3E%3Cpath d='M0 550 C150 520 320 540 470 565 S780 520 920 545 1020 565 1040 560 V680 H0Z' fill='%23FA8A3E'/%3E%3Cpath d='M0 620 C200 595 380 615 540 630 S840 600 1040 615 V680 H0Z' fill='%23F06A1C'/%3E%3C/svg%3E") center bottom / 100% 100% no-repeat,
-    radial-gradient(28% 34% at 30% 46%, #FFFFFF 0%, rgba(255, 255, 255, .7) 35%, transparent 70%),
-    linear-gradient(180deg, #FFFFFF 0%, #FFF6EE 30%, #FFE6D2 52%, #FFD2B0 70%);
+    radial-gradient(70% 55% at 15% 108%, #EE6418 0%, rgba(238, 100, 24, 0) 70%),
+    radial-gradient(65% 50% at 88% 104%, #F7803A 0%, rgba(247, 128, 58, 0) 70%),
+    radial-gradient(100% 55% at 50% 100%, #FFAE78 0%, rgba(255, 174, 120, 0) 75%),
+    radial-gradient(45% 40% at 30% 30%, #FFFFFF 0%, rgba(255, 255, 255, 0) 75%),
+    linear-gradient(180deg, #FFFFFF 0%, #FFF5EC 30%, #FFDEC4 58%, #FFB988 82%, #F98B4A 100%);
   font-family: -apple-system, BlinkMacSystemFont, var(--body);
   font-size: 13px; color: var(--ink); user-select: none; -webkit-user-select: none;
   box-shadow: 0 40px 80px -40px rgba(40, 20, 0, .45);
