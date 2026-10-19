@@ -127,7 +127,11 @@ struct TrackerView: View {
                 query = ""
                 selection = nil
                 isSearchOpen = false
-                if asksFirst { Task { searchFocused = true } }
+                if asksFirst && tracker.focusRequestWantsSearch {
+                    Task { searchFocused = true }
+                } else {
+                    searchFocused = false
+                }
                 // Opening the window on a new day goes straight to it.
                 let today = LocalDate()
                 if today != lastToday {
@@ -165,14 +169,14 @@ struct TrackerView: View {
     }
 
     private func tileGrid(_ sections: [TaskSection]) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 20) {
             ForEach(sections) { section in
                 let isCollapsed = !isSearching && collapsed.contains(section.id)
                 VStack(alignment: .leading, spacing: 8) {
                     Button { toggleCollapsed(section.id) } label: {
                         HStack(spacing: 6) {
                             Label(section.title, systemImage: section.systemImage)
-                                .labelStyle(SectionLabelStyle())
+                                .labelStyle(SectionLabelStyle(isPanel: section.id == "favorites"))
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(.tertiary)
@@ -198,7 +202,7 @@ struct TrackerView: View {
                             .frame(maxWidth: .infinity, minHeight: 64)
                             .background(
                                 RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
-                                    .strokeBorder(Color.primary.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                                    .strokeBorder(Color.harvestOrange.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             )
                     } else {
                         LazyVGrid(
@@ -230,19 +234,28 @@ struct TrackerView: View {
                 // something is dragged over it.
                 .padding(section.id == "favorites" ? 10 : 0)
                 .background(
-                    RoundedRectangle(cornerRadius: Metrics.tileCorner + 2, style: .continuous)
-                        .fill(Color.harvestOrange.opacity(section.id != "favorites" ? 0 : favoritesTargeted ? 0.16 : 0.07))
+                    RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
+                        .fill(section.id != "favorites" ? Color.clear : favoritesTargeted ? Color.harvestOrange.opacity(0.18) : Color.orangeSoft)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: Metrics.tileCorner + 2, style: .continuous)
+                    RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
                         .strokeBorder(Color.harvestOrange.opacity(section.id == "favorites" && favoritesTargeted ? 0.5 : 0), lineWidth: 1.5)
                 )
             }
             if !isSearching {
+                #if os(macOS)
+                // Clicking it puts you in the search box.
+                Button(action: openSearch) {
+                    Text("Search to find any of your \(tracker.tasks.count) tasks")
+                }
+                .buttonStyle(HintLinkStyle())
+                .frame(maxWidth: .infinity)
+                #else
                 Text("Search to find any of your \(tracker.tasks.count) tasks")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity)
+                #endif
             }
         }
         .background(
@@ -292,12 +305,12 @@ struct TrackerView: View {
                 // Ask first: the big box is always there, focused when the window opens.
                 searchField(flat, large: true)
                     .padding(.horizontal, Metrics.padding)
-                    .padding(.top, 12)
+                    .padding(.top, 14)
                     .padding(.bottom, 2)
             }
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 22) {
+                    VStack(spacing: 20) {
                         if isSearching {
                             content(sections)
                         } else {
@@ -317,6 +330,17 @@ struct TrackerView: View {
                     .padding(.horizontal, Metrics.padding)
                     .padding(.vertical, isSearching ? 10 : Metrics.padding)
                 }
+                // Scrolled content dissolves under the search box (and above
+                // the footer) instead of stopping at a hard edge.
+                .mask(
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 14)
+                        Rectangle()
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 10)
+                    }
+                )
                 .onChange(of: selection) { _, key in
                     guard let key else { return }
                     withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(key) }
@@ -330,7 +354,7 @@ struct TrackerView: View {
                 UndoBanner(entry: deleted, task: tracker.task(for: deleted))
             }
 
-            Divider()
+            Rectangle().fill(Color.hairline).frame(height: 1)
             bottomBar(flat)
         }
         .background {
@@ -366,11 +390,11 @@ struct TrackerView: View {
     private func searchField(_ flat: [TrackableTask], large: Bool = false) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: large ? 15 : 13, weight: .medium))
+                .font(.system(size: large ? 14 : 13, weight: .medium))
                 .foregroundStyle(searchFocused ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.secondary))
             TextField(large ? "What are you working on?" : "Start something new…", text: $query)
                 .textFieldStyle(.plain)
-                .font(.system(size: large ? 17 : 14))
+                .font(.system(size: large ? 15 : 13))
                 .focusEffectDisabled()
                 .focused($searchFocused)
                 .onKeyPress(.downArrow) { moveSelection(by: isSearching ? 1 : columnCount, in: flat); return .handled }
@@ -395,6 +419,12 @@ struct TrackerView: View {
                         backToProjects()
                     } else if !query.isEmpty {
                         query = ""
+                    } else if large, let windowActions {
+                        // Nothing typed: one Escape puts the window away,
+                        // rather than first leaving the box and then closing.
+                        selection = nil
+                        searchFocused = false
+                        windowActions.close()
                     } else {
                         selection = nil
                         closeSearch()
@@ -421,23 +451,31 @@ struct TrackerView: View {
                     #endif
                 } label: {
                     Image(systemName: "mic.fill")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.harvestOrange)
-                        .frame(width: 28, height: 28)
-                        .background(Circle().fill(Color.harvestOrange.opacity(0.13)))
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color.orangeSoft))
                 }
                 .buttonStyle(.plain)
                 .help("Dictate")
             }
         }
-        .padding(.horizontal, large ? 12 : 10)
+        .padding(.horizontal, 12)
         // Small: the same height as the footer buttons, so opening search doesn't resize the bar.
-        .frame(height: large ? 46 : 30)
-        .background(RoundedRectangle(cornerRadius: large ? 14 : 15, style: .continuous).fill(large ? Color.tileBackground : Color.panelBackground))
+        .frame(height: large ? 44 : 30)
+        .background(RoundedRectangle(cornerRadius: large ? 12 : 15, style: .continuous).fill(Color.tileBackground))
         .overlay(
-            RoundedRectangle(cornerRadius: large ? 14 : 15, style: .continuous)
-                .strokeBorder(searchFocused ? Color.harvestOrange.opacity(0.7) : Color.primary.opacity(0.1), lineWidth: searchFocused ? 1.5 : 1)
+            RoundedRectangle(cornerRadius: large ? 12 : 15, style: .continuous)
+                .strokeBorder(searchFocused ? Color.harvestOrange : Color.hairline, lineWidth: 1)
         )
+        // Focused: a soft orange ring outside the border, like the landing page.
+        .background(
+            RoundedRectangle(cornerRadius: (large ? 12 : 15) + 3, style: .continuous)
+                .fill(Color.orangeSoft)
+                .padding(-3)
+                .opacity(searchFocused ? 1 : 0)
+        )
+        .animation(.easeOut(duration: 0.15), value: searchFocused)
     }
 
     /// In search: a project row opens its tasks; a task row starts it.
@@ -475,6 +513,37 @@ struct TrackerView: View {
         selection = flat[next].key
     }
 
+    /// A star in the footer: your favorites as a menu, to start (or pause)
+    /// one without scrolling to the Favorites panel.
+    private var favoritesMenu: some View {
+        Menu {
+            let favorites = tracker.favoriteTasks
+            if favorites.isEmpty {
+                Text("Star a task to add it here")
+            }
+            ForEach(favorites) { task in
+                let isRunning = tracker.running?.key == task.key
+                Button {
+                    Task { await tracker.toggle(task) }
+                } label: {
+                    Label {
+                        Text(task.projectNameParts.name + " · " + task.task.name)
+                    } icon: {
+                        Image(systemName: isRunning ? "pause.fill" : "play.fill")
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "star")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .tint(.secondary)
+        .fixedSize()
+        .frame(width: 30, height: 30)
+        .help("Favorites")
+    }
+
     /// Search lives at the bottom, next to refresh, Open Harvest and settings.
     private func bottomBar(_ flat: [TrackableTask]) -> some View {
         HStack(spacing: 4) {
@@ -484,6 +553,7 @@ struct TrackerView: View {
             FooterButton(systemImage: "sparkles", help: "Plan your day in plain words (⌘P)") { isPlanning = true }
                 .keyboardShortcut("p", modifiers: .command)
                 .popover(isPresented: $isPlanning, arrowEdge: .top) { PlanDayView(day: selectedDay) }
+            favoritesMenu
                 .padding(.trailing, 2)
             if asksFirst {
                 Spacer()
@@ -574,8 +644,8 @@ struct TrackerView: View {
         .foregroundStyle(.secondary)
         .padding(.leading, Metrics.padding)
         .padding(.trailing, 8)
-        .padding(.vertical, 10)
-        .background(Color.tileBackground)
+        .padding(.vertical, 8)
+        .background(Color.panelBackground)
     }
     #endif
 
@@ -624,13 +694,47 @@ struct TrackerView: View {
     #endif
 }
 
+/// Quiet text that turns orange on hover, for hints you can click.
+private struct HintLinkStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11.5))
+            .foregroundStyle(isHovered ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary))
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .animation(.easeOut(duration: 0.15), value: isHovered)
+            #if os(macOS)
+            .onHover { isHovered = $0 }
+            #endif
+    }
+}
+
+/// Section headings as on the landing page: Favorites in plain words on its
+/// orange panel, the others small caps-style labels.
 private struct SectionLabelStyle: LabelStyle {
+    var isPanel = false
+
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 6) {
-            configuration.icon.foregroundStyle(.harvestOrange)
-            configuration.title.foregroundStyle(.secondary)
+            configuration.icon
+                .foregroundStyle(.harvestOrange)
+                .font(.system(size: isPanel ? 12 : 10.5, weight: .semibold))
+            if isPanel {
+                configuration.title
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            } else {
+                configuration.title
+                    .textCase(.uppercase)
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.66)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .font(.subheadline.weight(.semibold))
     }
 }
 
@@ -695,7 +799,7 @@ private struct FooterButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .frame(width: 30, height: 30)
-                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(isHovered ? 0.08 : 0)))
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(isHovered ? 0.06 : 0)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -709,7 +813,7 @@ private struct FooterButton: View {
 /// Orange title bar: the selected day and its week total in the middle, then
 /// Today and keyboard help on the right. The traffic lights sit on the left.
 private struct TitleBar: View {
-    static let barTrailing = Color(red: 0.92, green: 0.32, blue: 0.16)
+    static let barColor = Color.harvestOrange
     @Environment(TimeTracker.self) private var tracker
     @Binding var selectedDay: LocalDate
     @State private var showingHelp = false
@@ -723,7 +827,7 @@ private struct TitleBar: View {
                         .font(.system(size: 13, weight: .semibold))
                     Text("Week \(TimeFormat.hoursMinutes(tracker.weekSeconds(containing: selectedDay, at: context.date)))")
                         .font(.system(size: 12, weight: .medium).monospacedDigit())
-                        .opacity(0.75)
+                        .opacity(0.8)
                 }
                 .lineLimit(1)
 
@@ -739,7 +843,7 @@ private struct TitleBar: View {
                                 Image(systemName: "arrow.up")
                                     .font(.system(size: 9, weight: .bold))
                                     .padding(1.5)
-                                    .background(Circle().fill(Self.barTrailing))
+                                    .background(Circle().fill(Self.barColor))
                                     .offset(x: 4, y: 4)
                             }
                     }
@@ -760,19 +864,14 @@ private struct TitleBar: View {
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            LinearGradient(
-                colors: [Color(red: 0.95, green: 0.45, blue: 0.20), Self.barTrailing],
-                startPoint: .leading, endPoint: .trailing
-            )
-        )
+        .background(Self.barColor)
     }
 }
 
 private struct TitleBarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 17, weight: .regular))
+            .font(.system(size: 15, weight: .regular))
             .frame(width: 30, height: 28)
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.6 : 1)

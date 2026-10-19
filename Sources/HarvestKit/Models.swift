@@ -69,12 +69,15 @@ public struct HarvestUser: Codable, Sendable, Equatable {
     public let firstName: String
     public let lastName: String
     public let email: String
+    /// Hours a week you're expected to track, in seconds (Harvest's default is 35h).
+    public let weeklyCapacity: Int?
 
-    public init(id: Int, firstName: String, lastName: String, email: String) {
+    public init(id: Int, firstName: String, lastName: String, email: String, weeklyCapacity: Int? = nil) {
         self.id = id
         self.firstName = firstName
         self.lastName = lastName
         self.email = email
+        self.weeklyCapacity = weeklyCapacity
     }
 }
 
@@ -184,11 +187,33 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
     public let timerStartedAt: Date?
     public let createdAt: Date
     public let updatedAt: Date
+    /// Harvest won't let a locked entry change: it's approved, invoiced, or
+    /// in a period an admin has closed.
+    public let isLocked: Bool?
+    /// Harvest's own wording for why, e.g. "Item Invoiced and Approved".
+    public let lockedReason: String?
+    /// Approved through timesheet approval.
+    public let isClosed: Bool?
+    /// On an invoice.
+    public let isBilled: Bool?
+    public let invoice: InvoiceRef?
+
+    public struct InvoiceRef: Codable, Hashable, Sendable {
+        public let id: Int
+        public let number: String?
+
+        public init(id: Int, number: String?) {
+            self.id = id
+            self.number = number
+        }
+    }
 
     public init(
         id: Int, spentDate: LocalDate, project: NamedRef, task: NamedRef, client: NamedRef?,
         hours: Double, hoursWithoutTimer: Double? = nil, notes: String? = nil, isRunning: Bool = false,
-        timerStartedAt: Date? = nil, createdAt: Date = .now, updatedAt: Date = .now
+        timerStartedAt: Date? = nil, createdAt: Date = .now, updatedAt: Date = .now,
+        isLocked: Bool? = nil, lockedReason: String? = nil, isClosed: Bool? = nil, isBilled: Bool? = nil,
+        invoice: InvoiceRef? = nil
     ) {
         self.id = id
         self.spentDate = spentDate
@@ -202,6 +227,11 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
         self.timerStartedAt = timerStartedAt
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.isLocked = isLocked
+        self.lockedReason = lockedReason
+        self.isClosed = isClosed
+        self.isBilled = isBilled
+        self.invoice = invoice
     }
 
     public var key: TaskKey { TaskKey(projectID: project.id, taskID: task.id) }
@@ -211,4 +241,37 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
         guard isRunning, let started = timerStartedAt else { return hours * 3600 }
         return (hoursWithoutTimer ?? 0) * 3600 + max(0, now.timeIntervalSince(started))
     }
+}
+
+extension TimeEntry {
+    /// Why Harvest won't let this entry change, in words for the person
+    /// looking at it; nil when it can be edited.
+    public var lock: EntryLock? {
+        guard isLocked == true || isBilled == true || isClosed == true else { return nil }
+        if isBilled == true {
+            let number = invoice?.number.map { "invoice #\($0)" } ?? "an invoice"
+            return EntryLock(
+                kind: .invoiced, title: "Invoiced",
+                detail: "This time is on \(number), so Harvest won't let it change. To edit it, ask an admin to take it off the invoice."
+            )
+        }
+        if isClosed == true {
+            return EntryLock(
+                kind: .approved, title: "Approved",
+                detail: "This timesheet has been approved, so Harvest won't let it change. To edit it, ask whoever approved it to unapprove it."
+            )
+        }
+        return EntryLock(
+            kind: .locked, title: "Locked",
+            detail: (lockedReason.map { "Harvest says: \($0)." } ?? "An admin has locked this time period.")
+                + " To edit it, ask an admin to unlock it."
+        )
+    }
+}
+
+public struct EntryLock: Hashable, Sendable {
+    public enum Kind: Sendable { case invoiced, approved, locked }
+    public let kind: Kind
+    public let title: String
+    public let detail: String
 }

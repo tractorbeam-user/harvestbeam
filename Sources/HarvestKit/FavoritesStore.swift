@@ -56,13 +56,18 @@ public final class FavoritesStore {
         persist()
     }
 
-    /// Puts `key` just before `target` (or at the end when nil), starring it
-    /// if it isn't yet. Used by drag and drop.
+    /// Drops `key` on `target` (or at the end when nil), starring it if it
+    /// isn't yet. Used by drag and drop: a favorite dragged later in the list
+    /// lands just after the tile it's dropped on, one dragged earlier just
+    /// before it, so you can move a tile either way, even one step.
     public func place(_ key: TaskKey, before target: TaskKey?) {
         guard key != target else { return }
+        let from = keys.firstIndex(of: key)
+        let targetIndex = target.flatMap { keys.firstIndex(of: $0) }
         keys.removeAll { $0 == key }
         if let target, let index = keys.firstIndex(of: target) {
-            keys.insert(key, at: index)
+            let movesLater = from != nil && targetIndex != nil && from! < targetIndex!
+            keys.insert(key, at: movesLater ? index + 1 : index)
         } else {
             keys.append(key)
         }

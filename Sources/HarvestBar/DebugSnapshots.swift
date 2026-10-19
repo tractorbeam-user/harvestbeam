@@ -34,6 +34,13 @@ enum DebugSnapshots {
             write(entryWindow, to: url.appendingPathComponent("6-new-entry-\(suffix).png"))
             entryWindow.close()
 
+            let today = LocalDate()
+            let locksWindow = makeWindow(debugShortDayAndLocks(today: today.adding(days: -3), lockedDay: today.adding(days: -10))
+                .environment(tracker).frame(width: 440, height: 680, alignment: .top), appearance: appearance)
+            await settle()
+            write(locksWindow, to: url.appendingPathComponent("5-short-day-locks-\(suffix).png"))
+            locksWindow.close()
+
             let summaryWindow = makeWindow(debugTimeSummary().environment(tracker).frame(width: 300, height: 200), appearance: appearance)
             summaryWindow.setContentSize(NSSize(width: 300, height: 200))
             await settle()

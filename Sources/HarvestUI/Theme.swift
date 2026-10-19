@@ -9,23 +9,56 @@ public extension ShapeStyle where Self == Color {
 }
 
 extension Color {
-    /// Opaque window background; tiles sit on top of it.
+    /// Opaque window background; tiles sit on top of it. On the Mac it's a
+    /// barely-there warm grey, so white cards lift off it (warm near-black in
+    /// dark mode).
     static var panelBackground: Color {
         #if os(macOS)
-        Color(nsColor: .windowBackgroundColor)
+        .adaptive(light: 0xF8F7F5, dark: 0x1F1B18)
         #else
         Color(uiColor: .systemGroupedBackground)
         #endif
     }
 
-    /// Opaque tile and card fill, one step lighter (or darker) than the panel.
+    /// Opaque tile and card fill: white in light mode, one warm step up in
+    /// dark mode.
     static var tileBackground: Color {
         #if os(macOS)
-        Color(nsColor: .controlBackgroundColor)
+        .adaptive(light: 0xFFFFFF, dark: 0x29241F)
         #else
         Color(uiColor: .secondarySystemGroupedBackground)
         #endif
     }
+
+    /// The 1pt line around tiles, cards and the search box.
+    static var hairline: Color {
+        #if os(macOS)
+        .adaptive(light: 0x1C1916, dark: 0xEEE9E4, alpha: 0.09)
+        #else
+        Color.primary.opacity(0.08)
+        #endif
+    }
+
+    /// Pale orange behind Favorites, the running entry and soft buttons.
+    static var orangeSoft: Color {
+        #if os(macOS)
+        .adaptive(light: 0xFA5D00, dark: 0xFF6614, alpha: 0.1, darkAlpha: 0.14)
+        #else
+        Color.harvestOrange.opacity(0.1)
+        #endif
+    }
+
+    #if os(macOS)
+    static func adaptive(light: UInt32, dark: UInt32, alpha: CGFloat = 1, darkAlpha: CGFloat? = nil) -> Color {
+        func color(_ hex: UInt32, _ alpha: CGFloat) -> NSColor {
+            NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                    blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+        }
+        return Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? color(dark, darkAlpha ?? alpha) : color(light, alpha)
+        })
+    }
+    #endif
 }
 
 enum Metrics {
@@ -42,8 +75,10 @@ enum Metrics {
     static let padding: CGFloat = 16
     static let badgeSize: CGFloat = 34
     #endif
-    static let tileCorner: CGFloat = 16
-    static let cardCorner: CGFloat = 20
+    static let tileCorner: CGFloat = 12
+    static let cardCorner: CGFloat = 14
+    /// Favorites' orange panel.
+    static let panelCorner: CGFloat = 16
 }
 
 /// Round button with a glyph, used for Pause/Resume.

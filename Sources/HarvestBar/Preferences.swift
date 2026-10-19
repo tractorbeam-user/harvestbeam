@@ -87,6 +87,7 @@ struct GeneralPrefs: View {
     @AppStorage(Prefs.remindNoTimerAt) private var remindNoTimerAt = 600
     @AppStorage(Prefs.remindLongTimer) private var remindLongTimer = false
     @AppStorage(Prefs.remindLongTimerHours) private var remindLongTimerHours = 4
+    @AppStorage(ShortDays.enabledKey) private var nudgesShortDays = true
     @State private var openAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -126,6 +127,9 @@ struct GeneralPrefs: View {
                     .disabled(!remindLongTimer)
                 }
                 Text("Reminders are macOS notifications from Harvestbeam itself; click one to open the window. Turning one on asks for permission once.")
+                    .prefsNote()
+                Toggle("Point out short days earlier in the week", isOn: $nudgesShortDays)
+                Text("A day under three quarters of your usual day (your Harvest weekly capacity ÷ 5) gets a dot in the week strip and a note above your entries.")
                     .prefsNote()
             }
             .onChange(of: remindNoTimer) { _, on in if on { Notifier.requestPermission() } }

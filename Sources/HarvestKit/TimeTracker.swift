@@ -34,6 +34,9 @@ public final class TimeTracker {
     public var errorMessage: String?
     /// Bumped whenever the panel opens so the search field can grab focus.
     public private(set) var focusRequest = 0
+    /// Whether the latest `focusRequest` should put you in the search box.
+    /// ⌥H does, so you can type straight away; a menu bar click doesn't.
+    public private(set) var focusRequestWantsSearch = true
 
     public let favorites: FavoritesStore
     public let isDemo: Bool
@@ -187,7 +190,8 @@ public final class TimeTracker {
     // MARK: Lifecycle
 
     /// Call when the panel or app comes to the front.
-    public func didAppear() {
+    public func didAppear(focusSearch: Bool = true) {
+        focusRequestWantsSearch = focusSearch
         focusRequest += 1
         Task { await refresh() }
     }

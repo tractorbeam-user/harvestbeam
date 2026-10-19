@@ -48,7 +48,7 @@ struct SearchResultsList: View {
             }
             .padding(5)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.tileBackground))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.07)))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.hairline))
         }
     }
 

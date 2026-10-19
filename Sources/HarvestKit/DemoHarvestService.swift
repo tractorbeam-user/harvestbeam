@@ -59,11 +59,16 @@ public actor DemoHarvestService: HarvestService {
             let totalWeight = pattern.reduce(0) { $0 + $1.3 }
             for (projectID, task, client, weight) in pattern where random() < weight / totalWeight * 3 {
                 let stamp = day.date().addingTimeInterval(9 * 3600 + random() * 8 * 3600)
+                // Older Acme work is invoiced; last week's is approved.
+                let invoiced = daysAgo >= 14 && client == acme
+                let approved = !invoiced && (7..<14).contains(daysAgo)
                 generated.append(TimeEntry(
                     id: id, spentDate: day,
                     project: NamedRef(id: projectID, name: projectNames[projectID]!), task: task, client: client,
                     hours: (random() * 3 + 0.25).rounded(toPlaces: 2),
-                    createdAt: stamp, updatedAt: stamp
+                    createdAt: stamp, updatedAt: stamp,
+                    isLocked: invoiced || approved, isClosed: approved, isBilled: invoiced,
+                    invoice: invoiced ? .init(id: 1042, number: "1042") : nil
                 ))
                 id += 1
             }
@@ -79,7 +84,7 @@ public actor DemoHarvestService: HarvestService {
     }
 
     public func currentUser() async throws -> HarvestUser {
-        HarvestUser(id: 1, firstName: "Demo", lastName: "User", email: "demo@example.com")
+        HarvestUser(id: 1, firstName: "Demo", lastName: "User", email: "demo@example.com", weeklyCapacity: 40 * 3600)
     }
 
     public func company() async throws -> Company {

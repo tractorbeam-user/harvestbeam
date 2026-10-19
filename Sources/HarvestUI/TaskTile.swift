@@ -90,13 +90,15 @@ struct TaskTile: View {
                 if let code {
                     Text(code)
                         .font(.system(size: codeFont, weight: .medium).monospaced())
-                        .opacity(0.55)
+                        .opacity(isRunning ? 0.82 : 0.5)
+                        .padding(.bottom, 1)
                 }
-                Text(name)
+                // Hover slides a name that doesn't fit across to show the rest.
+                MarqueeText(text: name, isActive: isHovered)
                     .font(.system(size: titleFont, weight: .semibold))
-                Text(task.task.name)
+                MarqueeText(text: task.task.name, isActive: isHovered)
                     .font(.system(size: subtitleFont))
-                    .opacity(0.7)
+                    .opacity(isRunning ? 0.82 : 0.6)
             }
             .lineLimit(1)
             Spacer(minLength: 0)
@@ -115,9 +117,9 @@ struct TaskTile: View {
             if showsStar && (isHovered || isFavorite) { favoriteButton }
             actionIndicator
         }
-        .padding(.leading, 11)
-        .padding(.trailing, 7)
-        .padding(.vertical, 6)
+        .padding(.leading, 12)
+        .padding(.trailing, 9)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: Metrics.tileHeight, maxHeight: .infinity, alignment: .leading)
         .foregroundStyle(isRunning ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
     }
@@ -131,11 +133,12 @@ struct TaskTile: View {
             } else {
                 Image(systemName: "play.fill")
                     .foregroundStyle(isHovered || isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.harvestOrange))
-                    .background(Circle().fill(Color.harvestOrange.opacity(isHovered || isSelected ? 1 : 0.13)).frame(width: indicatorSize, height: indicatorSize))
+                    .background(Circle().fill(isHovered || isSelected ? Color.harvestOrange : Color.orangeSoft).frame(width: indicatorSize, height: indicatorSize))
             }
         }
         .font(.system(size: 9, weight: .bold))
         .frame(width: indicatorSize, height: indicatorSize)
+        .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 
     private var favoriteButton: some View {
@@ -161,9 +164,9 @@ struct TaskTile: View {
 
     #if os(macOS)
     private let codeFont: CGFloat = 10.5
-    private let titleFont: CGFloat = 12
+    private let titleFont: CGFloat = 12.5
     private let subtitleFont: CGFloat = 11.5
-    private let indicatorSize: CGFloat = 24
+    private let indicatorSize: CGFloat = 28
     #else
     private let codeFont: CGFloat = 12
     private let titleFont: CGFloat = 15
@@ -178,11 +181,12 @@ private struct TileChrome: ViewModifier {
     let isHovered: Bool
 
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
+        // Flat, like the landing page: a hairline, no shadow. Hover only
+        // darkens the line a touch.
+        let shape = RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
         content
             .background(shape.fill(isRunning ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(Color.tileBackground)))
-            .overlay(shape.strokeBorder(border, lineWidth: isSelected ? 2 : 1))
-            .shadow(color: .black.opacity(isHovered ? 0.10 : 0.04), radius: isHovered ? 6 : 2, y: isHovered ? 2 : 1)
+            .overlay(shape.strokeBorder(border, lineWidth: isSelected ? 1.5 : 1))
             .contentShape(shape)
             .animation(.easeOut(duration: 0.15), value: isHovered)
     }
@@ -190,6 +194,6 @@ private struct TileChrome: ViewModifier {
     private var border: Color {
         if isSelected { return .harvestOrange }
         if isRunning { return .clear }
-        return Color.primary.opacity(isHovered ? 0.16 : 0.07)
+        return isHovered ? Color.primary.opacity(0.18) : .hairline
     }
 }

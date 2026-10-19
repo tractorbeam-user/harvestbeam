@@ -153,7 +153,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.isOpaque = true
-        panel.backgroundColor = .windowBackgroundColor
+        // The same near-white (warm dark) surface the SwiftUI content paints, so
+        // resizing never flashes the system grey.
+        panel.backgroundColor = NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? NSColor(srgbRed: 0x1F / 255, green: 0x1B / 255, blue: 0x18 / 255, alpha: 1)
+                : NSColor(srgbRed: 0xF8 / 255, green: 0xF7 / 255, blue: 0xF5 / 255, alpha: 1)
+        }
         panel.contentMinSize = NSSize(width: 340, height: 440)
         // .fullScreenNone makes the green button zoom instead of going full screen.
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .fullScreenNone]
@@ -207,7 +213,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         if panel.isVisible && !panel.isMiniaturized {
             hidePanel()
         } else {
-            showPanel()
+            // Opened with the mouse, so don't grab the keyboard for the ask box.
+            showPanel(focusSearch: false)
         }
     }
 
@@ -241,7 +248,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
     }
 
-    func showPanel() {
+    func showPanel(focusSearch: Bool = true) {
         if !hasPlacedPanel {
             placeBelowStatusItem()
             hasPlacedPanel = true
@@ -258,7 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKeyAndOrderFront(nil)
-        tracker.didAppear()
+        tracker.didAppear(focusSearch: focusSearch)
     }
 
     func hidePanel() {
