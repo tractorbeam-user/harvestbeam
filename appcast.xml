@@ -7,6 +7,16 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam 1.3.1</title>
+      <pubDate>Mon, 26 Oct 2026 23:35:41 +0000</pubDate>
+      <sparkle:version>86</sparkle:version>
+      <sparkle:shortVersionString>1.3.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[**A quieter ask box:** Recent and Suggested wait until you click into the ask box or press ↓, instead of opening with the window.]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.3.1</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.3.1/Harvestbeam-1.3.1.dmg" type="application/octet-stream" sparkle:edSignature="tqaF/FMREp7CeBW653MvPgH3GlsKbiCtYjkjrmUpDNmohRX1+/VtTATBjdPE6imBMkVZHe0SUmmeL5HyFxmpDQ==" length="8878526" />
+    </item>
+    <item>
       <title>Harvestbeam 1.4.0-beta.1</title>
       <pubDate>Mon, 26 Oct 2026 22:57:18 +0000</pubDate>
       <sparkle:version>82</sparkle:version>
