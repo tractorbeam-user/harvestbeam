@@ -7,6 +7,17 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam 1.2.1</title>
+      <pubDate>Mon, 26 Oct 2026 16:53:20 +0000</pubDate>
+      <sparkle:version>78</sparkle:version>
+      <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[**Fixes:** the New Time Entry project list shows every project, not just the first 80.
+- Typing a new time on a running entry and pressing Return stops the timer at that time instead of restarting it.]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.2.1</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.2.1/Harvestbeam-1.2.1.dmg" type="application/octet-stream" sparkle:edSignature="gSC1dLJ+87Q6n11alUsXUVHstuEsXl5jQNQhxJI/7RE3qh/DELbTT9KjAz3fLn7DK44oMnoSOuBUkEhlguuhDw==" length="8356636" />
+    </item>
+    <item>
       <title>Harvestbeam 1.2.0</title>
       <pubDate>Mon, 19 Oct 2026 22:19:11 +0000</pubDate>
       <sparkle:version>76</sparkle:version>
