@@ -7,6 +7,19 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam 1.3.0</title>
+      <pubDate>Mon, 26 Oct 2026 22:56:14 +0000</pubDate>
+      <sparkle:version>81</sparkle:version>
+      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[**Your week, with your meetings:** the Week Calendar (⌘K) shows your week in columns with your calendar's meetings beside your time.
+- Each meeting is matched to a project from its title, code or client. Log one in a click, or all at once.
+- Recent and Suggested drop down from the ask box, each with why it's there.
+- Log meetings ahead of time, plus a round of fixes from a full review of the app.]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.3.0</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.3.0/Harvestbeam-1.3.0.dmg" type="application/octet-stream" sparkle:edSignature="XciYUFYXBBTpEsawl7q0Wu/f3Hnz2vM7jp/xZAYWLR/MldgahHzCqRNj1iia9QCBSxMO1Q879A5XKOnUrC0jBA==" length="8865931" />
+    </item>
+    <item>
       <title>Harvestbeam 1.2.1</title>
       <pubDate>Mon, 26 Oct 2026 16:53:20 +0000</pubDate>
       <sparkle:version>78</sparkle:version>
