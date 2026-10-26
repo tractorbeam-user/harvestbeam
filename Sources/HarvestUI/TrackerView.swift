@@ -161,7 +161,8 @@ struct TrackerView: View {
                 } else {
                     searchFocused = false
                 }
-                askListOpen = asksFirst && tracker.focusRequestWantsSearch
+                // The list waits to be asked for: a click in the box, or ↓.
+                askListOpen = false
                 // Opening the window on a new day goes straight to it.
                 let today = LocalDate()
                 if today != lastToday {
@@ -181,10 +182,18 @@ struct TrackerView: View {
                 }
             }
             .onChange(of: layoutRaw) { query = ""; isSearchOpen = false }
+            #if os(macOS)
+            // A click in the ask box opens Recent and Suggested; just opening
+            // the window, which also puts you in the box, doesn't.
+            .onReceive(NotificationCenter.default.publisher(for: .askFieldClicked)) { _ in
+                guard asksFirst, !isSearching else { return }
+                selection = nil
+                askListOpen = true
+            }
+            #endif
             .onChange(of: searchFocused) { _, focused in
                 if !focused && query.isEmpty { withAnimation(.snappy(duration: 0.2)) { isSearchOpen = false } }
                 if focused {
-                    askListOpen = true
                     if !isSearching { selection = nil }
                 } else if !isHoveringAskList {
                     askListOpen = false
@@ -463,6 +472,12 @@ struct TrackerView: View {
                     if large && query.isEmpty { RotatingPrompt(examples: askExamples).allowsHitTesting(false) }
                 }
                 .onKeyPress(.downArrow) {
+                    // ↓ in the empty box opens the list.
+                    if large, !isSearching, !listsTasks {
+                        selection = nil
+                        askListOpen = true
+                        return .handled
+                    }
                     // The list highlights its first row before you press anything.
                     if listsTasks, selection == nil { selection = flat.dropFirst().first?.key ?? flat.first?.key; return .handled }
                     moveSelection(by: isSearching || listsTasks ? 1 : columnCount, in: flat)

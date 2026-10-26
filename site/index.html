@@ -638,7 +638,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   html { scroll-behavior: auto; }
 }
 </style>
-<link rel="stylesheet" href="demo.css?v=1.3.3">
+<link rel="stylesheet" href="demo.css?v=1.3.4">
 </head>
 <body>
 <header class="menubar" aria-label="A menu bar with Harvestbeam's timer">
@@ -834,7 +834,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
             <button type="button" class="it" data-i="3"><span><b>Internal</b> · Admin</span><em class="s">usually Mondays</em></button>
           </span>
         </span></div>
-        <div class="txt"><h3>Recent and Suggested, from the ask box</h3><p>Press ⌥H or click the ask box and they drop down, each with why it's there: when you last did it, your Monday habit, the meeting about to start. ↑↓ and Return start one.</p></div>
+        <div class="txt"><h3>Recent and Suggested, from the ask box</h3><p>Click into the ask box, or press ↓ in it, and they drop down, each with why it's there: when you last did it, your Monday habit, the meeting about to start. ↑↓ and Return start one.</p></div>
       </div>
 <div class="spec">
         <div class="mini"><span class="toast" id="b-idle"><span data-b="idle-text">Away for <b class="num">0:42</b></span><span class="sep"></span><button type="button" class="act" data-b="idle-rm">Remove</button><button type="button" class="act dim" data-b="idle-keep">Keep</button></span></div>
@@ -900,7 +900,16 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <!-- Major features only, newest first. Add an entry with each release. -->
       <ol>
         <li>
-          <div class="ver">1.3<small>Oct 26, 2026</small><span class="new">Latest</span></div>
+          <div class="ver">1.3.1<small>Oct 26, 2026</small><span class="new">Latest</span></div>
+          <div>
+            <h3>A quieter ask box</h3>
+            <ul>
+              <li>Recent and Suggested wait until you click into the ask box or press ↓, instead of opening with the window</li>
+            </ul>
+          </div>
+        </li>
+        <li>
+          <div class="ver">1.3<small>Oct 26, 2026</small></div>
           <div>
             <h3>Your week, with your meetings</h3>
             <ul>
@@ -969,11 +978,11 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <p class="sub">Automatic tracking, in the spirit of Toggl: Harvestbeam notices what you're working on and fills in the gaps. Each feature is off until you switch it on in Preferences → Tracking, and what it sees stays on your Mac.</p>
       </div>
       <div class="get">
-        <a class="button" href="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.4.0-beta.1/Harvestbeam-1.4.0-beta.1.dmg">
+        <a class="button" href="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.4.0-beta.2/Harvestbeam-1.4.0-beta.2.dmg">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a.9.9 0 0 1 .9.9v6.9l2.3-2.3a.9.9 0 1 1 1.3 1.3L8.6 12.1a.9.9 0 0 1-1.2 0L3.5 8.2a.9.9 0 1 1 1.3-1.3l2.3 2.3V2.4a.9.9 0 0 1 .9-.9ZM2.5 13h11a.9.9 0 0 1 0 1.8h-11a.9.9 0 0 1 0-1.8Z"/></svg>
           Download the beta
         </a>
-        <small>Replaces your copy and keeps your sign-in. <a class="textlink" style="font-size: 12.5px" href="https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.4.0-beta.1">Release notes →</a></small>
+        <small>Replaces your copy and keeps your sign-in. <a class="textlink" style="font-size: 12.5px" href="https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.4.0-beta.2">Release notes →</a></small>
       </div>
     </div>
     <ul class="beta-grid">
@@ -1476,7 +1485,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
   requestAnimationFrame(frame);
 })();
 </script>
-<script src="demo.js?v=1.3.3" defer></script>
-<script src="bento.js?v=1.3.3" defer></script>
+<script src="demo.js?v=1.3.4" defer></script>
+<script src="bento.js?v=1.3.4" defer></script>
 </body>
 </html>

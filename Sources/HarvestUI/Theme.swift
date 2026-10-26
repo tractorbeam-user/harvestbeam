@@ -159,6 +159,12 @@ public extension EnvironmentValues {
     }
 }
 
+public extension Notification.Name {
+    /// The Mac window saw a click in a text field (its ask box), which opens
+    /// Recent and Suggested.
+    static let askFieldClicked = Notification.Name("HarvestUI.askFieldClicked")
+}
+
 /// Counts open popovers so the window behind them can dim, like Harvest's.
 @MainActor @Observable
 final class PopoverDimmer {

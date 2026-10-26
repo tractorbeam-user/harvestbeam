@@ -413,7 +413,9 @@
   // Events
   const ask = $("#dm-ask");
   ask.addEventListener("input", () => { S.query = ask.value; S.picked = null; S.sel = quickPlan().length ? -1 : 0; render(); rotate(); });
-  ask.addEventListener("focus", () => { S.drop = true; S.dsel = 0; renderDrop(); });
+  // Like the app: the list opens on a click in the box or ↓, not when the
+  // window opens and puts you in the box.
+  ask.addEventListener("mousedown", () => { S.drop = true; S.dsel = 0; renderDrop(); });
   ask.addEventListener("blur", () => { S.drop = false; renderDrop(); });
   const drop = $("#dm-drop");
   // Keep the box focused while clicking the list, so a click picks a row.
@@ -432,6 +434,7 @@
       // Escape closes the list first; the next one puts the window away.
       if (ev.key === "Escape") { ev.preventDefault(); S.drop = false; return renderDrop(); }
     }
+    if (ev.key === "ArrowDown" && !S.drop && !S.query.trim()) { ev.preventDefault(); S.drop = true; S.dsel = 0; return renderDrop(); }
     const flat = pickable(results());
     const floor = quickPlan().length ? -1 : 0;
     if (ev.key === "ArrowDown" && flat.length) { S.sel = Math.min(flat.length - 1, S.sel + 1); ev.preventDefault(); render(); }

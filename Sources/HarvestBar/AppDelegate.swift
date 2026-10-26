@@ -511,10 +511,13 @@ final class TrackerPanel: NSPanel {
     /// typing in, like clicking off a field on a web page. The click itself
     /// still goes through.
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .leftMouseDown, firstResponder is NSText,
-           let hit = contentView?.hitTest(contentView!.convert(event.locationInWindow, from: nil)),
-           !Self.isInTextField(hit) {
-            makeFirstResponder(nil)
+        if event.type == .leftMouseDown,
+           let hit = contentView?.hitTest(contentView!.convert(event.locationInWindow, from: nil)) {
+            if Self.isInTextField(hit) {
+                NotificationCenter.default.post(name: .askFieldClicked, object: nil)
+            } else if firstResponder is NSText {
+                makeFirstResponder(nil)
+            }
         }
         super.sendEvent(event)
     }
