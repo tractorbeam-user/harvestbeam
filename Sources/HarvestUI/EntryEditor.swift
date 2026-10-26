@@ -82,7 +82,7 @@ struct NewEntryEditor: View {
                         .background(fieldBackground)
                         .hoverOutline()
                         .focused($hoursFocused)
-                        .help(isTimerRunning ? "Change the time; the timer keeps running from there"
+                        .help(isTimerRunning ? "Change the time to stop the timer at it"
                               : startsTimer || (entry == nil && isToday) ? "h:mm or decimal. Leave empty to start a timer." : "h:mm or decimal")
                 }
             }
@@ -309,7 +309,7 @@ private struct ProjectPicker: View {
                 if words.allSatisfy(haystack.contains) { result.append((group.name, task)) }
             }
         }
-        return Array(result.prefix(80))
+        return result
     }
 
     var body: some View {

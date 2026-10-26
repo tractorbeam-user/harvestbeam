@@ -312,14 +312,13 @@ public final class TimeTracker {
     public func updateEntry(_ entry: TimeEntry, task: TrackableTask, notes: String, hours: Double?) async {
         guard let service else { return }
         do {
-            // Harvest won't set hours on a running timer, so when the time
-            // changed: stop it, set the hours, and start it again.
+            // Typing a new time on a running timer settles it: stop the timer
+            // (Harvest won't set hours on a running one) and keep the new time.
             if entry.isRunning, let hours, abs(hours - entry.elapsed() / 3600) > 1.0 / 120 {
                 let stopped = try await service.stopTimer(id: entry.id)
-                let updated = try await service.updateEntry(
+                upsert(try await service.updateEntry(
                     id: stopped.id, projectID: task.project.id, taskID: task.task.id, notes: notes, hours: hours
-                )
-                upsert(try await service.restartTimer(id: updated.id))
+                ))
             } else {
                 upsert(try await service.updateEntry(
                     id: entry.id, projectID: task.project.id, taskID: task.task.id,
