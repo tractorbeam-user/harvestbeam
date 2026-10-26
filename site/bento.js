@@ -6,6 +6,7 @@
   const PAUSE = '<svg viewBox="0 0 10 10"><rect x="2" y="1.5" width="2.2" height="7" rx=".5"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5"/></svg>';
   const hm = (s) => `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}`;
   const later = (ms, fn) => setTimeout(fn, ms);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // Menu bar: the square pauses and resumes; the text cycles how much shows.
   const mb = $("b-mb");
@@ -119,22 +120,61 @@
     }));
   }
 
-  // Recent and Suggested: star a recent task; dismiss a suggestion.
+  // Recent and Suggested in the ask box's list: the highlight walks down as
+  // if you were pressing ↓; hover or click picks a row and "starts" it.
   const rs = $("b-rs");
   if (rs) {
-    rs.querySelectorAll('[data-b="star"]').forEach((b) => b.addEventListener("click", () => {
-      b.classList.toggle("on"); b.textContent = b.classList.contains("on") ? "★" : "☆";
-    }));
-    const pool = [["Data Platform", "Meetings"], ["Internal", "Admin"], ["Context Launch", "Meetings"], ["Mobile App", "QA & Testing"], ["Website Redesign", "Meetings"]];
-    let next = 0;
-    const sug = q(rs, "sug");
-    const card = () => { const [n, t] = pool[next++ % pool.length]; return `<span class="t sug"><b>${n}</b><span>${t}</span><button type="button" class="x" aria-label="Remove suggestion">×</button></span>`; };
-    sug.innerHTML = card() + card();
-    sug.addEventListener("click", (e) => {
-      const x = e.target.closest(".x"); if (!x) return;
-      const t = x.parentElement;
-      t.classList.add("out");
-      later(200, () => { t.outerHTML = card(); });
+    const rows = [...rs.querySelectorAll(".it")];
+    let at = 0, hovering = false;
+    const show = (i) => { at = i; rows.forEach((r, j) => r.classList.toggle("on", j === i)); };
+    rows.forEach((r, i) => {
+      r.addEventListener("mouseenter", () => { hovering = true; show(i); });
+      r.addEventListener("click", () => {
+        const em = r.querySelector("em"), was = em.textContent;
+        em.textContent = "started";
+        later(1200, () => { em.textContent = was; });
+      });
+    });
+    rs.addEventListener("mouseleave", () => { hovering = false; });
+    if (!reduce) setInterval(() => { if (!hovering) show((at + 1) % rows.length); }, 1500);
+  }
+
+  // Week Calendar: click a blue meeting to log it (it turns orange and the
+  // day's total grows), or log them all; it resets after a while to try again.
+  const wk = $("b-wk");
+  if (wk) {
+    const all = q(wk, "wk-all");
+    const meetings = [...wk.querySelectorAll(".blk.m")];
+    const totals = [0, 1, 2].map((d) => q(wk, `wk-t${d}`));
+    const start = totals.map((t) => t.textContent);
+    const fmt = (s) => `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}`;
+    const secs = (t) => { const [h, m] = t.split(":").map(Number); return h * 3600 + m * 60; };
+    const original = meetings.map((m) => m.innerHTML);
+    let resetTimer;
+    const update = () => {
+      const left = meetings.filter((m) => m.classList.contains("m"));
+      const sum = left.reduce((t, m) => t + +m.dataset.s, 0);
+      all.textContent = left.length ? `Log ${left.length} meeting${left.length === 1 ? "" : "s"} · ${fmt(sum)}` : "All logged";
+      all.disabled = !left.length;
+      clearTimeout(resetTimer);
+      if (!left.length) resetTimer = later(5000, reset);
+    };
+    const log = (m) => {
+      if (!m.classList.contains("m")) return;
+      m.classList.replace("m", "o");
+      m.querySelector("span").textContent = m.querySelector("span").textContent.replace("→ ", "");
+      const t = totals[+m.dataset.d];
+      t.textContent = fmt(secs(t.textContent) + +m.dataset.s);
+      update();
+    };
+    const reset = () => {
+      meetings.forEach((m, i) => { m.classList.replace("o", "m"); m.innerHTML = original[i]; });
+      totals.forEach((t, i) => { t.textContent = start[i]; });
+      update();
+    };
+    meetings.forEach((m) => m.addEventListener("click", () => log(m)));
+    all.addEventListener("click", () => {
+      meetings.filter((m) => m.classList.contains("m")).forEach((m, i) => later(180 * i, () => log(m)));
     });
   }
 

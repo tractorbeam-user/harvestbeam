@@ -74,7 +74,7 @@
       entries, selected: today, open: true, query: "", picked: null, sel: 0,
       favorites: [key(1, "Strategy"), key(0, "Development"), key(3, "Design"), key(5, "Product Design")],
       hidden: new Set(), closed: new Set(), dismissed: new Set(), nudges: true,
-      pop: null, undo: null, idCount: id,
+      pop: null, undo: null, idCount: id, drop: false, dsel: 0,
     };
   }
   S = seed();
@@ -106,6 +106,60 @@
     const extra = [key(4, "QA & Testing"), key(6, "Meetings"), key(2, "Business Development"), key(1, "Meetings")].filter((k) => !shown.has(k));
     return [...Object.keys(score).sort((a, b) => score[b] - score[a]), ...extra].filter((k, i, a) => a.indexOf(k) === i).slice(0, 4);
   };
+
+  // The ask box's list: Recent and Suggested drop down while it's empty and
+  // focused, each with why it's there, like the app.
+  const PLURAL = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+  const lastLabel = (k) => {
+    const d = Math.max(...S.entries.filter((e) => e.k === k && e.day <= today).map((e) => e.day));
+    if (!isFinite(d)) return "";
+    const ago = today - d;
+    return ago === 0 ? "today" : ago === 1 ? "yesterday" : ago < 7 ? wdName(d)
+      : ddate(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+  const habit = (k) => {
+    const days = new Set(S.entries.filter((e) => e.k === k && e.day < today && today - e.day <= 28).map((e) => e.day));
+    const same = [...days].filter((d) => ddate(d).getDay() === ddate(today).getDay()).length;
+    return same >= 2 ? `usually ${PLURAL[ddate(today).getDay()]}` : days.size >= 2 ? `${days.size}× in 4 weeks` : "";
+  };
+  function dropItems() {
+    const r = running(), runK = r && r.day === today ? r.k : null;
+    const rec = recents().filter((k) => k !== runK).map((k) => ({ k, why: lastLabel(k) }));
+    const shown = new Set(rec.map((x) => x.k));
+    const sug = [];
+    // A meeting coming up today comes first, as when the app can see your calendar.
+    const meeting = key(6, "Meetings");
+    if (meeting !== runK && !shown.has(meeting)) { shown.add(meeting); sug.push({ k: meeting, why: "meeting at 2:00 PM", sug: true }); }
+    suggested().forEach((k) => { if (k !== runK && !shown.has(k) && sug.length < 4) { shown.add(k); sug.push({ k, why: habit(k), sug: true }); } });
+    return { rec, sug, all: [...rec, ...sug] };
+  }
+  const dropOpen = () => S.drop && S.open && !S.query.trim();
+  function renderDrop() {
+    const el = $("#dm-drop");
+    if (!el) return;
+    const show = dropOpen();
+    el.hidden = !show;
+    $(".dm-scroll").classList.toggle("dim", show);
+    if (!show) return;
+    const { rec, sug, all } = dropItems();
+    S.dsel = Math.max(0, Math.min(S.dsel, all.length - 1));
+    let n = -1;
+    const row = (x) => {
+      n++;
+      const p = proj(x.k), on = n === S.dsel;
+      return `<div class="it${on ? " sel" : ""}" data-di="${n}"><span class="nm"><b>${esc(p.name)}</b> · ${esc(taskOf(x.k))} <i>${esc(p.client)}</i></span><span class="why${x.sug ? " sug" : ""}">${on ? "↩ start" : esc(x.why)}</span></div>`;
+    };
+    el.innerHTML = (rec.length ? `<div class="lb">Recent</div>${rec.map(row).join("")}` : "")
+      + (rec.length && sug.length ? '<div class="sep"></div>' : "")
+      + (sug.length ? `<div class="lb">Suggested</div>${sug.map(row).join("")}` : "")
+      + '<div class="sep"></div><div class="ft">↑↓ to choose · type to search everything</div>';
+  }
+  function startDrop(i) {
+    const it = dropItems().all[i];
+    if (!it) return;
+    S.drop = false;
+    startTask(it.k);
+  }
 
   // Timers
   function stopRunning() {
@@ -151,7 +205,7 @@
   const pickable = (rows) => rows.filter((r) => r.type !== "grp");
   function pick(r) {
     if (r.type === "proj") { S.picked = S.picked === r.i ? null : r.i; S.sel = Math.max(0, pickable(results()).findIndex((x) => x.type === "proj" && x.i === r.i)); return render(); }
-    S.query = ""; S.picked = null; S.sel = 0; $("#dm-ask").value = "";
+    S.query = ""; S.picked = null; S.sel = 0; S.drop = false; $("#dm-ask").value = "";
     startTask(key(r.i, r.t));
   }
 
@@ -190,7 +244,7 @@
   }
   function addQuick() {
     quickPlan().forEach((x) => S.entries.push({ id: S.idCount++, day: S.selected, k: key(x.p, x.t), secs: x.s, notes: "", lock: null, order: S.idCount }));
-    S.query = ""; S.sel = 0; S.picked = null; ask.value = ""; render(); rotate();
+    S.query = ""; S.sel = 0; S.picked = null; S.drop = false; ask.value = ""; render(); rotate();
   }
   function body() {
     const rows = results();
@@ -241,6 +295,7 @@
     item.querySelector(".task").style.display = r ? "" : "none";
     item.classList.toggle("on", S.open);
     $(".dm-win").classList.toggle("hidden", !S.open);
+    renderDrop();
     $("#dm-toast").innerHTML = S.undo ? `<div class="dm-toast">Deleted ${esc(proj(S.undo.e.k).name)} · ${hm(S.undo.e.secs)}<span class="sp"></span><button class="dm-pill" data-undo>Undo</button></div>` : "";
     tick();
     renderPop();
@@ -358,7 +413,25 @@
   // Events
   const ask = $("#dm-ask");
   ask.addEventListener("input", () => { S.query = ask.value; S.picked = null; S.sel = quickPlan().length ? -1 : 0; render(); rotate(); });
+  ask.addEventListener("focus", () => { S.drop = true; S.dsel = 0; renderDrop(); });
+  ask.addEventListener("blur", () => { S.drop = false; renderDrop(); });
+  const drop = $("#dm-drop");
+  // Keep the box focused while clicking the list, so a click picks a row.
+  drop.addEventListener("mousedown", (ev) => ev.preventDefault());
+  drop.addEventListener("click", (ev) => { const it = ev.target.closest("[data-di]"); if (it) startDrop(+it.dataset.di); });
+  drop.addEventListener("mousemove", (ev) => {
+    const it = ev.target.closest("[data-di]");
+    if (it && +it.dataset.di !== S.dsel) { S.dsel = +it.dataset.di; renderDrop(); }
+  });
   ask.addEventListener("keydown", (ev) => {
+    if (dropOpen()) {
+      const count = dropItems().all.length;
+      if (ev.key === "ArrowDown") { S.dsel = Math.min(count - 1, S.dsel + 1); ev.preventDefault(); return renderDrop(); }
+      if (ev.key === "ArrowUp") { S.dsel = Math.max(0, S.dsel - 1); ev.preventDefault(); return renderDrop(); }
+      if (ev.key === "Enter") { ev.preventDefault(); return startDrop(S.dsel); }
+      // Escape closes the list first; the next one puts the window away.
+      if (ev.key === "Escape") { ev.preventDefault(); S.drop = false; return renderDrop(); }
+    }
     const flat = pickable(results());
     const floor = quickPlan().length ? -1 : 0;
     if (ev.key === "ArrowDown" && flat.length) { S.sel = Math.min(flat.length - 1, S.sel + 1); ev.preventDefault(); render(); }

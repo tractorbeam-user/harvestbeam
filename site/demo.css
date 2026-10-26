@@ -288,3 +288,20 @@
 .dm-ed .fav:hover, .dm-ed .fav.on { color: var(--orange); }
 .dm-ed .fav:hover { background: var(--orange-soft); }
 .dm-ed button.b { border-radius: 99px; padding: 5px 14px; font-size: 12.5px; }
+
+/* The ask box's list: Recent and Suggested drop down while it's empty and
+   focused, like the app's. */
+.dm-drop { position: absolute; left: 12px; right: 12px; top: 90px; z-index: 5; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 36px -12px rgba(40, 20, 0, .35); padding: 5px; font-size: 12.5px; }
+.dm-drop .lb { font-size: 9.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 5px 7px 3px; }
+.dm-drop .it { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 7px; border-radius: 7px; cursor: pointer; }
+.dm-drop .it .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-drop .it .nm b { font-weight: 600; }
+.dm-drop .it .nm i { font-style: normal; color: var(--muted); }
+.dm-drop .it .why { font-size: 11px; color: var(--muted); flex: none; }
+.dm-drop .it .why.sug { color: var(--orange); }
+.dm-drop .it.sel { background: var(--orange); color: #fff; }
+.dm-drop .it.sel .nm i, .dm-drop .it.sel .why { color: rgba(255, 255, 255, .85); }
+.dm-drop .sep { height: 1px; background: var(--line); margin: 4px 2px; }
+.dm-drop .ft { font-size: 10.5px; color: var(--muted); padding: 4px 7px 2px; }
+.dm-scroll { transition: opacity .12s; }
+.dm-scroll.dim { opacity: .35; }
