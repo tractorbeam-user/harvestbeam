@@ -17,9 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     private let controlButton = NSImageView()
     private var panel: TrackerPanel!
     private var hotKey: HotKey?
+    /// Continue the last entry, or stop the timer, from anywhere.
+    private var continueHotKey: HotKey?
     private var reminders: Reminders?
     private let updates = Updates()
-    private lazy var preferences = PreferencesWindowController(tracker: tracker, updates: updates) { [weak self] in
+    private lazy var preferences = PreferencesWindowController(tracker: tracker, updates: updates, recorder: recorder) { [weak self] in
         self?.resetPanelSize()
     }
     private var ticker: Timer?
@@ -27,6 +29,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     private var lastTitle: String?
     private var hasPlacedPanel = false
     private var onboarding: OnboardingWindowController?
+    /// Made the first time it's opened.
+    private var weekCalendar: WeekCalendarWindowController?
+    /// Shared by the week calendar and the ask box's meeting suggestions.
+    private lazy var calendarStore = tracker.isDemo ? CalendarStore.demo() : CalendarStore()
+    /// What's in front: the Timeline, on-screen suggestions and the Autotracker.
+    /// Beta builds only.
+    private lazy var recorder: ActivityRecorder? = Beta.isEnabled ? ActivityRecorder(tracker: tracker) : nil
+    private var autotracker: Autotracker?
+    private var meetingLogger: MeetingAutoLogger?
     /// The app that was in front before the window opened.
     private var previousApp: NSRunningApplication?
 
@@ -65,6 +76,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
         Notifier.setDelegate(self)
         reminders = Reminders(tracker: tracker) { [weak self] idle in self?.askAboutIdleTime(idle) }
+        Notifier.registerCategories()
+        if let recorder {
+            let autotracker = Autotracker(tracker: tracker)
+            self.autotracker = autotracker
+            recorder.onTick = { [weak autotracker] context, dwell in autotracker?.tick(context, dwell: dwell) }
+            meetingLogger = MeetingAutoLogger(tracker: tracker, calendar: calendarStore)
+        }
 
         // Keep the menu bar clock ticking, and pick up timers started on the web
         // or on another device.
@@ -126,6 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         windowMenu.addItem(withTitle: "Reset Window Size", action: #selector(resetPanelSize), keyEquivalent: "0")
+        windowMenu.addItem(withTitle: "Week Calendar", action: #selector(showWeekCalendar), keyEquivalent: "k")
         windowItem.submenu = windowMenu
         main.addItem(windowItem)
 
@@ -176,7 +195,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         )
         var windowActions = actions
         windowActions.openPreferences = { [weak self] in self?.showPreferences() }
-        let host = NSHostingView(rootView: RootView().environment(tracker).environment(\.windowActions, windowActions))
+        windowActions.openWeekCalendar = { [weak self] in self?.showWeekCalendar() }
+        let host = NSHostingView(rootView: RootView().environment(tracker).environment(calendarStore)
+            .environment(recorder).environment(\.windowActions, windowActions))
         host.sizingOptions = []
         panel.contentView = host
 
@@ -271,6 +292,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     func hidePanel() {
         panel.orderOut(nil)
         tracker.errorMessage = nil
+        // The week calendar stays up on its own; only the small window goes.
+        if let week = weekCalendar?.window, week.isVisible, !week.isMiniaturized {
+            previousApp = nil
+            return
+        }
         // Hand focus straight back to whatever you were working in.
         NSApp.hide(nil)
         if let app = previousApp, !app.isTerminated { app.activate() }
@@ -283,11 +309,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         preferences.show()
     }
 
+    @objc func showWeekCalendar() {
+        if weekCalendar == nil {
+            weekCalendar = WeekCalendarWindowController(tracker: tracker, calendar: calendarStore, recorder: recorder)
+        }
+        weekCalendar?.show()
+    }
+
     /// (Re)registers the show/hide shortcut from preferences; none if cleared.
     private func registerHotKey() {
         hotKey?.invalidate()
         hotKey = HotKey.Shortcut.load().map { shortcut in
-            HotKey(keyCode: shortcut.keyCode, carbonModifiers: shortcut.carbonModifiers) { [weak self] in self?.togglePanel() }
+            HotKey(id: 1, keyCode: shortcut.keyCode, carbonModifiers: shortcut.carbonModifiers) { [weak self] in self?.togglePanel() }
+        }
+        continueHotKey?.invalidate()
+        continueHotKey = !Beta.isEnabled ? nil : HotKey.Shortcut.load("continue", default: nil).map { shortcut in
+            HotKey(id: 2, keyCode: shortcut.keyCode, carbonModifiers: shortcut.carbonModifiers) { [weak self] in
+                guard let self else { return }
+                Task { await self.tracker.continueOrStop() }
+            }
         }
     }
 
@@ -319,7 +359,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        await MainActor.run { showPanel() }
+        let content = response.notification.request.content
+        let category = content.categoryIdentifier
+        let action = response.actionIdentifier
+        let task = (content.userInfo["task"] as? String).flatMap(TaskKey.init)
+        let entryID = (content.userInfo["entry"] as? String).flatMap(Int.init)
+        await MainActor.run {
+            switch category {
+            case Notifier.autotrackCategory where action != UNNotificationDismissActionIdentifier:
+                // Start, or a click on the notification itself.
+                if let task { autotracker?.start(task) }
+            case Notifier.autoLoggedCategory where action == Notifier.undoAction:
+                if let entryID, let entry = tracker.entries.first(where: { $0.id == entryID }) {
+                    Task { await tracker.deleteEntry(entry) }
+                }
+            default:
+                showPanel()
+            }
+        }
     }
 
     /// Back to the default size, keeping the window's top-left corner put.

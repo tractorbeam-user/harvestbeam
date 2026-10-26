@@ -114,7 +114,7 @@ private struct WeekStrip: View {
             Image(systemName: systemImage)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.tertiary)
-                .frame(width: 22, height: 48)
+                .frame(width: 22, height: 38)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -131,7 +131,7 @@ private struct WeekStrip: View {
         return Button { select(day) } label: {
             // The selected day is a pale orange pill holding its letter and
             // total; today is orange wherever you are in the week.
-            VStack(spacing: 3) {
+            VStack(spacing: 1) {
                 Text(letter)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isSelected || isToday ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.secondary))
@@ -146,8 +146,8 @@ private struct WeekStrip: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(isSelected ? Color.orangeSoft : .clear))
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(isSelected ? Color.orangeSoft : .clear))
             .padding(.horizontal, 1)
             .contentShape(Rectangle())
         }
@@ -365,7 +365,7 @@ struct SoftPillButtonStyle: ButtonStyle {
 #if DEBUG
 /// For offscreen snapshots: the short-day nudge as of `today`, over a day
 /// with locked entries.
-public func debugShortDayAndLocks(today: LocalDate, lockedDay: LocalDate) -> some View {
+@MainActor public func debugShortDayAndLocks(today: LocalDate, lockedDay: LocalDate) -> some View {
     VStack(spacing: 12) {
         ShortDayNudge(selectedDay: .constant(today), today: today)
         DayEntriesList(day: lockedDay)
@@ -379,7 +379,7 @@ public func debugShortDayAndLocks(today: LocalDate, lockedDay: LocalDate) -> som
 #endif
 
 /// Why an entry can't be edited, and where to go about it.
-private struct LockExplanation: View {
+struct LockExplanation: View {
     @Environment(TimeTracker.self) private var tracker
     @Environment(\.openURL) private var openURL
     let lock: EntryLock

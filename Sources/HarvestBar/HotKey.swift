@@ -12,6 +12,8 @@ final class HotKey {
     enum Mode { case carbon, eventTap, needsAccessibility }
 
     private(set) var mode: Mode = .needsAccessibility
+    /// Tells this shortcut's Carbon events apart from another HotKey's.
+    private let id: UInt32
     private let keyCode: UInt32
     private let carbonModifiers: UInt32
     private let action: () -> Void
@@ -26,20 +28,23 @@ final class HotKey {
         var carbonModifiers: Int
         static let `default` = Shortcut(keyCode: kVK_ANSI_H, carbonModifiers: optionKey)
 
-        static let keyCodeKey = "shortcut.toggle.keyCode"
-        static let modifiersKey = "shortcut.toggle.modifiers"
+        /// Which shortcut: "toggle" shows or hides the window; "continue"
+        /// continues the last entry or stops the timer, like Toggl's.
+        static func keyCodeKey(_ name: String) -> String { "shortcut.\(name).keyCode" }
+        static func modifiersKey(_ name: String) -> String { "shortcut.\(name).modifiers" }
 
-        /// Saved shortcut, the default, or nil when the user cleared it.
-        static func load() -> Shortcut? {
+        /// Saved shortcut, the default, or nil when the user cleared it (or
+        /// there's no default).
+        static func load(_ name: String = "toggle", default fallback: Shortcut? = .default) -> Shortcut? {
             let defaults = UserDefaults.standard
-            guard defaults.object(forKey: keyCodeKey) != nil else { return .default }
-            let code = defaults.integer(forKey: keyCodeKey)
-            return code < 0 ? nil : Shortcut(keyCode: code, carbonModifiers: defaults.integer(forKey: modifiersKey))
+            guard defaults.object(forKey: keyCodeKey(name)) != nil else { return fallback }
+            let code = defaults.integer(forKey: keyCodeKey(name))
+            return code < 0 ? nil : Shortcut(keyCode: code, carbonModifiers: defaults.integer(forKey: modifiersKey(name)))
         }
 
-        static func save(_ shortcut: Shortcut?) {
-            UserDefaults.standard.set(shortcut?.keyCode ?? -1, forKey: keyCodeKey)
-            UserDefaults.standard.set(shortcut?.carbonModifiers ?? 0, forKey: modifiersKey)
+        static func save(_ shortcut: Shortcut?, as name: String = "toggle") {
+            UserDefaults.standard.set(shortcut?.keyCode ?? -1, forKey: keyCodeKey(name))
+            UserDefaults.standard.set(shortcut?.carbonModifiers ?? 0, forKey: modifiersKey(name))
         }
 
         var eventFlags: CGEventFlags {
@@ -52,7 +57,8 @@ final class HotKey {
         }
     }
 
-    init(keyCode: Int = kVK_ANSI_H, carbonModifiers: Int = optionKey, action: @escaping () -> Void) {
+    init(id: UInt32 = 1, keyCode: Int = kVK_ANSI_H, carbonModifiers: Int = optionKey, action: @escaping () -> Void) {
+        self.id = id
         self.keyCode = UInt32(keyCode)
         self.carbonModifiers = UInt32(carbonModifiers)
         self.action = action
@@ -82,9 +88,15 @@ final class HotKey {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let installed = InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, userData in
+            { _, event, userData in
                 guard let userData else { return noErr }
                 let hotKey = Unmanaged<HotKey>.fromOpaque(userData).takeUnretainedValue()
+                // Every HotKey's handler sees every press; only the one whose
+                // shortcut it was acts, and the rest pass it along.
+                var pressed = EventHotKeyID()
+                GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                                  nil, MemoryLayout<EventHotKeyID>.size, nil, &pressed)
+                guard MainActor.assumeIsolated({ pressed.id == hotKey.id }) else { return OSStatus(eventNotHandledErr) }
                 MainActor.assumeIsolated { hotKey.fire() }
                 return noErr
             },
@@ -92,8 +104,8 @@ final class HotKey {
         )
         guard installed == noErr else { return false }
 
-        let id = EventHotKeyID(signature: OSType(0x4842_4152), id: 1) // "HBAR"
-        let status = RegisterEventHotKey(keyCode, carbonModifiers, id, GetApplicationEventTarget(), 0, &hotKeyRef)
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4842_4152), id: id) // "HBAR"
+        let status = RegisterEventHotKey(keyCode, carbonModifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
         if status != noErr {
             if let handlerRef { RemoveEventHandler(handlerRef) }
             handlerRef = nil

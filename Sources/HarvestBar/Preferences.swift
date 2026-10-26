@@ -16,6 +16,7 @@ enum Prefs {
     static let remindLongTimer = "prefs.remindLongTimer"
     static let remindLongTimerHours = "prefs.remindLongTimerHours"
     static let shortcutDisplay = "shortcut.toggle.display"
+    static let continueShortcutDisplay = "shortcut.continue.display"
 
     static func register() {
         UserDefaults.standard.register(defaults: [
@@ -44,12 +45,12 @@ extension Notification.Name {
 /// the toolbar, like Harvest's own.
 @MainActor
 final class PreferencesWindowController: NSWindowController {
-    init(tracker: TimeTracker, updates: Updates, resetLayout: @escaping () -> Void) {
+    init(tracker: TimeTracker, updates: Updates, recorder: ActivityRecorder?, resetLayout: @escaping () -> Void) {
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
         tabs.canPropagateSelectedChildViewControllerTitle = false
         func tab(_ label: String, _ symbol: String, _ view: some View) -> NSTabViewItem {
-            let host = NSHostingController(rootView: view.environment(tracker).environment(updates).tint(.harvestOrange))
+            let host = NSHostingController(rootView: view.environment(tracker).environment(updates).environment(recorder).tint(.harvestOrange))
             host.sizingOptions = [.preferredContentSize]
             let item = NSTabViewItem(viewController: host)
             item.label = label
@@ -57,6 +58,7 @@ final class PreferencesWindowController: NSWindowController {
             return item
         }
         tabs.addTabViewItem(tab("General", "gearshape", GeneralPrefs()))
+        if recorder != nil { tabs.addTabViewItem(tab("Tracking", "wand.and.stars", TrackingPrefs())) }
         tabs.addTabViewItem(tab("Shortcuts", "command", ShortcutPrefs()))
         tabs.addTabViewItem(tab("Support", "wrench.adjustable", SupportPrefs(resetLayout: resetLayout)))
 
@@ -145,7 +147,8 @@ struct GeneralPrefs: View {
                 }
                 Toggle("Install updates automatically", isOn: $updates.installsAutomatically)
                     .disabled(!updates.checksAutomatically)
-                Text("Harvestbeam looks for a new version on GitHub once a day. Unless it installs them automatically, it asks first.")
+                Text("Harvestbeam looks for a new version on GitHub once a day. Unless it installs them automatically, it asks first."
+                     + (Beta.isEnabled ? " You're on the beta, so you get beta versions as well as regular ones. To leave it, install the regular version from the website." : ""))
                     .prefsNote()
             }
         }
@@ -167,8 +170,7 @@ struct GeneralPrefs: View {
 
 struct ShortcutPrefs: View {
     @AppStorage(Prefs.shortcutDisplay) private var display = "⌥H"
-    @State private var recording = false
-    @State private var monitor: Any?
+    @AppStorage(Prefs.continueShortcutDisplay) private var continueDisplay = ""
 
     private let inApp: [(String, String)] = [
         ("New time entry", "⌘N"), ("Plan your day", "⌘P"), ("Search tasks", "⌘F"),
@@ -179,21 +181,12 @@ struct ShortcutPrefs: View {
     var body: some View {
         PrefsPage {
             PrefsSection("Anywhere on your Mac") {
-                HStack {
-                    Text("Show or hide Harvestbeam")
-                    Spacer()
-                    Button { recording ? stopRecording() : startRecording() } label: {
-                        Text(recording ? "Type a shortcut…" : (display.isEmpty ? "None" : display))
-                            .foregroundStyle(recording ? Color.harvestOrange : (display.isEmpty ? Color.secondary : Color.primary))
-                            .frame(width: 150)
-                    }
-                    if !display.isEmpty {
-                        Button { save(nil, display: "") } label: { Image(systemName: "xmark") }
-                            .buttonStyle(.borderless)
-                            .help("Remove this shortcut")
-                    }
+                ShortcutRecorder(title: "Show or hide Harvestbeam", name: "toggle", display: $display)
+                if Beta.isEnabled {
+                    ShortcutRecorder(title: "Continue last entry, or stop the timer", name: "continue", display: $continueDisplay)
                 }
-                Text("Use ⌘, ⌥ or ⌃ with a key. Esc cancels.").prefsNote()
+                Text("Use ⌘, ⌥ or ⌃ with a key. Esc cancels."
+                     + (Beta.isEnabled ? " Continue picks up your most recent entry; if a timer's running, it stops it." : "")).prefsNote()
             }
             Divider()
             PrefsSection("In the Harvestbeam window") {
@@ -206,8 +199,43 @@ struct ShortcutPrefs: View {
                 }
             }
             Divider()
-            Button("Restore Default Shortcuts") { save(.default, display: "⌥H") }
-                .frame(maxWidth: .infinity)
+            Button("Restore Default Shortcuts") {
+                HotKey.Shortcut.save(.default)
+                display = "⌥H"
+                HotKey.Shortcut.save(nil, as: "continue")
+                continueDisplay = ""
+                NotificationCenter.default.post(name: .toggleShortcutChanged, object: nil)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+/// One global shortcut: click, then type the keys.
+private struct ShortcutRecorder: View {
+    let title: String
+    /// "toggle" or "continue", as `HotKey.Shortcut` stores it.
+    let name: String
+    @Binding var display: String
+    @State private var recording = false
+    @State private var monitor: Any?
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Button { recording ? stopRecording() : startRecording() } label: {
+                Text(recording ? "Type a shortcut…" : (display.isEmpty ? "None" : display))
+                    .foregroundStyle(recording ? Color.harvestOrange : (display.isEmpty ? Color.secondary : Color.primary))
+                    .frame(width: 150)
+            }
+            if !display.isEmpty {
+                Button { save(nil, display: "") } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.borderless)
+                    .help("Remove this shortcut")
+            } else {
+                Color.clear.frame(width: 16, height: 1)
+            }
         }
         .onDisappear { stopRecording() }
     }
@@ -238,9 +266,184 @@ struct ShortcutPrefs: View {
     }
 
     private func save(_ shortcut: HotKey.Shortcut?, display: String) {
-        HotKey.Shortcut.save(shortcut)
+        HotKey.Shortcut.save(shortcut, as: name)
         self.display = display
         NotificationCenter.default.post(name: .toggleShortcutChanged, object: nil)
+    }
+}
+
+// MARK: Tracking
+
+/// Toggl-style automatic tracking: the Timeline, on-screen suggestions,
+/// Autotracker rules and auto-logged meetings. All off until turned on.
+struct TrackingPrefs: View {
+    @Environment(TimeTracker.self) private var tracker
+    @Environment(ActivityRecorder.self) private var recorder
+    @AppStorage(ActivityRecorder.timelineKey) private var records = false
+    @AppStorage(ActivityRecorder.websitesKey) private var websites = true
+    @AppStorage(ActivityRecorder.excludedKey) private var excluded = ActivityRecorder.defaultExcluded
+    @AppStorage(ActivityRecorder.suggestionsKey) private var suggests = false
+    @AppStorage(ActivityRecorder.autotrackKey) private var autotracks = false
+    @AppStorage(ActivityRecorder.autotrackStartKey) private var startsAutomatically = false
+    @AppStorage(ActivityRecorder.autotrackStopKey) private var stopsWhenUnmatched = false
+    @AppStorage(ActivityRecorder.autotrackDelayKey) private var delay = 5
+    @AppStorage(ActivityRecorder.autoLogMeetingsKey) private var logsMeetings = false
+    @State private var hasAccessibility = ActivityRecorder.hasAccessibility
+    @State private var isAddingRule = false
+    @State private var confirmsDelete = false
+
+    var body: some View {
+        PrefsPage {
+            if (records || suggests || autotracks) && !hasAccessibility {
+                HStack(alignment: .top) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.orange)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Window titles need Accessibility access").font(.headline)
+                        Text("Without it, only app names are seen, so rules and suggestions can't tell one document or site from another.").prefsNote()
+                    }
+                    Spacer()
+                    Button("Allow…") { ActivityRecorder.requestAccessibility() }
+                }
+                Divider()
+            }
+            PrefsSection("Timeline") {
+                Toggle("Record my Timeline", isOn: $records)
+                Toggle("Include the website in browsers (just the domain)", isOn: $websites)
+                    .disabled(!records && !suggests && !autotracks)
+                HStack {
+                    Text("Never record")
+                    TextField("App names, separated by commas", text: $excluded)
+                }
+                Text("Notes each app and window you spend more than 10 seconds in, so the Week Calendar can show what you worked on and what wasn't tracked. It stays on this Mac for two weeks; nothing goes to Harvest unless you log it.")
+                    .prefsNote()
+                Button("Delete Timeline…") { confirmsDelete = true }
+                    .confirmationDialog("Delete everything the Timeline has recorded?", isPresented: $confirmsDelete) {
+                        Button("Delete Timeline", role: .destructive) { recorder.deleteTimeline() }
+                    }
+            }
+            Divider()
+            PrefsSection("Suggestions") {
+                Toggle("Suggest tasks from what's on screen", isOn: $suggests)
+                Text("The ask box's first suggestion becomes the task that the app and window you were just in point to: your rules, where you've tracked before, and project or client names in the title.")
+                    .prefsNote()
+            }
+            Divider()
+            PrefsSection("Autotracker") {
+                Toggle("Track with rules", isOn: $autotracks)
+                    .onChange(of: autotracks) { _, on in if on { Notifier.requestPermission() } }
+                RulesList(isAdding: $isAddingRule)
+                    .disabled(!autotracks)
+                Picker("When a rule matches", selection: $startsAutomatically) {
+                    Text("Ask first").tag(false)
+                    Text("Start the timer").tag(true)
+                }
+                .disabled(!autotracks)
+                Stepper(value: $delay, in: 1...300) {
+                    Text("After \(delay) seconds in the window").monospacedDigit()
+                }
+                .disabled(!autotracks)
+                Toggle("Stop the timer when no rule matches any more", isOn: $stopsWhenUnmatched)
+                    .disabled(!autotracks)
+                Text("A rule matches when the app's name, the window title or the website contains any of its keywords. It never takes over a timer you started yourself without asking, and only stops timers it started.")
+                    .prefsNote()
+            }
+            Divider()
+            PrefsSection("Calendar") {
+                Toggle("Log meetings automatically", isOn: $logsMeetings)
+                    .onChange(of: logsMeetings) { _, on in if on { Notifier.requestPermission() } }
+                Text("Within five minutes of a meeting starting, it's logged to its matched task, and a notification lets you undo. Meetings with no match, no length, or added after they started are left for you.")
+                    .prefsNote()
+            }
+        }
+        .sheet(isPresented: $isAddingRule) { AddRuleSheet().environment(tracker) }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            hasAccessibility = ActivityRecorder.hasAccessibility
+        }
+        .onAppear { hasAccessibility = ActivityRecorder.hasAccessibility }
+    }
+}
+
+/// Your Autotracker rules, top one first.
+private struct RulesList: View {
+    @Environment(TimeTracker.self) private var tracker
+    @Binding var isAdding: Bool
+
+    var body: some View {
+        let rules = tracker.contextMemory.rules
+        VStack(alignment: .leading, spacing: 0) {
+            if rules.isEmpty {
+                Text("No rules yet").foregroundStyle(Color.secondary).padding(8)
+            }
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(rules) { rule in
+                        let task = tracker.tasks(for: [rule.taskKey]).first
+                        HStack {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(rule.keywords).fontWeight(.medium)
+                                Text(task.map { "→ \($0.projectNameParts.name) · \($0.task.name)" } ?? "→ a task you're no longer assigned to")
+                                    .font(.callout).foregroundStyle(Color.secondary)
+                            }
+                            Spacer()
+                            Button { tracker.contextMemory.setRules(rules.filter { $0.id != rule.id }) } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Remove this rule")
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                    }
+                }
+            }
+            .frame(maxHeight: 150)
+            Divider()
+            Button("Add Rule…") { isAdding = true }
+                .buttonStyle(.borderless)
+                .padding(8)
+        }
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.04)))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Keywords, then the task they mean.
+private struct AddRuleSheet: View {
+    @Environment(TimeTracker.self) private var tracker
+    @Environment(\.dismiss) private var dismiss
+    @State private var keywords = ""
+    @State private var query = ""
+    @State private var picked: TaskKey?
+
+    var body: some View {
+        let results = query.isEmpty ? tracker.recentTasks + tracker.favoriteTasks : Array(tracker.search(query).prefix(30))
+        VStack(alignment: .leading, spacing: 12) {
+            Text("New Autotracker Rule").font(.headline)
+            TextField("Keywords, e.g. Figma, Pinstripes", text: $keywords)
+            Text("Matches when the app's name, window title or website contains any of them.").prefsNote()
+            TextField("Search for the task", text: $query)
+            List(results, selection: $picked) { task in
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(task.projectNameParts.name).fontWeight(.medium)
+                    Text("\(task.task.name) · \(task.client?.name ?? "")").font(.callout).foregroundStyle(Color.secondary)
+                }
+                .tag(task.key)
+            }
+            .frame(height: 200)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Add Rule") {
+                    guard let picked else { return }
+                    tracker.contextMemory.setRules(tracker.contextMemory.rules + [AutotrackRule(keywords: keywords, taskKey: picked)])
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(picked == nil || keywords.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
     }
 }
 

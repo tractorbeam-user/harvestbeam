@@ -518,6 +518,31 @@ button.key.open path { transform: translateY(-2px) rotate(-20deg); }
 .cl ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; display: grid; gap: 5px; }
 .cl ul li::marker { color: var(--orange); }
 
+/* Beta: what's being tried out, as cards, with its own download. */
+.beta { padding-block: 88px 8px; }
+.beta .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 28px; }
+.beta .head .sub { color: var(--muted); margin: 0; font-size: 15.5px; max-width: 58ch; }
+.beta .section-title { margin-bottom: 12px; display: flex; align-items: center; gap: 12px; }
+.beta .pill { font-family: var(--body); font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--orange); background: var(--orange-soft); border-radius: 999px; padding: 4px 10px; }
+.beta .get { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.beta .get small { color: var(--faint); font-size: 12.5px; }
+.beta-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; list-style: none; margin: 0; padding: 0; }
+.beta-grid li { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px 22px 20px; display: flex; flex-direction: column; gap: 8px; }
+.beta-grid .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--orange-soft); display: grid; place-items: center; }
+.beta-grid .ic svg { width: 18px; height: 18px; fill: none; stroke: var(--orange); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.beta-grid h3 { font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: -0.015em; margin: 4px 0 0; }
+.beta-grid p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+.beta-grid li.note { background: transparent; border-style: dashed; }
+.beta-grid li.note p b { color: var(--ink); font-weight: 600; }
+@media (max-width: 900px) {
+  .beta { padding-block: 64px 0; }
+  .beta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .beta .get { align-items: flex-start; }
+}
+@media (max-width: 560px) {
+  .beta-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Feedback: back on the page background, an orange-tinted card with the
    pitch on the left and the form on the right. */
 .feedback { padding-block: 96px 104px; }
@@ -584,6 +609,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       <a href="#try">Try it</a>
       <a href="#features">Features</a>
       <a href="#changelog">What's new</a>
+      <a href="#beta">Beta</a>
       <a href="#feedback">Feedback</a>
       <a href="https://github.com/tractorbeam-user/harvestbeam">GitHub</a>
     </nav>
@@ -803,7 +829,19 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
         <!-- Major features only, newest first. Add an entry with each release. -->
       <ol>
         <li>
-          <div class="ver">1.2.1<small>Oct 26, 2026</small><span class="new">Latest</span></div>
+          <div class="ver">1.3<small>Oct 26, 2026</small><span class="new">Latest</span></div>
+          <div>
+            <h3>Your week, with your meetings</h3>
+            <ul>
+              <li>Week Calendar (⌘K): your week in columns, like Harvest's Calendar view, with your calendar's meetings beside your time</li>
+              <li>Each meeting is matched to a project from its title, code or client; log one in a click, or all of them at once</li>
+              <li>Recent and Suggested drop down from the ask box, each with why it's there (“usually Mondays”, “meeting at 2:00”)</li>
+              <li>Log meetings ahead of time, and a round of fixes found in a full review of the app</li>
+            </ul>
+          </div>
+        </li>
+        <li>
+          <div class="ver">1.2.1<small>Oct 26, 2026</small></div>
           <div>
             <h3>Fixes</h3>
             <ul>
@@ -852,6 +890,53 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
       </div>
     </section>
   </div>
+
+  <section class="wrap beta" id="beta">
+    <div class="head">
+      <div>
+        <h2 class="section-title">Beta features <span class="pill">1.4 beta</span></h2>
+        <p class="sub">Automatic tracking, in the spirit of Toggl: Harvestbeam notices what you're working on and fills in the gaps. Each feature is off until you switch it on in Preferences → Tracking, and what it sees stays on your Mac.</p>
+      </div>
+      <div class="get">
+        <a class="button" href="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.4.0-beta.1/Harvestbeam-1.4.0-beta.1.dmg">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a.9.9 0 0 1 .9.9v6.9l2.3-2.3a.9.9 0 1 1 1.3 1.3L8.6 12.1a.9.9 0 0 1-1.2 0L3.5 8.2a.9.9 0 1 1 1.3-1.3l2.3 2.3V2.4a.9.9 0 0 1 .9-.9ZM2.5 13h11a.9.9 0 0 1 0 1.8h-11a.9.9 0 0 1 0-1.8Z"/></svg>
+          Download the beta
+        </a>
+        <small>Replaces your copy and keeps your sign-in. <a class="textlink" style="font-size: 12.5px" href="https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.4.0-beta.1">Release notes →</a></small>
+      </div>
+    </div>
+    <ul class="beta-grid">
+      <li>
+        <span class="ic"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h5"/><circle cx="15" cy="14" r="2.5"/></svg></span>
+        <h3>Timeline</h3>
+        <p>Notes each app and window you spend more than 10 seconds in. The Week Calendar shows your day by the hour, with the stretches no timer covered ready to log in a click.</p>
+      </li>
+      <li>
+        <span class="ic"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M4 10h12M4 14h7"/><path d="M14 13.5 16 16l3-4"/></svg></span>
+        <h3>Autotracker rules</h3>
+        <p>“When Figma's window says Pinstripes, it's Creative Support.” After a few seconds in a matching window, Harvestbeam offers to start that timer, or starts it for you.</p>
+      </li>
+      <li>
+        <span class="ic"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="10" rx="2"/><path d="M7 17h6M10 14v3"/></svg></span>
+        <h3>Suggestions from your screen</h3>
+        <p>Press ⌥H and the first suggestion is the task the window you were just in points to, from your rules and where you've tracked before.</p>
+      </li>
+      <li>
+        <span class="ic"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="12" rx="2"/><path d="M3 8.5h14M7 3v3M13 3v3M7.5 12.5l1.8 1.8 3.4-3.6"/></svg></span>
+        <h3>Meetings log themselves</h3>
+        <p>Within five minutes of a meeting starting, it's logged to the project it matches, with Undo in the notification. Meetings with no clear match wait for you.</p>
+      </li>
+      <li>
+        <span class="ic"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 5v10l8-5Z"/></svg></span>
+        <h3>Continue or stop, anywhere</h3>
+        <p>One shortcut you choose: it stops the running timer, or picks your last entry back up, from any app.</p>
+      </li>
+      <li class="note">
+        <p><b>Private by design.</b> Window titles and site names never leave your Mac, and only the entries you log go to Harvest. Recording skips idle time, password managers and Messages, and keeps two weeks.</p>
+        <p><b>Leaving the beta</b> is just installing the regular version from the top of this page.</p>
+      </li>
+    </ul>
+  </section>
 
   <section class="wrap feedback" id="feedback">
     <div class="fbwrap">

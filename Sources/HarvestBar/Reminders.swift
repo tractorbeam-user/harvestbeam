@@ -14,11 +14,31 @@ enum Notifier {
         center?.requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    static func post(id: String, title: String, body: String) {
+    /// An Autotracker match: "Start" (or clicking it) starts the task.
+    static let autotrackCategory = "AUTOTRACK"
+    static let startAction = "START"
+    /// A meeting logged on its own: "Undo" deletes the entry.
+    static let autoLoggedCategory = "AUTOLOGGED"
+    static let undoAction = "UNDO"
+
+    static func registerCategories() {
+        center?.setNotificationCategories([
+            UNNotificationCategory(identifier: autotrackCategory,
+                                   actions: [UNNotificationAction(identifier: startAction, title: "Start")],
+                                   intentIdentifiers: []),
+            UNNotificationCategory(identifier: autoLoggedCategory,
+                                   actions: [UNNotificationAction(identifier: undoAction, title: "Undo", options: [.destructive])],
+                                   intentIdentifiers: []),
+        ])
+    }
+
+    static func post(id: String, title: String, body: String, category: String? = nil, userInfo: [String: String] = [:]) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
+        if let category { content.categoryIdentifier = category }
+        content.userInfo = userInfo
         center?.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 

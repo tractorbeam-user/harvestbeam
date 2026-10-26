@@ -12,6 +12,11 @@ VERSION="${VERSION:-1.0.0}"
 # Sparkle compares this build number to the appcast's, so it only goes up.
 BUILD="${BUILD:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 APP="build/${APP_NAME}.app"
+# CHANNEL=beta builds the beta: same app, with the beta features switched on
+# and Sparkle also taking beta-channel updates (see Sources/HarvestUI/Beta.swift).
+CHANNEL="${CHANNEL:-}"
+BETA_KEY=""
+[[ "$CHANNEL" == "beta" ]] && BETA_KEY="<key>HBBetaFeatures</key><true/>"
 # Sparkle reads updates from appcast.xml on main (scripts/release.sh adds to it)
 # and only installs ones signed with the private half of this key.
 FEED_URL="${FEED_URL:-https://raw.githubusercontent.com/tractorbeam-user/harvestbeam/main/appcast.xml}"
@@ -58,6 +63,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>SUFeedURL</key><string>${FEED_URL}</string>
   <key>SUPublicEDKey</key><string>${SPARKLE_PUBLIC_KEY}</string>
   <key>SUEnableAutomaticChecks</key><true/>
+  ${BETA_KEY}
+  <key>NSAppleEventsUsageDescription</key><string>Harvestbeam reads the website in your browser's front tab, just its domain, for your Timeline and Autotracker rules. It stays on this Mac.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key><string>Harvestbeam shows your meetings next to your time, so you can log them in a click. Your calendar stays on this Mac.</string>
 </dict>
 </plist>
 PLIST

@@ -24,6 +24,8 @@ struct NewEntryEditor: View {
     let day: LocalDate
     /// Set when editing an existing entry.
     var entry: TimeEntry?
+    /// Set when logging a meeting from the week calendar.
+    var meeting: CalendarMeeting?
     @FocusState private var hoursFocused: Bool
 
     @State private var projectID: Int?
@@ -32,11 +34,13 @@ struct NewEntryEditor: View {
     @State private var hours = ""
     @State private var isSaving = false
     @State private var isFavoriteHovered = false
+    @State private var suggestion: MeetingSuggestion?
+    @State private var alwaysHere = false
 
     private var isToday: Bool { day == LocalDate() }
     private var parsedHours: Double? { EntryEditor.parseHours(hours) }
     private var hoursEmpty: Bool { hours.trimmingCharacters(in: .whitespaces).isEmpty }
-    private var startsTimer: Bool { entry == nil && isToday && hoursEmpty }
+    private var startsTimer: Bool { entry == nil && meeting == nil && isToday && hoursEmpty }
     private var isTimerRunning: Bool { entry?.isRunning ?? false }
     private var selectedTask: TrackableTask? {
         guard let taskKey else { return nil }
@@ -49,10 +53,15 @@ struct NewEntryEditor: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text((entry == nil ? "New Time Entry" : "Edit Time Entry") + (isToday ? "" : " · \(day.dayTitle(today: LocalDate()))"))
+            Text((meeting?.isActivity == true ? "Log Activity" : meeting != nil ? "Log Meeting" : entry == nil ? "New Time Entry" : "Edit Time Entry") + (isToday ? "" : " · \(day.dayTitle(today: LocalDate()))"))
                 .font(.system(size: 13, weight: .semibold))
                 .padding(.top, 14)
-                .padding(.bottom, 12)
+                .padding(.bottom, meeting == nil ? 12 : 6)
+            if let meeting {
+                meetingNote(meeting)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+            }
 
             VStack(spacing: 10) {
                 VStack(spacing: 0) {
@@ -88,6 +97,16 @@ struct NewEntryEditor: View {
             }
             .padding(.horizontal, 14)
 
+            if meeting != nil {
+                Toggle(meeting?.isActivity == true ? "Always log this window here" : "Always log this meeting here", isOn: $alwaysHere)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 12))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .disabled(taskKey == nil)
+            }
+
             HStack(spacing: 8) {
                 // Favorite sits opposite the buttons instead of in a gutter.
                 Button {
@@ -107,10 +126,18 @@ struct NewEntryEditor: View {
                 .disabled(taskKey == nil)
                 .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
                 Spacer()
+                if let meeting {
+                    Button("Skip") {
+                        tracker.setSkipped(meeting, true)
+                        dismiss()
+                    }
+                    .buttonStyle(PillButtonStyle(prominent: false))
+                    .help("Not something to log. It turns gray; right-click it to undo.")
+                }
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                     .buttonStyle(PillButtonStyle(prominent: false))
-                Button(startsTimer ? "Start Timer" : "Save Entry") { save() }
+                Button(startsTimer ? "Start Timer" : meeting != nil ? "Log It" : "Save Entry") { save() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(PillButtonStyle(prominent: true))
                     .disabled(isSaving || taskKey == nil || (!startsTimer && !isTimerRunning && !hoursEmpty && parsedHours == nil))
@@ -130,12 +157,41 @@ struct NewEntryEditor: View {
                 notes = entry.notes ?? ""
                 hours = TimeFormat.hoursMinutes(entry.elapsed())
                 if !entry.isRunning { hoursFocused = true }
+            } else if let meeting {
+                // The meeting's own title and length, and its best-guess task.
+                notes = meeting.title
+                hours = TimeFormat.hoursMinutes(meeting.hours * 3600)
+                suggestion = tracker.meetingSuggestion(for: meeting)
+                if let task = suggestion?.task {
+                    projectID = task.project.id
+                    taskKey = task.key
+                }
+                alwaysHere = suggestion?.reason == .remembered
+                // Ready to log; keep the project list closed.
+                hoursFocused = true
             // Start from the most recently used task.
             } else if let recent = tracker.recentTasks.first ?? tracker.favoriteTasks.first {
                 projectID = recent.project.id
                 taskKey = recent.key
             }
         }
+    }
+
+    /// When the meeting was, and why this task was picked (or that one is needed).
+    private func meetingNote(_ meeting: CalendarMeeting) -> some View {
+        let time = meeting.start.formatted(date: .omitted, time: .shortened)
+        let why = suggestion.map { $0.explanation } ?? "Pick the task this meeting belongs to"
+        return HStack(spacing: 6) {
+            Image(systemName: "calendar")
+            Text("\(time) · \(why)")
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 11.5))
+        .foregroundStyle(Color.meetingText)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.meetingFill.opacity(0.6)))
     }
 
     private var fieldBackground: some View {
@@ -209,6 +265,8 @@ struct NewEntryEditor: View {
         Task {
             if let entry {
                 await tracker.updateEntry(entry, task: task, notes: notes, hours: parsedHours)
+            } else if let meeting {
+                await tracker.log(meeting, task: task, notes: notes, hours: parsedHours ?? meeting.hours, remember: alwaysHere)
             } else {
                 // Empty hours on another day adds a 0:00 entry to fill in later.
                 await tracker.addEntry(task: task, on: day, notes: notes, hours: startsTimer ? nil : (parsedHours ?? 0))
@@ -246,7 +304,7 @@ struct PillButtonStyle: ButtonStyle {
 
 #if DEBUG
 /// For offscreen snapshots of the New Entry popover.
-public func debugNewEntryEditor() -> some View { NewEntryEditor(day: LocalDate()) }
+@MainActor public func debugNewEntryEditor() -> some View { NewEntryEditor(day: LocalDate()) }
 #endif
 
 /// Hover feedback for the entry popover's fields and menus.
@@ -376,7 +434,9 @@ private struct ProjectPicker: View {
                                     .contentShape(Rectangle())
                                     .onTapGesture { pick(match.task) }
                                     .onHover { if $0 { highlighted = index } }
-                                    .id(index)
+                                    // Keyed by project, not position: rows keyed by position kept
+                                    // showing the unfiltered list's text after typing.
+                                    .id(match.task.project.id)
                             }
                         }
                         .padding(.bottom, 4)
@@ -384,7 +444,9 @@ private struct ProjectPicker: View {
                     // A ScrollView has no height of its own inside a popover, so
                     // size it to the rows (about 26pt each, plus client headers).
                     .frame(height: listHeight(matches))
-                    .onChange(of: highlighted) { _, index in proxy.scrollTo(index) }
+                    .onChange(of: highlighted) { _, index in
+                        if matches.indices.contains(index) { proxy.scrollTo(matches[index].task.project.id) }
+                    }
                 }
             }
         }

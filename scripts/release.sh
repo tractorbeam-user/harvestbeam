@@ -2,6 +2,8 @@
 # Builds Harvestbeam, wraps it in a disk image, publishes a GitHub Release and
 # adds it to appcast.xml so installed copies update themselves.
 #   scripts/release.sh 1.1.0 ["What's new, in light Markdown"]
+#   CHANNEL=beta scripts/release.sh 1.4.0-beta.1 ["…"]   → a beta: a GitHub
+#     pre-release with the beta features on, offered only to beta builds
 # Needs a clean checkout of main (or a branch that fast-forwards it, as in a
 # worktree), the GitHub CLI (gh) signed in, and the Sparkle private key in the
 # login Keychain (see "Releasing" in the README). Everything is pushed to main,
@@ -23,7 +25,8 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 git push origin HEAD:main
 
-VERSION="$VERSION" scripts/build-app.sh
+CHANNEL="${CHANNEL:-}"
+VERSION="$VERSION" CHANNEL="$CHANNEL" scripts/build-app.sh
 scripts/make-dmg.sh "$DMG"
 BUILD="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/Harvestbeam.app/Contents/Info.plist)"
 
@@ -42,7 +45,15 @@ Already installed? Harvestbeam offers this update itself, or choose **Check for 
 [[ -n "$RELEASE_NOTES" ]] && NOTES="${RELEASE_NOTES}
 
 ${NOTES}"
-gh release create "$TAG" "$DMG" --title "Harvestbeam ${VERSION}" --notes "$NOTES" --generate-notes
+if [[ "$CHANNEL" == "beta" ]]; then
+  NOTES="**Beta.** Includes features still being tried out; see the Beta section of the website. Beta versions update to newer betas and regular releases.
+
+${NOTES}"
+  # A pre-release, so the website's "latest" download stays the regular one.
+  gh release create "$TAG" "$DMG" --title "Harvestbeam ${VERSION}" --notes "$NOTES" --generate-notes --prerelease
+else
+  gh release create "$TAG" "$DMG" --title "Harvestbeam ${VERSION}" --notes "$NOTES" --generate-notes
+fi
 
 # Newest first, so the item goes above the others. Sparkle compares
 # sparkle:version (the build number) to decide what's newer.
@@ -52,7 +63,8 @@ ITEM="    <item>
       <sparkle:version>${BUILD}</sparkle:version>
       <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-${RELEASE_NOTES:+      <description sparkle:format=\"markdown\"><![CDATA[${RELEASE_NOTES}]]></description>
+${CHANNEL:+      <sparkle:channel>${CHANNEL}</sparkle:channel>
+}${RELEASE_NOTES:+      <description sparkle:format=\"markdown\"><![CDATA[${RELEASE_NOTES}]]></description>
 }      <sparkle:fullReleaseNotesLink>https://github.com/${REPO}/releases/tag/${TAG}</sparkle:fullReleaseNotesLink>
       <enclosure url=\"${URL}\" type=\"application/octet-stream\" ${SIGNATURE} />
     </item>" python3 - <<'PY'

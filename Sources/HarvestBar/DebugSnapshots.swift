@@ -47,10 +47,30 @@ enum DebugSnapshots {
             write(summaryWindow, to: url.appendingPathComponent("7-summary-\(suffix).png"))
             summaryWindow.close()
 
+            let weekWindow = makeWindow(debugWeekCalendar().environment(tracker).frame(width: 1100, height: 760), appearance: appearance)
+            weekWindow.setContentSize(NSSize(width: 1100, height: 760))
+            await settle()
+            write(weekWindow, to: url.appendingPathComponent("9-week-calendar-\(suffix).png"))
+            weekWindow.close()
+
+            let timelineWindow = makeWindow(debugWeekCalendarWithTimeline(tracker).environment(tracker).frame(width: 1300, height: 760), appearance: appearance)
+            timelineWindow.setContentSize(NSSize(width: 1300, height: 760))
+            await settle()
+            write(timelineWindow, to: url.appendingPathComponent("9-week-timeline-\(suffix).png"))
+            timelineWindow.close()
+            UserDefaults.standard.removeObject(forKey: "weekCalendar.showsTimeline")
+
+            let meetingWindow = makeWindow(debugMeetingEditor().environment(tracker).frame(width: 340, height: 300), appearance: appearance)
+            meetingWindow.setContentSize(NSSize(width: 340, height: 300))
+            await settle()
+            write(meetingWindow, to: url.appendingPathComponent("9-log-meeting-\(suffix).png"))
+            meetingWindow.close()
+
             for (name, view) in [("general", AnyView(GeneralPrefs())), ("shortcuts", AnyView(ShortcutPrefs())),
-                                 ("support", AnyView(SupportPrefs(resetLayout: {})))] {
-                let prefsWindow = makeWindow(view.environment(tracker).environment(Updates()).frame(width: 480, height: 560, alignment: .top), appearance: appearance)
-                prefsWindow.setContentSize(NSSize(width: 480, height: 560))
+                                 ("tracking", AnyView(TrackingPrefs())), ("support", AnyView(SupportPrefs(resetLayout: {})))] {
+                let prefsWindow = makeWindow(view.environment(tracker).environment(Updates()).environment(ActivityRecorder(tracker: tracker))
+                    .frame(width: 480, height: name == "tracking" ? 1000 : 560, alignment: .top), appearance: appearance)
+                prefsWindow.setContentSize(NSSize(width: 480, height: name == "tracking" ? 1000 : 560))
                 await settle()
                 write(prefsWindow, to: url.appendingPathComponent("8-prefs-\(name)-\(suffix).png"))
                 prefsWindow.close()

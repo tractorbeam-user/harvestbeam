@@ -39,6 +39,10 @@ public final class TimeTracker {
     public private(set) var focusRequestWantsSearch = true
 
     public let favorites: FavoritesStore
+    /// Meetings you've logged or skipped, and where some always go.
+    public let meetingMemory: MeetingMemory
+    /// Autotracker rules, and which windows you track what in.
+    public let contextMemory: ContextMemory
     public let isDemo: Bool
 
     @ObservationIgnored private var service: (any HarvestService)?
@@ -50,14 +54,24 @@ public final class TimeTracker {
     @ObservationIgnored private(set) var usage: [TaskKey: Double] = [:]
     /// Earliest day `entries` covers; older weeks are fetched on demand.
     @ObservationIgnored private var loadedFrom: LocalDate?
+    /// Latest day `entries` covers; later weeks are fetched on demand.
+    @ObservationIgnored private var loadedThrough: LocalDate?
     @ObservationIgnored private var isLoadingHistory = false
 
     static let historyDays = 60
+    /// Entries logged ahead (meetings later this week, next week's plans).
+    static let futureDays = 28
 
-    public init(service: (any HarvestService)?, accountName: String?, favorites: FavoritesStore, isDemo: Bool = false) {
+    public init(
+        service: (any HarvestService)?, accountName: String?, favorites: FavoritesStore,
+        meetingMemory: MeetingMemory = MeetingMemory(), contextMemory: ContextMemory = ContextMemory(),
+        isDemo: Bool = false
+    ) {
         self.service = service
         self.accountName = accountName
         self.favorites = favorites
+        self.meetingMemory = meetingMemory
+        self.contextMemory = contextMemory
         self.isDemo = isDemo
         self.phase = service == nil ? .signedOut : .loading
     }
@@ -79,6 +93,8 @@ public final class TimeTracker {
             service: DemoHarvestService(),
             accountName: "Tractorbeam (demo)",
             favorites: FavoritesStore(defaults: defaults, syncWithICloud: false),
+            meetingMemory: MeetingMemory(defaults: defaults),
+            contextMemory: ContextMemory(defaults: defaults),
             isDemo: true
         )
     }
@@ -113,6 +129,22 @@ public final class TimeTracker {
 
     /// The weekday the account's weeks start on (`Calendar` numbering).
     public var firstWeekday: Int { company?.firstWeekday ?? 2 }
+
+    /// Fetches later entries when you page forward past what's loaded.
+    public func ensureLoaded(through day: LocalDate) async {
+        guard let service, let user, let loadedThrough, day > loadedThrough, !isLoadingHistory else { return }
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+        let through = day.adding(days: 28)
+        do {
+            let later = try await service.timeEntries(userID: user.id, from: loadedThrough.adding(days: 1), to: through)
+            let known = Set(entries.map(\.id))
+            entries = Self.sorted(entries + later.filter { !known.contains($0.id) })
+            self.loadedThrough = through
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 
     /// Fetches older entries when you page back past what's loaded.
     public func ensureLoaded(from day: LocalDate) async {
@@ -208,14 +240,16 @@ public final class TimeTracker {
 
             let today = LocalDate()
             let from = today.adding(days: -Self.historyDays)
+            let through = today.adding(days: Self.futureDays)
             async let assignments = service.projectAssignments()
-            async let history = service.timeEntries(userID: me.id, from: from, to: today)
+            async let history = service.timeEntries(userID: me.id, from: from, to: through)
             let (loadedAssignments, loadedEntries) = try await (assignments, history)
 
             tasks = ProjectAssignment.trackableTasks(from: loadedAssignments)
-            // Keep any older weeks already paged in.
-            entries = Self.sorted(loadedEntries + entries.filter { $0.spentDate < from })
+            // Keep any older or later weeks already paged in.
+            entries = Self.sorted(loadedEntries + entries.filter { $0.spentDate < from || $0.spentDate > through })
             loadedFrom = min(loadedFrom ?? from, from)
+            loadedThrough = max(loadedThrough ?? through, through)
             lastRefresh = .now
             phase = .ready
             errorMessage = nil
@@ -304,6 +338,19 @@ public final class TimeTracker {
         }
     }
 
+    /// Toggl's Continue/Stop: stops the running timer; otherwise starts the
+    /// most recent entry again (today's, or a fresh one today with the same
+    /// task and notes when it was on another day).
+    public func continueOrStop() async {
+        if running != nil {
+            await pause()
+        } else if let paused = pausedEntry {
+            await toggle(paused)
+        } else if let last = entries.first(where: { $0.spentDate <= LocalDate() }) {
+            await addEntry(task: task(for: last), on: LocalDate(), notes: last.notes ?? "", hours: nil)
+        }
+    }
+
     public func resume() async {
         guard let entry = pausedEntry else { return }
         await toggle(task(for: entry))
@@ -350,22 +397,33 @@ public final class TimeTracker {
     }
 
     /// Adds an entry to `day`: a running timer when no hours are given (today
-    /// only), otherwise a stopped entry with those hours.
-    public func addEntry(task: TrackableTask, on day: LocalDate, notes: String, hours: Double?) async {
-        guard let service, busyKey == nil else { return }
+    /// only), otherwise a stopped entry with those hours. Returns the entry.
+    @discardableResult
+    public func addEntry(task: TrackableTask, on day: LocalDate, notes: String, hours: Double?) async -> TimeEntry? {
+        guard let service else { return nil }
+        // Saving right after starting or pausing a timer waits its turn,
+        // instead of quietly doing nothing.
+        guard await waitUntilIdle() else {
+            errorMessage = "Harvest is still working on your last change. Try again in a moment."
+            return nil
+        }
         busyKey = task.key
         defer { busyKey = nil }
         let notes = notes.isEmpty ? nil : notes
         do {
+            let added: TimeEntry
             if let hours {
-                upsert(try await service.createEntry(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes, hours: hours))
+                added = try await service.createEntry(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes, hours: hours)
             } else {
                 if let current = running { upsert(try await service.stopTimer(id: current.id)) }
-                upsert(try await service.startTimer(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes))
+                added = try await service.startTimer(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes)
             }
+            upsert(added)
             errorMessage = nil
+            return added
         } catch {
             errorMessage = error.localizedDescription
+            return nil
         }
     }
 
@@ -445,11 +503,23 @@ public final class TimeTracker {
         tasks = []
         entries = []
         loadedFrom = nil
+        loadedThrough = nil
         lastRefresh = nil
         phase = .signedOut
     }
 
     // MARK: Helpers
+
+    /// Waits up to ten seconds for a start or stop already on its way to
+    /// Harvest; false if it's still going.
+    private func waitUntilIdle() async -> Bool {
+        var waited = 0
+        while busyKey != nil, waited < 100 {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+        return busyKey == nil
+    }
 
     private func upsert(_ entry: TimeEntry) {
         var updated = entries.filter { $0.id != entry.id }

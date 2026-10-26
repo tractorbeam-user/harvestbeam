@@ -48,6 +48,23 @@ extension Color {
         #endif
     }
 
+    /// Calendar meetings not logged yet: a pale blue, like a calendar event.
+    static var meetingFill: Color {
+        #if os(macOS)
+        .adaptive(light: 0xDCEBFB, dark: 0x1D3550)
+        #else
+        Color.blue.opacity(0.15)
+        #endif
+    }
+
+    static var meetingText: Color {
+        #if os(macOS)
+        .adaptive(light: 0x1F5FAD, dark: 0xA9CCF5)
+        #else
+        Color.blue
+        #endif
+    }
+
     #if os(macOS)
     static func adaptive(light: UInt32, dark: UInt32, alpha: CGFloat = 1, darkAlpha: CGFloat? = nil) -> Color {
         func color(_ hex: UInt32, _ alpha: CGFloat) -> NSColor {
@@ -111,6 +128,8 @@ public struct WindowActions: Sendable {
     public var setTitle: @MainActor @Sendable (String) -> Void
     /// Opens the Preferences window; set by the Mac app after init.
     public var openPreferences: (@MainActor @Sendable () -> Void)?
+    /// Opens the week calendar window; set by the Mac app after init.
+    public var openWeekCalendar: (@MainActor @Sendable () -> Void)?
 
     public init(
         close: @escaping @MainActor @Sendable () -> Void,

@@ -19,6 +19,13 @@ struct TrackerView: View {
     @Environment(TimeTracker.self) private var tracker
     @Environment(\.openURL) private var openURL
     @Environment(\.windowActions) private var windowActions
+    #if os(macOS)
+    /// Today's meetings, for "meeting at 2:00" suggestions; absent in previews.
+    @Environment(CalendarStore.self) private var calendar: CalendarStore?
+    /// What you were in before opening the window, for on-screen suggestions.
+    @Environment(ActivityRecorder.self) private var recorder: ActivityRecorder?
+    @AppStorage(ActivityRecorder.suggestionsKey) private var suggestsFromScreen = false
+    #endif
 
     @State private var query = ""
     @State private var selection: TaskKey?
@@ -29,6 +36,11 @@ struct TrackerView: View {
     /// Search starts as an icon and opens into a field when you need it.
     @State private var isSearchOpen = false
     @State private var favoritesTargeted = false
+    /// Recent and Suggested drop down from the empty ask box while it's focused.
+    @State private var askListOpen = false
+    /// Keeps the list up while the pointer is on it: a click there takes
+    /// focus out of the box before the row's button sees it.
+    @State private var isHoveringAskList = false
     /// Classic with the big "What are you working on?" box is the one layout.
     /// Tiles and List were tried and set aside; flip this to bring them back.
     private static let showsLayoutSwitcher = false
@@ -149,6 +161,7 @@ struct TrackerView: View {
                 } else {
                     searchFocused = false
                 }
+                askListOpen = asksFirst && tracker.focusRequestWantsSearch
                 // Opening the window on a new day goes straight to it.
                 let today = LocalDate()
                 if today != lastToday {
@@ -170,6 +183,12 @@ struct TrackerView: View {
             .onChange(of: layoutRaw) { query = ""; isSearchOpen = false }
             .onChange(of: searchFocused) { _, focused in
                 if !focused && query.isEmpty { withAnimation(.snappy(duration: 0.2)) { isSearchOpen = false } }
+                if focused {
+                    askListOpen = true
+                    if !isSearching { selection = nil }
+                } else if !isHoveringAskList {
+                    askListOpen = false
+                }
             }
     }
 
@@ -315,15 +334,38 @@ struct TrackerView: View {
     }
 
     private func mainColumn(_ sections: [TaskSection]) -> some View {
-        // Keyboard selection skips folded sections.
-        let flat = sections.filter { isSearching || !collapsed.contains($0.id) }.flatMap(\.tasks)
+        let askRecent = askRecentItems
+        let askSuggested = askSuggestedItems(excluding: Set(askRecent.map(\.id)))
+        let showsAskList = asksFirst && askListOpen && !isSearching && !(askRecent.isEmpty && askSuggested.isEmpty)
+        // Keyboard selection walks the ask box's list when it's open, and
+        // otherwise skips folded sections.
+        let flat = showsAskList
+            ? (askRecent + askSuggested).map(\.task)
+            : sections.filter { isSearching || !collapsed.contains($0.id) }.flatMap(\.tasks)
         return VStack(spacing: 0) {
             if asksFirst {
                 // Ask first: the big box is always there, focused when the window opens.
-                searchField(flat, large: true)
+                searchField(flat, large: true, listsTasks: showsAskList)
+                    .overlay(alignment: .top) {
+                        if showsAskList {
+                            AskDropdown(
+                                recent: askRecent, suggested: askSuggested, selection: selection,
+                                runningKey: tracker.running?.key, pick: pick, highlight: { selection = $0 }
+                            )
+                            .fixedSize(horizontal: false, vertical: true)
+                            .offset(y: 50)
+                            .onHover { hovering in
+                                isHoveringAskList = hovering
+                                if !hovering && !searchFocused { askListOpen = false }
+                            }
+                            .transition(.opacity.combined(with: .offset(y: -4)))
+                        }
+                    }
+                    .animation(.easeOut(duration: 0.12), value: showsAskList)
                     .padding(.horizontal, Metrics.padding)
                     .padding(.top, 14)
                     .padding(.bottom, 2)
+                    .zIndex(1)
             }
             ScrollViewReader { proxy in
                 ScrollView {
@@ -363,6 +405,8 @@ struct TrackerView: View {
                     withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(key) }
                 }
             }
+            .opacity(showsAskList ? 0.35 : 1)
+            .animation(.easeOut(duration: 0.12), value: showsAskList)
 
             if let error = tracker.errorMessage {
                 ErrorBanner(message: error) { tracker.errorMessage = nil }
@@ -404,7 +448,8 @@ struct TrackerView: View {
 
     /// The search field: small in the bottom bar, or `large` as the Classic
     /// layout's "What are you working on?" box.
-    private func searchField(_ flat: [TrackableTask], large: Bool = false) -> some View {
+    /// `listsTasks`: the ask box's list is open, so ↑↓ go row by row.
+    private func searchField(_ flat: [TrackableTask], large: Bool = false, listsTasks: Bool = false) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: large ? 14 : 13, weight: .medium))
@@ -417,27 +462,33 @@ struct TrackerView: View {
                 .overlay(alignment: .leading) {
                     if large && query.isEmpty { RotatingPrompt(examples: askExamples).allowsHitTesting(false) }
                 }
-                .onKeyPress(.downArrow) { moveSelection(by: isSearching ? 1 : columnCount, in: flat); return .handled }
+                .onKeyPress(.downArrow) {
+                    // The list highlights its first row before you press anything.
+                    if listsTasks, selection == nil { selection = flat.dropFirst().first?.key ?? flat.first?.key; return .handled }
+                    moveSelection(by: isSearching || listsTasks ? 1 : columnCount, in: flat)
+                    return .handled
+                }
                 .onKeyPress(.upArrow) {
                     // From the first result, up goes back to the "Add …" row.
                     if isSearching, !quickPlan.isEmpty, selection == flat.first?.key { selection = nil; return .handled }
-                    moveSelection(by: isSearching ? -1 : -columnCount, in: flat)
+                    if listsTasks, selection == nil { return .handled }
+                    moveSelection(by: isSearching || listsTasks ? -1 : -columnCount, in: flat)
                     return .handled
                 }
                 .onKeyPress(.rightArrow) {
-                    guard selection != nil else { return .ignored }
+                    guard selection != nil, !listsTasks else { return .ignored }
                     moveSelection(by: 1, in: flat)
                     return .handled
                 }
                 .onKeyPress(.leftArrow) {
-                    guard selection != nil else { return .ignored }
+                    guard selection != nil, !listsTasks else { return .ignored }
                     moveSelection(by: -1, in: flat)
                     return .handled
                 }
                 .onSubmit {
                     let plan = quickPlan
                     if selection == nil, !plan.isEmpty { return addQuickPlan(plan) }
-                    guard let key = selection ?? (isSearching ? flat.first?.key : nil),
+                    guard let key = selection ?? (isSearching || listsTasks ? flat.first?.key : nil),
                           let task = flat.first(where: { $0.key == key }) else { return }
                     pick(task)
                 }
@@ -446,6 +497,10 @@ struct TrackerView: View {
                         backToProjects()
                     } else if !query.isEmpty {
                         query = ""
+                    } else if listsTasks {
+                        // The list first; the next Escape puts the window away.
+                        askListOpen = false
+                        selection = nil
                     } else if large, let windowActions {
                         // Nothing typed: one Escape puts the window away,
                         // rather than first leaving the box and then closing.
@@ -519,8 +574,55 @@ struct TrackerView: View {
         query = ""
         pickedProject = nil
         selection = nil
+        askListOpen = false
         Task { await tracker.toggle(task) }
     }
+
+    #if os(macOS)
+    /// Recent work for the ask box's list, with when you last did it. Not the
+    /// running timer: Return on the first row should start something, never
+    /// pause what you're doing.
+    private var askRecentItems: [AskItem] {
+        tracker.recentTasks.filter { $0.key != tracker.running?.key }
+            .map { AskItem(task: $0, reason: tracker.lastTrackedLabel($0.key), isSuggestion: false) }
+    }
+
+    /// Up to four suggestions: what's on screen first (Toggl's Smart
+    /// Suggestions), then a matched meeting coming up today, then habits.
+    private func askSuggestedItems(excluding shown: Set<TaskKey>) -> [AskItem] {
+        var seen = shown
+        var items: [AskItem] = []
+        if suggestsFromScreen, let context = recorder?.lastExternal, let match = tracker.suggestion(for: context),
+           match.task.key != tracker.running?.key {
+            // Shown even if it's also a recent task: it's the best guess.
+            seen.insert(match.task.key)
+            items.append(AskItem(task: match.task, reason: "in \(context.app)", isSuggestion: true))
+        }
+        for (task, reason) in upcomingMeetingTasks() where seen.insert(task.key).inserted {
+            items.append(AskItem(task: task, reason: reason, isSuggestion: true))
+        }
+        for task in tracker.suggestedTasks where seen.insert(task.key).inserted {
+            items.append(AskItem(task: task, reason: tracker.habitLabel(task.key), isSuggestion: true))
+        }
+        return Array(items.prefix(4))
+    }
+
+    /// Matched meetings happening now or in the next three hours, not yet logged.
+    private func upcomingMeetingTasks() -> [(TrackableTask, String)] {
+        guard let calendar, calendar.access == .granted else { return [] }
+        let now = Date()
+        let today = LocalDate(now)
+        return calendar.meetings(from: today, through: today)
+            .filter { $0.end > now && $0.start < now.addingTimeInterval(3 * 3600) }
+            .compactMap { meeting -> (TrackableTask, String)? in
+                guard case .upcoming(let suggestion?) = tracker.status(of: meeting, at: now) else { return nil }
+                let when = meeting.start <= now ? "meeting now" : "meeting at \(meeting.start.formatted(date: .omitted, time: .shortened))"
+                return (suggestion.task, when)
+            }
+            .prefix(2)
+            .map { $0 }
+    }
+    #endif
 
     /// What the ask box suggests you can type: a search, then a few entries
     /// built from your own recent work.
@@ -867,6 +969,7 @@ private struct FooterButton: View {
 private struct TitleBar: View {
     static let barColor = Color.harvestOrange
     @Environment(TimeTracker.self) private var tracker
+    @Environment(\.windowActions) private var windowActions
     @Binding var selectedDay: LocalDate
     @State private var showingHelp = false
 
@@ -885,6 +988,15 @@ private struct TitleBar: View {
 
                 HStack(spacing: 2) {
                     Spacer()
+                    if let openWeek = windowActions?.openWeekCalendar {
+                        Button { openWeek() } label: {
+                            Image(systemName: "rectangle.split.3x1")
+                        }
+                        .buttonStyle(TitleBarButtonStyle())
+                        .keyboardShortcut("k", modifiers: .command)
+                        .help("Week calendar, with your meetings (⌘K)")
+                        .accessibilityLabel("Week calendar")
+                    }
                     Button {
                         withAnimation(.snappy(duration: 0.2)) { selectedDay = today }
                     } label: {
