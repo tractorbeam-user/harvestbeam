@@ -7,6 +7,20 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam 1.4.0-beta.1</title>
+      <pubDate>Mon, 26 Oct 2026 22:57:18 +0000</pubDate>
+      <sparkle:version>82</sparkle:version>
+      <sparkle:shortVersionString>1.4.0-beta.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:channel>beta</sparkle:channel>
+      <description sparkle:format="markdown"><![CDATA[**Beta: automatic tracking.** Everything in 1.3, plus, each off until you turn it on in Preferences → Tracking:
+- Timeline: the apps and windows you use, by the hour, with untracked stretches ready to log.
+- Autotracker rules: offers to start (or starts) a timer when a window matches.
+- Suggestions from what's on screen, meetings that log themselves, and a Continue/Stop shortcut.]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.4.0-beta.1</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.4.0-beta.1/Harvestbeam-1.4.0-beta.1.dmg" type="application/octet-stream" sparkle:edSignature="BaK5j5YLncypL1Esun0ZBDTFl8ZCG6taGAiO1pQiJCZvCLUgPrKkS7aJRHBH8t2Qe4fINoP/LoQqhrnOp6enDQ==" length="8865961" />
+    </item>
+    <item>
       <title>Harvestbeam 1.3.0</title>
       <pubDate>Mon, 26 Oct 2026 22:56:14 +0000</pubDate>
       <sparkle:version>81</sparkle:version>
