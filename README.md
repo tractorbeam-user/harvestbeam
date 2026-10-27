@@ -34,13 +34,13 @@ scripts/release.sh 1.1.0 "**New:** Start Again Today from any entry.
 - Fixed a crash when a project had no tasks."
 ```
 
-A beta goes out on its own channel, with the beta features (Sources/HarvestUI/Beta.swift) switched on:
+A beta is its own app, **Harvestbeam Beta**, with the beta features (Sources/HarvestUI/Beta.swift) switched on:
 
 ```bash
-CHANNEL=beta scripts/release.sh 1.4.0-beta.1 "**Beta:** automatic tracking."
+CHANNEL=beta scripts/release.sh 1.4.0-beta.3 "**Beta:** automatic tracking."
 ```
 
-It's a GitHub pre-release, so the site's "latest" download stays the regular version, and its appcast item is marked `<sparkle:channel>beta</sparkle:channel>`, so only beta builds are offered it. Beta builds still take regular releases.
+It builds `Harvestbeam Beta.app` with its own bundle ID (`com.tractorbeam.harvestbar.beta`), so it installs next to Harvestbeam with its own settings while sharing the Keychain sign-in. It ships as `Harvestbeam-Beta-<version>.dmg` in a GitHub pre-release, so the site's "latest" download stays the regular version, and goes in [`appcast-beta.xml`](appcast-beta.xml), the feed only the beta reads.
 
 From a clean `main`, this pushes, builds the app with that version, wraps it in a branded disk image (`scripts/make-dmg.sh`) and publishes a GitHub Release with install notes. Then it signs the disk image with Sparkle's `sign_update`, adds the release to [`appcast.xml`](appcast.xml) and commits and pushes that to `main`. It needs the GitHub CLI (`gh`) signed in and the update signing key (below).
 

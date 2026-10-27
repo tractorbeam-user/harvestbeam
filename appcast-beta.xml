@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sparkle update feed for Harvestbeam Beta, the separate beta app.
+     CHANNEL=beta scripts/release.sh adds an item per beta; only beta builds
+     read it (SUFeedURL in build-app.sh). -->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Harvestbeam Beta</title>
+    <link>https://github.com/tractorbeam-user/harvestbeam</link>
+    <language>en</language>
+  </channel>
+</rss>

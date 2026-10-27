@@ -60,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             button.action = #selector(statusItemClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.imagePosition = .imageLeading
-            button.setAccessibilityTitle("Harvestbeam")
+            button.setAccessibilityTitle(AppInfo.name)
         }
         controlButton.isHidden = true
         statusItem.button?.addSubview(controlButton)
@@ -122,8 +122,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         appMenu.addItem(withTitle: "Preferences…", action: #selector(showPreferences), keyEquivalent: ",")
         appMenu.addItem(withTitle: "Check for Updates…", action: #selector(Updates.checkForUpdates(_:)), keyEquivalent: "").target = updates
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide Harvestbeam", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit Harvestbeam", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Hide \(AppInfo.name)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Quit \(AppInfo.name)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
 
@@ -160,7 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             backing: .buffered,
             defer: false
         )
-        panel.title = "Harvestbeam"
+        panel.title = AppInfo.name
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.titlebarSeparatorStyle = .none
@@ -485,19 +485,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium),
             ])
             let task = (tracker.running ?? paused).map { tracker.task(for: $0) }
-            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)" } ?? "Harvestbeam (⌥H)"
+            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)" } ?? "\(AppInfo.name) (⌥H)"
             button.layoutSubtreeIfNeeded()
             if let cell = button.cell as? NSButtonCell {
                 controlButton.frame = cell.imageRect(forBounds: button.bounds)
             }
         } else {
             controlButton.isHidden = true
-            let image = NSImage(systemSymbolName: "timer", accessibilityDescription: "Harvestbeam")?
+            let image = NSImage(systemSymbolName: "timer", accessibilityDescription: AppInfo.name)?
                 .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
             image?.isTemplate = true
             button.image = image
             button.attributedTitle = NSAttributedString(string: "")
-            button.toolTip = "Harvestbeam (⌥H)"
+            button.toolTip = "\(AppInfo.name) (⌥H)"
         }
     }
 }

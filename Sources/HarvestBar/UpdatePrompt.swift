@@ -1,4 +1,5 @@
 import AppKit
+import HarvestUI
 import Observation
 import Sparkle
 import SwiftUI
@@ -328,7 +329,7 @@ struct UpdateView: View {
     private var title: String {
         switch prompt.phase {
         case .checking: "Checking for updates"
-        case .found(let info): "Harvestbeam \(info.version) is here"
+        case .found(let info): "\(AppInfo.name) \(info.version) is here"
         case .upToDate: "You're up to date"
         case .downloading: "Downloading \(prompt.version)"
         case .preparing: "Getting \(prompt.version) ready"
@@ -345,11 +346,11 @@ struct UpdateView: View {
         case .upToDate(let version): "You're on the latest version, \(version)."
         case .downloading: nil
         case .preparing: "Checking the download and unpacking it."
-        case .installing: "Harvestbeam reopens in a moment."
-        case .ready(let info): "Harvestbeam \(info.version) is downloaded. It installs when you relaunch, or the next time you quit."
+        case .installing: "\(AppInfo.name) reopens in a moment."
+        case .ready(let info): "\(AppInfo.name) \(info.version) is downloaded. It installs when you relaunch, or the next time you quit."
         case .failed(let failure):
             failure.whileChecking
-                ? "Harvestbeam couldn't reach the update server. Check your internet connection, then try again."
+                ? "\(AppInfo.name) couldn't reach the update server. Check your internet connection, then try again."
                 : "Something went wrong while getting the new version ready. The version you have still works."
         }
     }

@@ -13,3 +13,9 @@ public enum Beta {
     /// The Sparkle channel beta builds also take updates from.
     public static let channel = "beta"
 }
+
+/// The app's own name: "Harvestbeam", or "Harvestbeam Beta" for the beta.
+public enum AppInfo {
+    public static let name: String =
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Harvestbeam"
+}

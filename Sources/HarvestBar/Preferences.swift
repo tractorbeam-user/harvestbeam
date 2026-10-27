@@ -147,8 +147,8 @@ struct GeneralPrefs: View {
                 }
                 Toggle("Install updates automatically", isOn: $updates.installsAutomatically)
                     .disabled(!updates.checksAutomatically)
-                Text("Harvestbeam looks for a new version on GitHub once a day. Unless it installs them automatically, it asks first."
-                     + (Beta.isEnabled ? " You're on the beta, so you get beta versions as well as regular ones. To leave it, install the regular version from the website." : ""))
+                Text("\(AppInfo.name) looks for a new version on GitHub once a day. Unless it installs them automatically, it asks first."
+                     + (Beta.isEnabled ? " This is the beta, a separate app from Harvestbeam, so it gets new betas. To leave it, quit it and move it to the Trash." : ""))
                     .prefsNote()
             }
         }
@@ -181,7 +181,7 @@ struct ShortcutPrefs: View {
     var body: some View {
         PrefsPage {
             PrefsSection("Anywhere on your Mac") {
-                ShortcutRecorder(title: "Show or hide Harvestbeam", name: "toggle", display: $display)
+                ShortcutRecorder(title: "Show or hide \(AppInfo.name)", name: "toggle", display: $display)
                 if Beta.isEnabled {
                     ShortcutRecorder(title: "Continue last entry, or stop the timer", name: "continue", display: $continueDisplay)
                 }
@@ -462,7 +462,7 @@ struct SupportPrefs: View {
     var body: some View {
         PrefsPage {
             PrefsSection("Reset App") {
-                Text("Harvestbeam keeps your projects and recent entries in memory. Reload them from Harvest if something looks out of date.")
+                Text("\(AppInfo.name) keeps your projects and recent entries in memory. Reload them from Harvest if something looks out of date.")
                     .prefsNote()
                 Button(reloaded ? "Reloaded" : "Reload from Harvest") {
                     Task {
@@ -491,7 +491,7 @@ struct SupportPrefs: View {
             Divider()
             PrefsSection("About") {
                 HStack {
-                    Text("Harvestbeam \(version)")
+                    Text("\(AppInfo.name) \(version)")
                     Spacer()
                     Link("Report a Problem…", destination: URL(string: "https://github.com/tractorbeam-user/harvestbeam/issues")!)
                 }

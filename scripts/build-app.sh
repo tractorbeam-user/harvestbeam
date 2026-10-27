@@ -2,24 +2,33 @@
 # Builds "Harvestbeam.app" with SwiftPM and wraps it in an app bundle.
 #   scripts/build-app.sh            → build/Harvestbeam.app
 #   scripts/build-app.sh --install  → also copies it to /Applications and opens it
+#   CHANNEL=beta scripts/build-app.sh   → build/Harvestbeam Beta.app
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# CHANNEL=beta builds the beta: its own app, "Harvestbeam Beta", with its own
+# bundle ID (so it sits next to Harvestbeam, with its own settings, sharing
+# the Keychain sign-in), the beta features switched on (Sources/HarvestUI/
+# Beta.swift) and updates from the beta feed, appcast-beta.xml.
+CHANNEL="${CHANNEL:-}"
 APP_NAME="Harvestbeam"
 BUNDLE_ID="com.tractorbeam.harvestbar"
+FEED_FILE="appcast.xml"
+BETA_KEY=""
+if [[ "$CHANNEL" == "beta" ]]; then
+  APP_NAME="Harvestbeam Beta"
+  BUNDLE_ID="com.tractorbeam.harvestbar.beta"
+  FEED_FILE="appcast-beta.xml"
+  BETA_KEY="<key>HBBetaFeatures</key><true/>"
+fi
 # scripts/release.sh passes VERSION; local builds keep the default.
 VERSION="${VERSION:-1.0.0}"
 # Sparkle compares this build number to the appcast's, so it only goes up.
 BUILD="${BUILD:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 APP="build/${APP_NAME}.app"
-# CHANNEL=beta builds the beta: same app, with the beta features switched on
-# and Sparkle also taking beta-channel updates (see Sources/HarvestUI/Beta.swift).
-CHANNEL="${CHANNEL:-}"
-BETA_KEY=""
-[[ "$CHANNEL" == "beta" ]] && BETA_KEY="<key>HBBetaFeatures</key><true/>"
-# Sparkle reads updates from appcast.xml on main (scripts/release.sh adds to it)
+# Sparkle reads updates from the feed on main (scripts/release.sh adds to it)
 # and only installs ones signed with the private half of this key.
-FEED_URL="${FEED_URL:-https://raw.githubusercontent.com/tractorbeam-user/harvestbeam/main/appcast.xml}"
+FEED_URL="${FEED_URL:-https://raw.githubusercontent.com/tractorbeam-user/harvestbeam/main/${FEED_FILE}}"
 SPARKLE_PUBLIC_KEY="y+DGD90Za+tNzS/KyDmBkCKFUwzGBoHzC25Q1U1ozac="
 
 # With only the Command Line Tools installed, the newest macOS SDK expects
@@ -75,7 +84,8 @@ codesign --force --deep --sign - "$APP"
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then
-  pkill -x HarvestBar 2>/dev/null || true
+  # Quit only this app: the beta and the regular one can both be installed.
+  pkill -f "/Applications/${APP_NAME}.app/Contents/MacOS/HarvestBar" 2>/dev/null || true
   rm -rf "/Applications/${APP_NAME}.app"
   rm -rf "/Applications/Harvest Bar.app" # the app's old name
   cp -R "$APP" /Applications/

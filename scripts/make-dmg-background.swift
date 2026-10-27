@@ -1,6 +1,6 @@
 // Draws the disk image window's background: Harvestbeam orange, the name in
 // white, and a dotted beam from the app to Applications that ends in the
-// Tractorbeam triangle. Run: swift scripts/make-dmg-background.swift <dir>
+// Tractorbeam triangle. Run: swift scripts/make-dmg-background.swift <dir> [name]
 // Writes background.png and background@2x.png. Finder draws icon labels black
 // in Light Mode and white in Dark Mode; both read on this orange.
 import AppKit
@@ -15,6 +15,8 @@ let appCenter = NSPoint(x: 260, y: 228)
 let applicationsCenter = NSPoint(x: 540, y: 228)
 
 let directory = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first ?? ".")
+/// "Harvestbeam", or "Harvestbeam Beta" for the beta's disk image.
+let appName = CommandLine.arguments.dropFirst(2).first ?? "Harvestbeam"
 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
 func render(scale: CGFloat) -> Data {
@@ -45,7 +47,7 @@ func render(scale: CGFloat) -> Data {
     // The name, in a serif like the welcome window's headlines.
     let serif = NSFontDescriptor.preferredFontDescriptor(forTextStyle: .largeTitle).withDesign(.serif)
         .map { NSFont(descriptor: $0, size: 30) } ?? nil
-    let title = NSAttributedString(string: "Harvestbeam", attributes: [
+    let title = NSAttributedString(string: appName, attributes: [
         .font: serif ?? NSFont.systemFont(ofSize: 30),
         .foregroundColor: NSColor.white,
         .kern: -0.4,
@@ -72,7 +74,7 @@ func render(scale: CGFloat) -> Data {
     NSColor.white.setFill()
     arrow.fill()
 
-    let caption = NSAttributedString(string: "Drag Harvestbeam into Applications", attributes: [
+    let caption = NSAttributedString(string: "Drag \(appName) into Applications", attributes: [
         .font: NSFont.systemFont(ofSize: 13, weight: .medium),
         .foregroundColor: NSColor(white: 1, alpha: 0.85),
     ])
