@@ -8,6 +8,16 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam Beta 1.4.0-beta.4</title>
+      <pubDate>Wed, 28 Oct 2026 18:42:29 +0000</pubDate>
+      <sparkle:version>93</sparkle:version>
+      <sparkle:shortVersionString>1.4.0-beta.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[**Edits that stick,** as in Harvestbeam 1.3.2, plus the beta's automatic tracking: the Timeline, Autotracker rules, suggestions from what's on screen, meetings that log themselves and a Continue/Stop shortcut.]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.4.0-beta.4</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.4.0-beta.4/Harvestbeam-Beta-1.4.0-beta.4.dmg" type="application/octet-stream" sparkle:edSignature="UyuYBqIdR0FjonDm/RzfcB+cvT5OJXCkSvE8+7wzQ1cJDMnm2ar/WJoJcMbJfgJ/C5xUhis1G/hVzjk1Q3lfAg==" length="8894714" />
+    </item>
+    <item>
       <title>Harvestbeam Beta 1.4.0-beta.3</title>
       <pubDate>Tue, 27 Oct 2026 21:16:51 +0000</pubDate>
       <sparkle:version>89</sparkle:version>
