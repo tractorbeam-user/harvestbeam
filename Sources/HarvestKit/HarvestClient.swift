@@ -8,13 +8,15 @@ public protocol HarvestService: Sendable {
     func projectAssignments() async throws -> [ProjectAssignment]
     func timeEntries(userID: Int, from: LocalDate, to: LocalDate) async throws -> [TimeEntry]
     func startTimer(projectID: Int, taskID: Int, spentDate: LocalDate, notes: String?) async throws -> TimeEntry
-    /// Creates a stopped entry with hours already logged.
-    func createEntry(projectID: Int, taskID: Int, spentDate: LocalDate, notes: String?, hours: Double) async throws -> TimeEntry
+    /// Creates a stopped entry with hours already logged; on accounts that
+    /// track start and end times, `times` sets those instead.
+    func createEntry(projectID: Int, taskID: Int, spentDate: LocalDate, notes: String?, hours: Double, times: ClockTimes?) async throws -> TimeEntry
     func restartTimer(id: Int) async throws -> TimeEntry
     func stopTimer(id: Int) async throws -> TimeEntry
     func updateNotes(id: Int, notes: String) async throws -> TimeEntry
-    /// Changes an entry's task, notes and (for stopped entries) hours.
-    func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?) async throws -> TimeEntry
+    /// Changes an entry's task, notes and (for stopped entries) hours, or its
+    /// start and end `times` on accounts that track those.
+    func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?, times: ClockTimes?) async throws -> TimeEntry
     func deleteEntry(id: Int) async throws
 }
 
@@ -120,9 +122,15 @@ public struct HarvestClient: HarvestService {
         return try await send("POST", "time_entries", body: Body(projectId: projectID, taskId: taskID, spentDate: spentDate, notes: notes))
     }
 
-    public func createEntry(projectID: Int, taskID: Int, spentDate: LocalDate, notes: String?, hours: Double) async throws -> TimeEntry {
-        struct Body: Encodable { let projectId: Int; let taskId: Int; let spentDate: LocalDate; let notes: String?; let hours: Double }
-        return try await send("POST", "time_entries", body: Body(projectId: projectID, taskId: taskID, spentDate: spentDate, notes: notes, hours: hours))
+    public func createEntry(projectID: Int, taskID: Int, spentDate: LocalDate, notes: String?, hours: Double, times: ClockTimes?) async throws -> TimeEntry {
+        struct Body: Encodable {
+            let projectId: Int; let taskId: Int; let spentDate: LocalDate; let notes: String?
+            let hours: Double?; let startedTime: String?; let endedTime: String?
+        }
+        return try await send("POST", "time_entries", body: Body(
+            projectId: projectID, taskId: taskID, spentDate: spentDate, notes: notes,
+            hours: times == nil ? hours : nil, startedTime: times?.started, endedTime: times?.ended
+        ))
     }
 
     public func restartTimer(id: Int) async throws -> TimeEntry {
@@ -138,9 +146,15 @@ public struct HarvestClient: HarvestService {
         return try await send("PATCH", "time_entries/\(id)", body: Body(notes: notes))
     }
 
-    public func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?) async throws -> TimeEntry {
-        struct Body: Encodable { let projectId: Int; let taskId: Int; let notes: String; let hours: Double? }
-        return try await send("PATCH", "time_entries/\(id)", body: Body(projectId: projectID, taskId: taskID, notes: notes, hours: hours))
+    public func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?, times: ClockTimes?) async throws -> TimeEntry {
+        struct Body: Encodable {
+            let projectId: Int; let taskId: Int; let notes: String
+            let hours: Double?; let startedTime: String?; let endedTime: String?
+        }
+        return try await send("PATCH", "time_entries/\(id)", body: Body(
+            projectId: projectID, taskId: taskID, notes: notes,
+            hours: times == nil ? hours : nil, startedTime: times?.started, endedTime: times?.ended
+        ))
     }
 
     public func deleteEntry(id: Int) async throws {

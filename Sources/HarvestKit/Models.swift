@@ -185,6 +185,9 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
     public let notes: String?
     public let isRunning: Bool
     public let timerStartedAt: Date?
+    /// "9:00am", on accounts that track start and end times.
+    public let startedTime: String?
+    public let endedTime: String?
     public let createdAt: Date
     public let updatedAt: Date
     /// Harvest won't let a locked entry change: it's approved, invoiced, or
@@ -211,7 +214,8 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
     public init(
         id: Int, spentDate: LocalDate, project: NamedRef, task: NamedRef, client: NamedRef?,
         hours: Double, hoursWithoutTimer: Double? = nil, notes: String? = nil, isRunning: Bool = false,
-        timerStartedAt: Date? = nil, createdAt: Date = .now, updatedAt: Date = .now,
+        timerStartedAt: Date? = nil, startedTime: String? = nil, endedTime: String? = nil,
+        createdAt: Date = .now, updatedAt: Date = .now,
         isLocked: Bool? = nil, lockedReason: String? = nil, isClosed: Bool? = nil, isBilled: Bool? = nil,
         invoice: InvoiceRef? = nil
     ) {
@@ -225,6 +229,8 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
         self.notes = notes
         self.isRunning = isRunning
         self.timerStartedAt = timerStartedAt
+        self.startedTime = startedTime
+        self.endedTime = endedTime
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.isLocked = isLocked

@@ -311,7 +311,7 @@ extension TimeTracker {
         } else {
             meetingMemory.forget(meeting.title)
         }
-        if let entry = await addEntry(task: task, on: meeting.day, notes: notes, hours: hours) {
+        if let entry = await addEntry(task: task, on: meeting.day, notes: notes, hours: hours, startingAt: meeting.start) {
             meetingMemory.markLogged(meeting.id, entryID: entry.id)
         }
     }

@@ -356,23 +356,42 @@ public final class TimeTracker {
         await toggle(task(for: entry))
     }
 
+    /// Accounts set to track start and end times keep an entry's hours as
+    /// the gap between them, so new lengths go in as times.
+    var tracksStartAndEnd: Bool { company?.wantsTimestampTimers == true }
+
+    /// The start and end times that give `entry` a new length: it keeps its
+    /// start, and the end moves. Nil on duration accounts.
+    func times(for entry: TimeEntry, hours: Double) -> ClockTimes? {
+        guard tracksStartAndEnd else { return nil }
+        if let start = entry.startedTime { return ClockTime.times(startingAt: start, hours: hours) }
+        return entry.timerStartedAt.flatMap { ClockTime.times(from: $0, hours: hours) }
+    }
+
     public func updateEntry(_ entry: TimeEntry, task: TrackableTask, notes: String, hours: Double?) async {
         guard let service else { return }
         do {
+            var target = entry
+            var newHours = entry.isRunning ? nil : hours
             // Typing a new time on a running timer settles it: stop the timer
             // (Harvest won't set hours on a running one) and keep the new time.
             if entry.isRunning, let hours, abs(hours - entry.elapsed() / 3600) > 1.0 / 120 {
-                let stopped = try await service.stopTimer(id: entry.id)
-                upsert(try await service.updateEntry(
-                    id: stopped.id, projectID: task.project.id, taskID: task.task.id, notes: notes, hours: hours
-                ))
-            } else {
-                upsert(try await service.updateEntry(
-                    id: entry.id, projectID: task.project.id, taskID: task.task.id,
-                    notes: notes, hours: entry.isRunning ? nil : hours
-                ))
+                target = try await service.stopTimer(id: entry.id)
+                newHours = hours
             }
-            errorMessage = nil
+            let updated = try await service.updateEntry(
+                id: target.id, projectID: task.project.id, taskID: task.task.id, notes: notes,
+                hours: newHours, times: newHours.flatMap { times(for: target, hours: $0) }
+            )
+            upsert(updated)
+            // Say so when Harvest kept a different length, rather than
+            // quietly showing the old time again.
+            if let newHours, abs(updated.hours - newHours) > 1.0 / 60 {
+                errorMessage = "Harvest kept this entry at \(TimeFormat.hoursMinutes(updated.hours * 3600)), not \(TimeFormat.hoursMinutes(newHours * 3600))."
+                    + (tracksStartAndEnd ? " Your account tracks start and end times; change them in Harvest." : "")
+            } else {
+                errorMessage = nil
+            }
         } catch {
             await recover(from: error)
         }
@@ -386,7 +405,7 @@ public final class TimeTracker {
             let hours = max(0, stopped.hours - seconds / 3600)
             var updated = try await service.updateEntry(
                 id: stopped.id, projectID: stopped.project.id, taskID: stopped.task.id,
-                notes: stopped.notes ?? "", hours: hours
+                notes: stopped.notes ?? "", hours: hours, times: times(for: stopped, hours: hours)
             )
             if keepRunning { updated = try await service.restartTimer(id: updated.id) }
             upsert(updated)
@@ -398,8 +417,10 @@ public final class TimeTracker {
 
     /// Adds an entry to `day`: a running timer when no hours are given (today
     /// only), otherwise a stopped entry with those hours. Returns the entry.
+    /// On accounts that track start and end times it starts at `startingAt`
+    /// (a meeting's start), else ends now (today) or starts at 9:00 (other days).
     @discardableResult
-    public func addEntry(task: TrackableTask, on day: LocalDate, notes: String, hours: Double?) async -> TimeEntry? {
+    public func addEntry(task: TrackableTask, on day: LocalDate, notes: String, hours: Double?, startingAt: Date? = nil) async -> TimeEntry? {
         guard let service else { return nil }
         // Saving right after starting or pausing a timer waits its turn,
         // instead of quietly doing nothing.
@@ -413,7 +434,13 @@ public final class TimeTracker {
         do {
             let added: TimeEntry
             if let hours {
-                added = try await service.createEntry(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes, hours: hours)
+                var times: ClockTimes?
+                if tracksStartAndEnd {
+                    let start = startingAt ?? (day == LocalDate() ? Date().addingTimeInterval(-hours * 3600) : day.date().addingTimeInterval(9 * 3600))
+                    times = ClockTime.times(from: start, hours: hours)
+                }
+                added = try await service.createEntry(projectID: task.project.id, taskID: task.task.id, spentDate: day,
+                                                      notes: notes, hours: hours, times: times)
             } else {
                 if let current = running { upsert(try await service.stopTimer(id: current.id)) }
                 added = try await service.startTimer(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes)
@@ -447,7 +474,7 @@ public final class TimeTracker {
         do {
             var restored = try await service.createEntry(
                 projectID: entry.project.id, taskID: entry.task.id, spentDate: entry.spentDate,
-                notes: entry.notes, hours: entry.elapsed() / 3600
+                notes: entry.notes, hours: entry.elapsed() / 3600, times: times(for: entry, hours: entry.elapsed() / 3600)
             )
             if entry.isRunning {
                 if let current = running { upsert(try await service.stopTimer(id: current.id)) }

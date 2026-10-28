@@ -113,7 +113,7 @@ public actor DemoHarvestService: HarvestService {
         return entry
     }
 
-    public func createEntry(projectID: Int, taskID: Int, spentDate: LocalDate, notes: String?, hours: Double) async throws -> TimeEntry {
+    public func createEntry(projectID: Int, taskID: Int, spentDate: LocalDate, notes: String?, hours: Double, times: ClockTimes?) async throws -> TimeEntry {
         guard let a = assignments.first(where: { $0.project.id == projectID }),
               let ta = a.taskAssignments.first(where: { $0.task.id == taskID })
         else { throw HarvestError.server(status: 422, message: "Unknown task") }
@@ -150,7 +150,7 @@ public actor DemoHarvestService: HarvestService {
         }
     }
 
-    public func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?) async throws -> TimeEntry {
+    public func updateEntry(id: Int, projectID: Int, taskID: Int, notes: String, hours: Double?, times: ClockTimes?) async throws -> TimeEntry {
         guard let a = assignments.first(where: { $0.project.id == projectID }),
               let ta = a.taskAssignments.first(where: { $0.task.id == taskID })
         else { throw HarvestError.server(status: 422, message: "Unknown task") }
