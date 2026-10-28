@@ -2,17 +2,7 @@ import HarvestKit
 import SwiftUI
 
 enum EntryEditor {
-    /// "1:30" → 1.5, "1.25" → 1.25, "45m" → 0.75.
-    static func parseHours(_ text: String) -> Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespaces).lowercased()
-        if trimmed.contains(":") {
-            let parts = trimmed.split(separator: ":")
-            guard parts.count == 2, let h = Double(parts[0]), let m = Double(parts[1]), m < 60 else { return nil }
-            return h + m / 60
-        }
-        if trimmed.hasSuffix("m"), let m = Double(trimmed.dropLast()) { return m / 60 }
-        return Double(trimmed.replacingOccurrences(of: "h", with: ""))
-    }
+    static func parseHours(_ text: String) -> Double? { TimeFormat.parseHours(text) }
 }
 
 /// Add or edit time, laid out like Harvest's New Time Entry popover: a star,
@@ -40,6 +30,8 @@ struct NewEntryEditor: View {
     private var isToday: Bool { day == LocalDate() }
     private var parsedHours: Double? { EntryEditor.parseHours(hours) }
     private var hoursEmpty: Bool { hours.trimmingCharacters(in: .whitespaces).isEmpty }
+    /// Something's typed in the time box that can't be read as a time.
+    private var hoursInvalid: Bool { !hoursEmpty && parsedHours == nil }
     private var startsTimer: Bool { entry == nil && meeting == nil && isToday && hoursEmpty }
     private var isTimerRunning: Bool { entry?.isRunning ?? false }
     private var selectedTask: TrackableTask? {
@@ -89,10 +81,21 @@ struct NewEntryEditor: View {
                         .padding(.horizontal, 10)
                         .frame(width: 84, height: 50)
                         .background(fieldBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(Color.red.opacity(hoursInvalid ? 0.7 : 0), lineWidth: 1.5)
+                        )
                         .hoverOutline()
                         .focused($hoursFocused)
                         .help(isTimerRunning ? "Change the time to stop the timer at it"
-                              : startsTimer || (entry == nil && isToday) ? "h:mm or decimal. Leave empty to start a timer." : "h:mm or decimal")
+                              : startsTimer || (entry == nil && isToday) ? "0:25, 25m or 1.5. Leave empty to start a timer." : "0:25, 25m or 1.5")
+                }
+                // Why Save is off, instead of a button that just won't work.
+                if hoursInvalid {
+                    Text("Type a time like 0:25, 25m or 1.5")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Color.red)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
             .padding(.horizontal, 14)
@@ -140,7 +143,7 @@ struct NewEntryEditor: View {
                 Button(startsTimer ? "Start Timer" : meeting != nil ? "Log It" : "Save Entry") { save() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(PillButtonStyle(prominent: true))
-                    .disabled(isSaving || taskKey == nil || (!startsTimer && !isTimerRunning && !hoursEmpty && parsedHours == nil))
+                    .disabled(isSaving || taskKey == nil || (!startsTimer && !isTimerRunning && hoursInvalid))
             }
             .padding(14)
         }
