@@ -205,8 +205,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         panel.setFrameAutosaveName(Self.frameName)
     }
 
-    /// The menu bar icon opens the window, or hides it whenever it's showing,
-    /// even if another app is in front.
+    /// The menu bar icon opens the window, or hides it whenever it's on screen,
+    /// even if another app is in front. A window buried behind others comes
+    /// forward instead.
     @objc func controlClicked() {
         // Nothing to pause or resume: open the window to pick something.
         guard tracker.running != nil || tracker.pausedEntry != nil else {
@@ -231,7 +232,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 return
             }
         }
-        if panel.isVisible && !panel.isMiniaturized {
+        // Only put it away if you can actually see it. Open but buried under
+        // another app's windows, or left on another Space, it counts as
+        // visible to AppKit, and hiding it would make this click look dead.
+        if panel.isVisible && !panel.isMiniaturized && panel.occlusionState.contains(.visible) {
             hidePanel()
         } else {
             // Opened with the mouse, so don't grab the keyboard for the ask box.
