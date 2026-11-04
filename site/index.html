@@ -552,6 +552,11 @@ button.key.open path { transform: translateY(-2px) rotate(-20deg); }
 .cl h3 { font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: -0.015em; margin: 0 0 8px; }
 .cl ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; display: grid; gap: 5px; }
 .cl ul li::marker { color: var(--orange); }
+.cl > ol > li[hidden] { display: none; }
+.cl .more { display: block; margin: 16px auto 0; font: inherit; font-weight: 600; font-size: 14.5px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 10px 20px; cursor: pointer; transition: transform .15s; }
+.cl .more:hover { transform: translateY(-1px); }
+.cl .more:active { transform: translateY(0) scale(.98); }
+.cl .more:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 
 /* Feedback: back on the page background, an orange-tinted card with the
    pitch on the left and the form on the right. */
@@ -970,9 +975,32 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: s
           </div>
         </li>
       </ol>
+      <button class="more" type="button" hidden>Show more</button>
       </div>
     </section>
   </div>
+  <script>
+  // What's new: the latest 5 releases, then 5 more per click. Without
+  // JavaScript every release shows.
+  (() => {
+    const list = document.querySelectorAll(".cl > ol > li");
+    const more = document.querySelector(".cl .more");
+    const STEP = 5;
+    let shown = 0;
+    const show = () => {
+      shown += STEP;
+      list.forEach((li, i) => { li.hidden = i >= shown; });
+      more.hidden = shown >= list.length;
+    };
+    more.addEventListener("click", () => {
+      const next = list[shown];
+      show();
+      next?.querySelector(".ver")?.setAttribute("tabindex", "-1");
+      next?.querySelector(".ver")?.focus({ preventScroll: true });
+    });
+    show();
+  })();
+  </script>
 
   <section class="wrap feedback" id="feedback">
     <div class="fbwrap">
