@@ -7,6 +7,16 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam 1.3.5</title>
+      <pubDate>Wed, 04 Nov 2026 21:57:04 +0000</pubDate>
+      <sparkle:version>104</sparkle:version>
+      <sparkle:shortVersionString>1.3.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[Harvestbeam is in the Dock and ⌘-Tab, and clicking its Dock icon always brings the window back. Putting the window away hides it like any Mac app, right where you left it, and a window left on an unplugged screen comes back under the menu bar.]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.3.5</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.3.5/Harvestbeam-1.3.5.dmg" type="application/octet-stream" sparkle:edSignature="F9rki5RElZC4bvuUqIMjVzT0et9SSZcDWolKGBAk+rJOJwpQGO8Wdm1NF7bEDgwJ1dNZ91nkQ9xqCOxoVDLcAA==" length="9042394" />
+    </item>
+    <item>
       <title>Harvestbeam 1.3.4</title>
       <pubDate>Wed, 04 Nov 2026 21:07:59 +0000</pubDate>
       <sparkle:version>99</sparkle:version>
