@@ -44,6 +44,9 @@ public final class TimeTracker {
     /// Autotracker rules, and which windows you track what in.
     public let contextMemory: ContextMemory
     public let isDemo: Bool
+    /// Told about a few milestones, for the app's anonymous usage counts.
+    /// Never carries anything from Harvest: just which thing happened.
+    public var onUsage: ((UsageEvent) -> Void)?
 
     @ObservationIgnored private var service: (any HarvestService)?
     @ObservationIgnored private var lastRefresh: Date?
@@ -286,6 +289,7 @@ public final class TimeTracker {
             }
             upsert(started)
             errorMessage = nil
+            onUsage?(.timerStarted)
         } catch {
             await recover(from: error)
         }
@@ -519,6 +523,7 @@ public final class TimeTracker {
         phase = .loading
         errorMessage = nil
         await refresh(force: true)
+        onUsage?(.signedIn)
     }
 
     public func signOut() {

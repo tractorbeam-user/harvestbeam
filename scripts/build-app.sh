@@ -30,6 +30,9 @@ APP="build/${APP_NAME}.app"
 # and only installs ones signed with the private half of this key.
 FEED_URL="${FEED_URL:-https://raw.githubusercontent.com/tractorbeam-user/harvestbeam/main/${FEED_FILE}}"
 SPARKLE_PUBLIC_KEY="y+DGD90Za+tNzS/KyDmBkCKFUwzGBoHzC25Q1U1ozac="
+# Anonymous usage counts (Sources/HarvestBar/Analytics.swift). Empty leaves
+# them off. Not a secret: every copy of the app carries it.
+TELEMETRYDECK_APP_ID="${TELEMETRYDECK_APP_ID-}"
 
 # With only the Command Line Tools installed, the newest macOS SDK expects
 # SwiftUI macro plugins that ship with Xcode. Fall back to the newest SDK that
@@ -72,6 +75,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>SUFeedURL</key><string>${FEED_URL}</string>
   <key>SUPublicEDKey</key><string>${SPARKLE_PUBLIC_KEY}</string>
   <key>SUEnableAutomaticChecks</key><true/>
+  <key>TelemetryDeckAppID</key><string>${TELEMETRYDECK_APP_ID}</string>
   ${BETA_KEY}
   <key>NSAppleEventsUsageDescription</key><string>Harvestbeam reads the website in your browser's front tab, just its domain, for your Timeline and Autotracker rules. It stays on this Mac.</string>
   <key>NSCalendarsFullAccessUsageDescription</key><string>Harvestbeam shows your meetings next to your time, so you can log them in a click. Your calendar stays on this Mac.</string>

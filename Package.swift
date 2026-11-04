@@ -12,6 +12,9 @@ let package = Package(
     dependencies: [
         // In-app updates for the Mac app, from the appcast on main.
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.0"),
+        // Anonymous usage counts (active users, versions), off with a switch
+        // in Preferences. Never sends anything from Harvest.
+        .package(url: "https://github.com/TelemetryDeck/SwiftSDK", from: "2.14.2"),
     ],
     targets: [
         // Models, Harvest API client, Keychain, ranking. No UI.
@@ -21,7 +24,11 @@ let package = Package(
         // The macOS menu bar shell: status item, popover, ⌥H shortcut.
         .executableTarget(
             name: "HarvestBar",
-            dependencies: ["HarvestKit", "HarvestUI", .product(name: "Sparkle", package: "Sparkle")]
+            dependencies: [
+                "HarvestKit", "HarvestUI",
+                .product(name: "Sparkle", package: "Sparkle"),
+                .product(name: "TelemetryDeck", package: "SwiftSDK"),
+            ]
         ),
         .testTarget(name: "HarvestKitTests", dependencies: ["HarvestKit"]),
     ]

@@ -70,6 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
 
         Prefs.register()
         Prefs.applyDockVisibility()
+        Analytics.update(isDemo: tracker.isDemo)
+        tracker.onUsage = { Analytics.send($0) }
         registerHotKey()
         NotificationCenter.default.addObserver(forName: .toggleShortcutChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.registerHotKey() }
@@ -318,6 +320,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             weekCalendar = WeekCalendarWindowController(tracker: tracker, calendar: calendarStore, recorder: recorder)
         }
         weekCalendar?.show()
+        Analytics.send(.weekCalendarOpened)
     }
 
     /// (Re)registers the show/hide shortcut from preferences; none if cleared.

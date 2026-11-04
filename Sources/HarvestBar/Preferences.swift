@@ -28,6 +28,7 @@ enum Prefs {
             remindLongTimer: false,
             remindLongTimerHours: 4,
             shortcutDisplay: "⌥H",
+            Analytics.enabledKey: true,
         ])
     }
 
@@ -91,6 +92,8 @@ struct GeneralPrefs: View {
     @AppStorage(Prefs.remindLongTimerHours) private var remindLongTimerHours = 4
     @AppStorage(ShortDays.enabledKey) private var nudgesShortDays = true
     @State private var openAtLogin = SMAppService.mainApp.status == .enabled
+    @AppStorage(Analytics.enabledKey) private var sharesUsage = true
+    @Environment(TimeTracker.self) private var tracker
 
     var body: some View {
         PrefsPage {
@@ -150,6 +153,15 @@ struct GeneralPrefs: View {
                 Text("\(AppInfo.name) looks for a new version on GitHub once a day. Unless it installs them automatically, it asks first."
                      + (Beta.isEnabled ? " This is the beta, a separate app from Harvestbeam, so it gets new betas. To leave it, quit it and move it to the Trash." : ""))
                     .prefsNote()
+            }
+            if Analytics.isAvailable {
+                Divider()
+                PrefsSection("Privacy") {
+                    Toggle("Share anonymous usage stats", isOn: $sharesUsage)
+                        .onChange(of: sharesUsage) { Analytics.update(isDemo: tracker.isDemo) }
+                    Text("Helps show how many people use \(AppInfo.name) and which versions they're on: a random ID, the app and macOS version, and when you sign in or start a timer. Nothing from Harvest, like your projects, clients, notes or times, ever leaves your Mac.")
+                        .prefsNote()
+                }
             }
         }
     }
