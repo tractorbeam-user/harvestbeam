@@ -112,6 +112,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
     }
 
+    /// Clicking the Dock icon always brings the window back, wherever it went.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showPanel()
+        return false
+    }
+
     // MARK: Menu
 
     /// A menu bar app has no visible menus, but text fields still look up
@@ -183,7 +189,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
         panel.contentMinSize = NSSize(width: 340, height: 440)
         // .fullScreenNone makes the green button zoom instead of going full screen.
-        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .fullScreenNone]
+        panel.collectionBehavior = [.managed, .moveToActiveSpace, .fullScreenAuxiliary, .fullScreenNone]
+        // It's a panel only so it can float when kept on top; otherwise it's
+        // an ordinary window, in the Window menu and Mission Control.
+        panel.isExcludedFromWindowsMenu = false
         panel.delegate = self
         setKeptOnTop(UserDefaults.standard.bool(forKey: Self.keepOnTopKey))
 
@@ -276,7 +285,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     }
 
     func showPanel(focusSearch: Bool = true) {
-        if !hasPlacedPanel {
+        // First time, or left on a display that's since been unplugged: put
+        // it under the menu bar item, so it never opens somewhere you can't see.
+        if !hasPlacedPanel || !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(panel.frame) }) {
             placeBelowStatusItem()
             hasPlacedPanel = true
         }
@@ -295,14 +306,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         tracker.didAppear(focusSearch: focusSearch)
     }
 
+    /// Puts the window away. In the Dock (the default), that's an ordinary
+    /// Hide, like ⌘H: the window keeps its place, and the Dock icon, ⌘-Tab, the
+    /// menu bar item or ⌥H bring it back. As a menu-bar-only app there's no
+    /// Dock icon to go back to, so the window goes until the next click.
     func hidePanel() {
-        panel.orderOut(nil)
         tracker.errorMessage = nil
         // The week calendar stays up on its own; only the small window goes.
         if let week = weekCalendar?.window, week.isVisible, !week.isMiniaturized {
+            panel.orderOut(nil)
             previousApp = nil
             return
         }
+        if !UserDefaults.standard.bool(forKey: Prefs.showInDock) { panel.orderOut(nil) }
         // Hand focus straight back to whatever you were working in.
         NSApp.hide(nil)
         if let app = previousApp, !app.isTerminated { app.activate() }

@@ -20,7 +20,7 @@ enum Prefs {
 
     static func register() {
         UserDefaults.standard.register(defaults: [
-            showInDock: false,
+            showInDock: true,
             idleDetection: true,
             idleMinutes: 10,
             remindNoTimer: false,
@@ -83,7 +83,7 @@ final class PreferencesWindowController: NSWindowController {
 
 struct GeneralPrefs: View {
     @Environment(Updates.self) private var updates
-    @AppStorage(Prefs.showInDock) private var showInDock = false
+    @AppStorage(Prefs.showInDock) private var showInDock = true
     @AppStorage(Prefs.idleDetection) private var idleDetection = true
     @AppStorage(Prefs.idleMinutes) private var idleMinutes = 10
     @AppStorage(Prefs.remindNoTimer) private var remindNoTimer = false
