@@ -46,7 +46,8 @@ extension Notification.Name {
 /// the toolbar, like Harvest's own.
 @MainActor
 final class PreferencesWindowController: NSWindowController {
-    init(tracker: TimeTracker, updates: Updates, recorder: ActivityRecorder?, resetLayout: @escaping () -> Void) {
+    init(tracker: TimeTracker, updates: Updates, recorder: ActivityRecorder?,
+         showTour: @escaping () -> Void, resetLayout: @escaping () -> Void) {
         let tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
         tabs.canPropagateSelectedChildViewControllerTitle = false
@@ -61,7 +62,7 @@ final class PreferencesWindowController: NSWindowController {
         tabs.addTabViewItem(tab("General", "gearshape", GeneralPrefs()))
         if recorder != nil { tabs.addTabViewItem(tab("Tracking", "wand.and.stars", TrackingPrefs())) }
         tabs.addTabViewItem(tab("Shortcuts", "command", ShortcutPrefs()))
-        tabs.addTabViewItem(tab("Support", "wrench.adjustable", SupportPrefs(resetLayout: resetLayout)))
+        tabs.addTabViewItem(tab("Support", "wrench.adjustable", SupportPrefs(resetLayout: resetLayout, showTour: showTour)))
 
         let window = NSWindow(contentViewController: tabs)
         window.title = "Preferences"
@@ -464,6 +465,7 @@ private struct AddRuleSheet: View {
 struct SupportPrefs: View {
     @Environment(TimeTracker.self) private var tracker
     let resetLayout: () -> Void
+    var showTour: () -> Void = {}
     @State private var reloaded = false
 
     private var version: String {
@@ -491,6 +493,10 @@ struct SupportPrefs: View {
                     resetLayout()
                 }
                 .frame(maxWidth: .infinity)
+                Text("Walk through the window's main features again, one at a time.")
+                    .prefsNote()
+                Button("Show Tour Again") { showTour() }
+                    .frame(maxWidth: .infinity)
             }
             Divider()
             PrefsSection("Account") {

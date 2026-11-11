@@ -286,6 +286,7 @@ struct TrackerView: View {
                     RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
                         .strokeBorder(Color.harvestOrange.opacity(section.id == "favorites" && favoritesTargeted ? 0.5 : 0), lineWidth: 1.5)
                 )
+                .tourStop(section.id == "favorites" ? .favorites : nil)
             }
             if !isSearching {
                 #if os(macOS)
@@ -355,6 +356,7 @@ struct TrackerView: View {
             if asksFirst {
                 // Ask first: the big box is always there, focused when the window opens.
                 searchField(flat, large: true, listsTasks: showsAskList)
+                    .tourStop(.ask)
                     .overlay(alignment: .top) {
                         if showsAskList {
                             AskDropdown(
@@ -809,6 +811,7 @@ struct TrackerView: View {
             .fixedSize()
             .frame(width: 30, height: 30)
             .help("Settings · \(tracker.accountName ?? "Harvest") · ⌥H shows or hides this window")
+            .tourStop(.settings)
         }
         .foregroundStyle(.secondary)
         .padding(.leading, Metrics.padding)
