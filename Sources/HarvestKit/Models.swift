@@ -200,6 +200,9 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
     /// On an invoice.
     public let isBilled: Bool?
     public let invoice: InvoiceRef?
+    /// Harvest's billable flag for the entry; nil from older data or demo
+    /// entries that don't say.
+    public let billable: Bool?
 
     public struct InvoiceRef: Codable, Hashable, Sendable {
         public let id: Int
@@ -217,7 +220,7 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
         timerStartedAt: Date? = nil, startedTime: String? = nil, endedTime: String? = nil,
         createdAt: Date = .now, updatedAt: Date = .now,
         isLocked: Bool? = nil, lockedReason: String? = nil, isClosed: Bool? = nil, isBilled: Bool? = nil,
-        invoice: InvoiceRef? = nil
+        invoice: InvoiceRef? = nil, billable: Bool? = nil
     ) {
         self.id = id
         self.spentDate = spentDate
@@ -238,6 +241,7 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
         self.isClosed = isClosed
         self.isBilled = isBilled
         self.invoice = invoice
+        self.billable = billable
     }
 
     public var key: TaskKey { TaskKey(projectID: project.id, taskID: task.id) }

@@ -820,6 +820,9 @@ struct TrackerView: View {
                     }
                 ))
                 Divider()
+                if let openSummary = windowActions?.openWeeklySummary {
+                    Button("Weekly Summary…") { openSummary(nil) }
+                }
                 if let open = windowActions?.openPreferences {
                     Button("Preferences…") { open() }
                         .keyboardShortcut(",", modifiers: .command)
@@ -1027,6 +1030,9 @@ private struct TitleBar: View {
                     Text("Week \(TimeFormat.hoursMinutes(tracker.weekSeconds(containing: selectedDay, at: context.date)))")
                         .font(.system(size: 12, weight: .medium).monospacedDigit())
                         .opacity(0.8)
+                    if let openSummary = windowActions?.openWeeklySummary {
+                        WeeklySummaryButton { openSummary(selectedDay) }
+                    }
                 }
                 .lineLimit(1)
 

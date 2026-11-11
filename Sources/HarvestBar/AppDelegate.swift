@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     private var onboarding: OnboardingWindowController?
     /// Made the first time it's opened.
     private var weekCalendar: WeekCalendarWindowController?
+    private var weeklySummary: WeeklySummaryWindowController?
     /// Shared by the week calendar and the ask box's meeting suggestions.
     private lazy var calendarStore = tracker.isDemo ? CalendarStore.demo() : CalendarStore()
     /// What's in front: the Timeline, on-screen suggestions and the Autotracker.
@@ -212,6 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         var windowActions = actions
         windowActions.openPreferences = { [weak self] in self?.showPreferences() }
         windowActions.openWeekCalendar = { [weak self] in self?.showWeekCalendar() }
+        windowActions.openWeeklySummary = { [weak self] day in self?.showWeeklySummary(day: day) }
         let host = NSHostingView(rootView: RootView().environment(tracker).environment(calendarStore)
             .environment(recorder).environment(tour).environment(\.windowActions, windowActions))
         host.sizingOptions = []
@@ -354,6 +356,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
         weekCalendar?.show()
         Analytics.send(.weekCalendarOpened)
+    }
+
+    func showWeeklySummary(day: LocalDate?) {
+        if weeklySummary == nil { weeklySummary = WeeklySummaryWindowController(tracker: tracker) }
+        weeklySummary?.show(day: day)
     }
 
     /// (Re)registers the show/hide shortcut from preferences; none if cleared.

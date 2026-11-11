@@ -66,6 +66,7 @@ private struct WeekStrip: View {
                         Text("Week \(TimeFormat.hoursMinutes(tracker.weekSeconds(containing: selectedDay, at: context.date)))")
                             .font(.subheadline.monospacedDigit())
                             .foregroundStyle(.secondary)
+                        WeeklySummarySheetButton(day: selectedDay)
                         if selectedDay != today {
                             Button("Today") { select(today) }
                                 .buttonStyle(.bordered)

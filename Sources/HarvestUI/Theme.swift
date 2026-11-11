@@ -1,3 +1,4 @@
+import HarvestKit
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -130,6 +131,9 @@ public struct WindowActions: Sendable {
     public var openPreferences: (@MainActor @Sendable () -> Void)?
     /// Opens the week calendar window; set by the Mac app after init.
     public var openWeekCalendar: (@MainActor @Sendable () -> Void)?
+    /// Opens the Weekly Summary on the week holding a day (nil: its default
+    /// week); set by the Mac app after init.
+    public var openWeeklySummary: (@MainActor @Sendable (LocalDate?) -> Void)?
 
     public init(
         close: @escaping @MainActor @Sendable () -> Void,
