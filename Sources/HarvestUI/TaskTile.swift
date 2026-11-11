@@ -16,6 +16,7 @@ struct TaskTile: View {
     var acceptsDrops = false
     @State private var isDropTarget = false
     @State private var isHovered = false
+    @State private var picksIcon = false
 
     private var isBusy: Bool { tracker.busyKey == task.key }
     /// Shows the state you just asked for while Harvest confirms it, instead
@@ -71,6 +72,9 @@ struct TaskTile: View {
             Button(isRunning ? "Pause Timer" : "Start Timer", systemImage: isRunning ? "pause.fill" : "play.fill") {
                 Task { await tracker.toggle(task) }
             }
+            if isFavorite {
+                Button("Choose Icon…", systemImage: "face.smiling") { picksIcon = true }
+            }
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: isFavorite ? "star.slash" : "star") {
                 tracker.favorites.toggle(task.key)
             }
@@ -78,6 +82,7 @@ struct TaskTile: View {
                 Button("Remove from Suggested", systemImage: "xmark", action: onRemove)
             }
         }
+        .modifier(FavoriteIconPopover(key: task.key, isPresented: $picksIcon))
         .help([task.client?.name, task.projectCode].compactMap { $0 }.joined(separator: " · "))
         .accessibilityLabel("\(task.project.name), \(task.task.name), \(task.client?.name ?? "")")
         .accessibilityHint(isRunning ? "Pauses the timer" : "Starts a timer")
@@ -85,6 +90,11 @@ struct TaskTile: View {
 
     private var content: some View {
         HStack(spacing: 6) {
+            if isFavorite, let icon = FavoriteIcons.shared.icon(for: task.key) {
+                FavoriteIconView(icon: icon, size: 17, onOrange: isRunning)
+                    .padding(.trailing, 3)
+                    .onTapGesture { picksIcon = true }
+            }
             VStack(alignment: .leading, spacing: 1) {
                 let (code, name) = task.projectNameParts
                 if let code {

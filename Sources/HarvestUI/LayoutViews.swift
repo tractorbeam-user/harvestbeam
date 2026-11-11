@@ -75,12 +75,13 @@ struct BigTilesView: View {
     }
 }
 
-private struct BigTile: View {
+struct BigTile: View {
     @Environment(TimeTracker.self) private var tracker
     let task: TrackableTask
     let seconds: TimeInterval
     @State private var isHovered = false
     @State private var isDropTarget = false
+    @State private var picksIcon = false
 
     private var isRunning: Bool {
         let running = tracker.running?.key == task.key
@@ -91,7 +92,11 @@ private struct BigTile: View {
     var body: some View {
         let (code, name) = task.projectNameParts
         VStack(alignment: .leading, spacing: 0) {
-            if let code {
+            if isFavorite, let icon = FavoriteIcons.shared.icon(for: task.key) {
+                FavoriteIconView(icon: icon, size: 20, onOrange: isRunning)
+                    .padding(.bottom, 4)
+                    .onTapGesture { picksIcon = true }
+            } else if let code {
                 Text(code).font(.system(size: 10, weight: .medium).monospaced()).opacity(0.55)
             }
             Text(name)
@@ -148,8 +153,10 @@ private struct BigTile: View {
         }
         .contextMenu {
             Button(isRunning ? "Pause Timer" : "Start Timer") { Task { await tracker.toggle(task) } }
+            if isFavorite { Button("Choose Icon…") { picksIcon = true } }
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(task.key) }
         }
+        .modifier(FavoriteIconPopover(key: task.key, isPresented: $picksIcon))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { Task { await tracker.toggle(task) } }

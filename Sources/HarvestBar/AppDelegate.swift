@@ -249,8 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         if panel.isVisible && !panel.isMiniaturized && panel.occlusionState.contains(.visible) {
             hidePanel()
         } else {
-            // Opened with the mouse, so don't grab the keyboard for the ask box.
-            showPanel(focusSearch: false)
+            showPanel()
         }
     }
 
@@ -280,11 +279,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         if NSApp.isActive && panel.isVisible && !panel.isMiniaturized && panel.occlusionState.contains(.visible) {
             hidePanel()
         } else {
-            showPanel()
+            // From the keyboard, so you can type straight away.
+            showPanel(focusSearch: true)
         }
     }
 
-    func showPanel(focusSearch: Bool = true) {
+    /// The ask box waits for a click or ⌘F, except from ⌥H (`focusSearch`).
+    func showPanel(focusSearch: Bool = false) {
         // First time, or left on a display that's since been unplugged: put
         // it under the menu bar item, so it never opens somewhere you can't see.
         if !hasPlacedPanel || !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(panel.frame) }) {
@@ -303,6 +304,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKeyAndOrderFront(nil)
+        // macOS puts the cursor in the first text field by default; don't.
+        if !focusSearch { panel.makeFirstResponder(nil) }
         tracker.didAppear(focusSearch: focusSearch)
     }
 

@@ -35,8 +35,8 @@ public final class TimeTracker {
     /// Bumped whenever the panel opens so the search field can grab focus.
     public private(set) var focusRequest = 0
     /// Whether the latest `focusRequest` should put you in the search box.
-    /// ⌥H does, so you can type straight away; a menu bar click doesn't.
-    public private(set) var focusRequestWantsSearch = true
+    /// ⌥H does, so you can type straight away; nothing else does.
+    public private(set) var focusRequestWantsSearch = false
 
     public let favorites: FavoritesStore
     /// Meetings you've logged or skipped, and where some always go.
@@ -225,7 +225,7 @@ public final class TimeTracker {
     // MARK: Lifecycle
 
     /// Call when the panel or app comes to the front.
-    public func didAppear(focusSearch: Bool = true) {
+    public func didAppear(focusSearch: Bool = false) {
         focusRequestWantsSearch = focusSearch
         focusRequest += 1
         Task { await refresh() }
@@ -398,6 +398,66 @@ public final class TimeTracker {
             }
         } catch {
             await recover(from: error)
+        }
+    }
+
+    /// Moves `seconds` of `entry` to `task` on the same day: shortens this
+    /// entry and logs the rest as a new one there. A running timer keeps
+    /// running. If the new entry can't be made, the old one gets its time back.
+    /// Returns whether it worked.
+    @discardableResult
+    public func moveTime(_ seconds: TimeInterval, from entry: TimeEntry, to task: TrackableTask, notes: String = "") async -> Bool {
+        guard let service else { return false }
+        if let lock = entry.lock {
+            errorMessage = "This entry is \(lock.title.lowercased()), so its time can't be moved."
+            return false
+        }
+        let moving = (seconds / 60).rounded() / 60
+        let had = entry.elapsed() / 3600
+        guard moving >= 1.0 / 60 else { errorMessage = "Move at least a minute."; return false }
+        guard moving <= had - 1.0 / 60 || (!entry.isRunning && moving <= had) else {
+            errorMessage = "This entry only has \(TimeFormat.hoursMinutes(had * 3600)) to move."
+            return false
+        }
+        guard await waitUntilIdle() else {
+            errorMessage = "Harvest is still working on your last change. Try again in a moment."
+            return false
+        }
+        do {
+            // Harvest won't change the hours on a running timer: stop it, take
+            // the time off, and start it again.
+            let wasRunning = entry.isRunning
+            let source = wasRunning ? try await service.stopTimer(id: entry.id) : entry
+            let original = source.hours
+            let left = max(0, original - moving)
+            var shortened = try await service.updateEntry(
+                id: source.id, projectID: source.project.id, taskID: source.task.id,
+                notes: source.notes ?? "", hours: left, times: times(for: source, hours: left)
+            )
+            if wasRunning { shortened = try await service.restartTimer(id: shortened.id) }
+            upsert(shortened)
+            if await addEntry(task: task, on: entry.spentDate, notes: notes, hours: moving) == nil {
+                // Put the time back rather than lose it.
+                var restored = try await service.updateEntry(
+                    id: shortened.id, projectID: shortened.project.id, taskID: shortened.task.id,
+                    notes: shortened.notes ?? "", hours: wasRunning ? nil : original, times: nil
+                )
+                if wasRunning {
+                    restored = try await service.stopTimer(id: restored.id)
+                    restored = try await service.updateEntry(
+                        id: restored.id, projectID: restored.project.id, taskID: restored.task.id,
+                        notes: restored.notes ?? "", hours: original, times: times(for: restored, hours: original))
+                    restored = try await service.restartTimer(id: restored.id)
+                }
+                upsert(restored)
+                errorMessage = "Couldn't log the time on \(task.task.name), so it stayed where it was."
+                return false
+            }
+            errorMessage = nil
+            return true
+        } catch {
+            await recover(from: error)
+            return false
         }
     }
 

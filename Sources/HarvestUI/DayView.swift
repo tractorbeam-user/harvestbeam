@@ -203,6 +203,7 @@ private struct EntryRow: View {
     @State private var isHovered = false
     @State private var isEditing = false
     @State private var isShowingLock = false
+    @State private var isSplitting = false
     private var isFavorite: Bool { tracker.favorites.contains(entry.key) }
     /// Approved, invoiced or locked: Harvest won't let it change.
     private var lock: EntryLock? { entry.lock }
@@ -211,7 +212,7 @@ private struct EntryRow: View {
         // Double-click (or double-tap) edits; only the round button starts or
         // pauses, so a double-click never toggles the timer by accident.
         HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     if let client = task.client?.name {
                         Text(client)
                             .font(.system(size: 11))
@@ -246,7 +247,7 @@ private struct EntryRow: View {
                             .foregroundStyle(lock == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                     }
                 }
-                .font(.system(size: 20, weight: .medium, design: .rounded).monospacedDigit())
+                .font(.system(size: 18, weight: .medium, design: .rounded).monospacedDigit())
 
                 if let lock {
                     // A lock where play would be; it says why.
@@ -268,8 +269,8 @@ private struct EntryRow: View {
             }
             .padding(.leading, 14)
             .padding(.trailing, 12)
-            .padding(.vertical, 11)
-            .frame(minHeight: 64)
+            .padding(.vertical, 8)
+            .frame(minHeight: 54)
             .background(background)
             .contentShape(Rectangle())
             .onTapGesture(count: 2) { if lock == nil { isEditing = true } else { isShowingLock = true } }
@@ -290,6 +291,8 @@ private struct EntryRow: View {
                 Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
             } else {
                 Button("Edit Entry") { isEditing = true }
+                Button("Split Entry…") { isSplitting = true }
+                    .disabled(entry.elapsed() < 120)
                 Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
                 Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
                     Task { await tracker.toggle(entry) }
@@ -302,6 +305,7 @@ private struct EntryRow: View {
             }
         }
         .popover(isPresented: $isEditing, arrowEdge: .bottom) { NewEntryEditor(day: entry.spentDate, entry: entry) }
+        .popover(isPresented: $isSplitting, arrowEdge: .bottom) { SplitEntryView(entry: entry, task: task) }
         .accessibilityAction(named: "Edit Entry") { isEditing = true }
     }
 
@@ -315,7 +319,7 @@ private struct EntryRow: View {
         Image(systemName: "lock.fill")
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
-            .frame(width: 32, height: 32)
+            .frame(width: 28, height: 28)
             .background(Circle().fill(Color.primary.opacity(isHovered ? 0.09 : 0.05)))
             .animation(.easeOut(duration: 0.15), value: isHovered)
     }
@@ -326,17 +330,17 @@ private struct EntryRow: View {
             if tracker.busyKey == entry.key ? !entry.isRunning : entry.isRunning {
                 Image(systemName: "pause.fill")
                     .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
                     .background(Circle().fill(.harvestOrange))
             } else {
                 Image(systemName: "play.fill")
                     .foregroundStyle(isHovered ? AnyShapeStyle(.white) : AnyShapeStyle(.harvestOrange))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
                     .background(Circle().fill(isHovered ? Color.harvestOrange : Color.orangeSoft))
             }
         }
-        .font(.system(size: 11, weight: .bold))
-        .frame(width: 32, height: 32)
+        .font(.system(size: 10, weight: .bold))
+        .frame(width: 28, height: 28)
         .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 }

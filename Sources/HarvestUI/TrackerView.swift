@@ -45,6 +45,11 @@ struct TrackerView: View {
     /// Tiles and List were tried and set aside; flip this to bring them back.
     private static let showsLayoutSwitcher = false
     private static let showsAskBox = true
+    /// The landing page's feedback form, told which version it came from.
+    static var feedbackURL: URL {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        return URL(string: "https://harvestbeam.vercel.app/?from=app&v=\(version)#feedback")!
+    }
     @AppStorage("windowLayout") private var layoutRaw = WindowLayout.classic.rawValue
     private var layout: WindowLayout {
         Self.showsLayoutSwitcher ? WindowLayout(rawValue: layoutRaw) ?? .classic : .classic
@@ -53,6 +58,8 @@ struct TrackerView: View {
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
+    @AppStorage(FavoritesStyle.key) private var favoritesStyleRaw = FavoritesStyle.panel.rawValue
+    private var favoritesStyle: FavoritesStyle { FavoritesStyle(rawValue: favoritesStyleRaw) ?? .panel }
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
     @State private var selectedDay = LocalDate()
     /// The date when the window last checked, to notice a new day.
@@ -249,6 +256,12 @@ struct TrackerView: View {
                                 RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
                                     .strokeBorder(Color.harvestOrange.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             )
+                    } else if section.id == "favorites" && favoritesStyle != .panel {
+                        switch favoritesStyle {
+                        case .list: FavoritesListView(tasks: section.tasks)
+                        case .chips: FavoritesChipsView(tasks: section.tasks)
+                        default: FavoritesTilesView(tasks: section.tasks)
+                        }
                     } else {
                         LazyVGrid(
                             columns: [GridItem(.adaptive(minimum: Metrics.tileMinWidth), spacing: Metrics.spacing)],
@@ -280,7 +293,9 @@ struct TrackerView: View {
                 .padding(section.id == "favorites" ? 10 : 0)
                 .background(
                     RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
-                        .fill(section.id != "favorites" ? Color.clear : favoritesTargeted ? Color.harvestOrange.opacity(0.18) : Color.orangeSoft)
+                        .fill(section.id != "favorites" ? Color.clear
+                              : favoritesTargeted ? Color.harvestOrange.opacity(0.18)
+                              : favoritesStyle == .panel ? Color.orangeSoft : Color.clear)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
@@ -573,6 +588,14 @@ struct TrackerView: View {
                 .opacity(searchFocused ? 1 : 0)
         )
         .animation(.easeOut(duration: 0.15), value: searchFocused)
+        // A click anywhere in the big box, not only on its text, puts you in
+        // it with Recent and Suggested open.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard large else { return }
+            searchFocused = true
+            if asksFirst && !isSearching { selection = nil; askListOpen = true }
+        }
     }
 
     /// In search: a project row opens its tasks; a task row starts it.
@@ -750,6 +773,9 @@ struct TrackerView: View {
             .help("Layout: Classic, Tiles or List")
             }
 
+            FooterButton(systemImage: "bubble.left", help: "Send feedback: a bug, a question or an idea") {
+                openURL(Self.feedbackURL)
+            }
             FooterButton(systemImage: "arrow.up.forward.app", help: "Open Harvest") {
                 if let url = tracker.harvestWebURL { openURL(url) }
             }
@@ -766,6 +792,9 @@ struct TrackerView: View {
                         Button("Show Removed Suggestions") { tracker.showHiddenSuggestions() }
                     }
                     Divider()
+                }
+                Picker("Favorites", selection: $favoritesStyleRaw) {
+                    ForEach(FavoritesStyle.allCases) { Text($0.label).tag($0.rawValue) }
                 }
                 Menu("Menu Bar") {
                     Picker("Show", selection: $menuBarContent) {

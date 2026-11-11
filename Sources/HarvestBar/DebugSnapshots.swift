@@ -27,6 +27,35 @@ enum DebugSnapshots {
             await settle()
             write(window, to: url.appendingPathComponent("1-running-\(suffix).png"))
 
+            // Each Favorites style, with a few more favorites to show off.
+            for task in tracker.tasks.dropFirst(5).prefix(3) where !tracker.favorites.contains(task.key) {
+                tracker.favorites.toggle(task.key)
+            }
+            let savedIcons = UserDefaults.standard.dictionary(forKey: "favoriteIcons.v1")
+            let demoIcons = ["e:🎨", "s:person.2:1", "e:🧾", "s:paperplane:3", "e:💻"]
+            var iconMap: [String: String] = [:]
+            for (task, icon) in zip(tracker.favoriteTasks, demoIcons) { iconMap[task.key.description] = icon }
+            UserDefaults.standard.set(iconMap, forKey: "favoriteIcons.v1")
+            FavoriteIcons.shared.reload()
+            let savedStyle = UserDefaults.standard.string(forKey: "favoritesStyle")
+            for style in ["panel", "list", "chips", "tiles"] {
+                UserDefaults.standard.set(style, forKey: "favoritesStyle")
+                let styleWindow = makeWindow(RootView().environment(tracker), appearance: appearance)
+                styleWindow.setContentSize(NSSize(width: 440, height: 1060))
+                await settle()
+                write(styleWindow, to: url.appendingPathComponent("2-favorites-\(style)-\(suffix).png"))
+                styleWindow.close()
+            }
+            UserDefaults.standard.set(savedStyle, forKey: "favoritesStyle")
+            UserDefaults.standard.set(savedIcons, forKey: "favoriteIcons.v1")
+            FavoriteIcons.shared.reload()
+
+
+            let splitWindow = makeWindow(debugSplitEntry(tracker).environment(tracker), appearance: appearance)
+            splitWindow.setContentSize(NSSize(width: 340, height: 420))
+            await settle()
+            write(splitWindow, to: url.appendingPathComponent("6-split-entry-\(suffix).png"))
+            splitWindow.close()
 
             let entryWindow = makeWindow(debugNewEntryEditor().environment(tracker).frame(width: 340, height: 260), appearance: appearance)
             entryWindow.setContentSize(NSSize(width: 340, height: 260))
