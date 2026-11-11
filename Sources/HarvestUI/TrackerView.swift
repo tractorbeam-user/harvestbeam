@@ -58,6 +58,7 @@ struct TrackerView: View {
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
+    @AppStorage(AppAppearance.key) private var appearanceRaw = AppAppearance.system.rawValue
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
     @State private var selectedDay = LocalDate()
     /// The date when the window last checked, to notice a new day.
@@ -794,6 +795,12 @@ struct TrackerView: View {
                         Button("Show Removed Suggestions") { tracker.showHiddenSuggestions() }
                     }
                     Divider()
+                }
+                Picker("Appearance", selection: Binding(get: { appearanceRaw }, set: {
+                    appearanceRaw = $0
+                    AppAppearance.set(AppAppearance(rawValue: $0) ?? .system)
+                })) {
+                    ForEach(AppAppearance.allCases) { Text($0.label).tag($0.rawValue) }
                 }
                 Menu("Menu Bar") {
                     Picker("Show", selection: $menuBarContent) {

@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         MenuBarDisplay.register()
+        AppAppearance.apply()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         // A fixed name, so macOS remembers this item's place and visibility by
         // it rather than by creation order.
