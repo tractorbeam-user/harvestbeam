@@ -23,9 +23,19 @@ enum DebugSnapshots {
                 tracker.favorites.toggle(second.key)
             }
 
-            let window = makeWindow(RootView().environment(tracker), appearance: appearance)
+            let tour = TourModel(shortcut: "⌥H")
+            let window = makeWindow(RootView().environment(tracker).environment(tour), appearance: appearance)
             await settle()
             write(window, to: url.appendingPathComponent("1-running-\(suffix).png"))
+
+            // The first-run tour, one stop at a time.
+            for stop in TourStop.allCases {
+                tour.current = stop
+                await settle()
+                write(window, to: url.appendingPathComponent("10-tour-\(stop.rawValue + 1)-\(stop.name)-\(suffix).png"))
+            }
+            tour.current = nil
+            await settle()
 
             // Each Favorites style, with a few more favorites to show off.
             for task in tracker.tasks.dropFirst(5).prefix(3) where !tracker.favorites.contains(task.key) {

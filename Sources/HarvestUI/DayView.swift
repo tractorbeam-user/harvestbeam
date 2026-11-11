@@ -9,9 +9,9 @@ struct DayView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            WeekStrip(selectedDay: $selectedDay)
-            ShortDayNudge(selectedDay: $selectedDay)
-            DayEntriesList(day: selectedDay)
+            WeekStrip(selectedDay: $selectedDay).tourStop(.days)
+            ShortDayNudge(selectedDay: $selectedDay).tourStop(.days)
+            DayEntriesList(day: selectedDay).tourStop(.entries)
         }
     }
 }

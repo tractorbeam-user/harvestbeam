@@ -21,9 +21,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     private var continueHotKey: HotKey?
     private var reminders: Reminders?
     private let updates = Updates()
-    private lazy var preferences = PreferencesWindowController(tracker: tracker, updates: updates, recorder: recorder) { [weak self] in
+    private lazy var preferences = PreferencesWindowController(
+        tracker: tracker, updates: updates, recorder: recorder,
+        showTour: { [weak self] in self?.showTour(force: true) }
+    ) { [weak self] in
         self?.resetPanelSize()
     }
+    /// The first-run tour of the window, after the welcome.
+    private let tour = TourModel()
     private var ticker: Timer?
     private var poller: Timer?
     private var lastTitle: String?
@@ -208,7 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         windowActions.openPreferences = { [weak self] in self?.showPreferences() }
         windowActions.openWeekCalendar = { [weak self] in self?.showWeekCalendar() }
         let host = NSHostingView(rootView: RootView().environment(tracker).environment(calendarStore)
-            .environment(recorder).environment(\.windowActions, windowActions))
+            .environment(recorder).environment(tour).environment(\.windowActions, windowActions))
         host.sizingOptions = []
         panel.contentView = host
 
@@ -261,10 +266,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             needsAccessibility: hotKey?.mode == .needsAccessibility
         ) { [weak self] in
             self?.onboarding = nil
-            self?.showPanel()
+            self?.showTour(force: false)
         }
         onboarding = controller
         controller.show()
+    }
+
+    /// Opens the window with the tour running: the first time after the
+    /// welcome, or again from Preferences.
+    private func showTour(force: Bool) {
+        tour.shortcut = HotKey.Shortcut.load() == nil ? nil : UserDefaults.standard.string(forKey: Prefs.shortcutDisplay) ?? "⌥H"
+        // Opened by the tour, so the ask box doesn't take the keyboard.
+        showPanel(focusSearch: false)
+        if force { tour.start() } else { tour.startIfUnseen() }
     }
 
     /// ⌥H: bring the window forward, or hide it if it's already focused.

@@ -4,6 +4,8 @@ import SwiftUI
 /// Entry point for both platforms: sign-in, first load, or the tracker.
 public struct RootView: View {
     @Environment(TimeTracker.self) private var tracker
+    /// The first-run tour; absent on iOS and in most previews.
+    @Environment(TourModel.self) private var tour: TourModel?
 
     public init() {}
 
@@ -12,7 +14,7 @@ public struct RootView: View {
             switch tracker.phase {
             case .signedOut: SignInView()
             case .loading: LoadingView()
-            case .ready: TrackerView()
+            case .ready: TrackerView().tourOverlay(tour)
             }
         }
         .tint(.harvestOrange)
