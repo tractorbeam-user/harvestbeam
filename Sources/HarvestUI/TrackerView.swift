@@ -259,7 +259,6 @@ struct TrackerView: View {
                     } else if section.id == "favorites" && favoritesStyle != .panel {
                         switch favoritesStyle {
                         case .list: FavoritesListView(tasks: section.tasks)
-                        case .chips: FavoritesChipsView(tasks: section.tasks)
                         default: FavoritesTilesView(tasks: section.tasks)
                         }
                     } else {
@@ -796,7 +795,8 @@ struct TrackerView: View {
                     }
                     Divider()
                 }
-                Picker("Favorites", selection: $favoritesStyleRaw) {
+                // A style that's since gone (Chips) shows as Panel, checked.
+                Picker("Favorites", selection: Binding(get: { favoritesStyle.rawValue }, set: { favoritesStyleRaw = $0 })) {
                     ForEach(FavoritesStyle.allCases) { Text($0.label).tag($0.rawValue) }
                 }
                 Menu("Menu Bar") {

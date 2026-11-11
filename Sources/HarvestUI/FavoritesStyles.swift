@@ -7,8 +7,6 @@ enum FavoritesStyle: String, CaseIterable, Identifiable {
     case panel
     /// One quiet row each: star, name, today's time.
     case list
-    /// A wrap of small pills under the ask box.
-    case chips
     /// Large tiles with today's time on each.
     case tiles
 
@@ -18,7 +16,6 @@ enum FavoritesStyle: String, CaseIterable, Identifiable {
         switch self {
         case .panel: return "Panel"
         case .list: return "List"
-        case .chips: return "Chips"
         case .tiles: return "Big Tiles"
         }
     }
@@ -127,89 +124,6 @@ private struct FavoriteRow: View {
         .onHover { isHovered = $0 }
         #endif
         .modifier(FavoriteChrome(task: task, picksIcon: $picksIcon))
-    }
-}
-
-// MARK: Chips
-
-struct FavoritesChipsView: View {
-    @Environment(TimeTracker.self) private var tracker
-    let tasks: [TrackableTask]
-
-    var body: some View {
-        FlowLayout(spacing: 6) {
-            ForEach(tasks) { task in
-                // Two favorites in one project would read the same; add the task.
-                let name = task.projectNameParts.name
-                let shared = tasks.filter { $0.projectNameParts.name == name }.count > 1
-                FavoriteChip(task: task, label: shared ? name + " · " + task.task.name : name)
-            }
-        }
-    }
-}
-
-private struct FavoriteChip: View {
-    @Environment(TimeTracker.self) private var tracker
-    let task: TrackableTask
-    let label: String
-    @State private var isHovered = false
-    @State private var picksIcon = false
-
-    var body: some View {
-        let running = tracker.isShownRunning(task)
-        HStack(spacing: 5) {
-            if running { Image(systemName: "pause.fill").font(.system(size: 9, weight: .bold)) }
-            if let icon = FavoriteIcons.shared.icon(for: task.key) {
-                FavoriteIconView(icon: icon, size: 12, onOrange: running)
-            }
-            Text(label).lineLimit(1)
-        }
-        .font(.system(size: 12, weight: .medium))
-        .padding(.horizontal, 11)
-        .padding(.vertical, 5)
-        .contentShape(Capsule())
-        .foregroundStyle(running ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-        .background(
-            Capsule().fill(running ? AnyShapeStyle(Color.harvestOrange)
-                           : AnyShapeStyle(Color.primary.opacity(isHovered ? 0.08 : 0.0)))
-        )
-        .overlay(Capsule().strokeBorder(running ? Color.clear : Color.primary.opacity(0.15)))
-        .help(task.projectNameParts.name + " · " + task.task.name)
-        #if os(macOS)
-        .onHover { isHovered = $0 }
-        #endif
-        // Room around the pill so dragging's clip doesn't shave its ends.
-        .padding(.horizontal, 3)
-        .modifier(FavoriteChrome(task: task, picksIcon: $picksIcon))
-    }
-}
-
-/// Lays children out left to right, wrapping onto new lines.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, line: CGFloat = 0, widest: CGFloat = 0
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
-            if x > 0 && x + size.width > width { x = 0; y += line + spacing; line = 0 }
-            x += size.width + spacing
-            widest = max(widest, x - spacing)
-            line = max(line, size.height)
-        }
-        return CGSize(width: min(widest, width), height: y + line)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, line: CGFloat = 0
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
-            if x > bounds.minX && x + size.width > bounds.maxX { x = bounds.minX; y += line + spacing; line = 0 }
-            view.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            line = max(line, size.height)
-        }
     }
 }
 

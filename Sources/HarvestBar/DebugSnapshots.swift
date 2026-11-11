@@ -48,7 +48,7 @@ enum DebugSnapshots {
             UserDefaults.standard.set(iconMap, forKey: "favoriteIcons.v1")
             FavoriteIcons.shared.reload()
             let savedStyle = UserDefaults.standard.string(forKey: "favoritesStyle")
-            for style in ["panel", "list", "chips", "tiles"] {
+            for style in ["panel", "list", "tiles"] {
                 UserDefaults.standard.set(style, forKey: "favoritesStyle")
                 let styleWindow = makeWindow(RootView().environment(tracker), appearance: appearance)
                 styleWindow.setContentSize(NSSize(width: 440, height: 1060))
