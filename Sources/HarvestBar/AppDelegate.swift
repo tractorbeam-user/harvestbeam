@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     /// Continue the last entry, or stop the timer, from anywhere.
     private var continueHotKey: HotKey?
     private var reminders: Reminders?
+    private var weekReviewReminder: WeekReviewReminder?
     private let updates = Updates()
     private lazy var preferences = PreferencesWindowController(
         tracker: tracker, updates: updates, recorder: recorder,
@@ -83,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         }
         Notifier.setDelegate(self)
         reminders = Reminders(tracker: tracker) { [weak self] idle in self?.askAboutIdleTime(idle) }
+        weekReviewReminder = WeekReviewReminder(tracker: tracker)
         Notifier.registerCategories()
         if let recorder {
             let autotracker = Autotracker(tracker: tracker)
@@ -404,6 +406,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let action = response.actionIdentifier
         let task = (content.userInfo["task"] as? String).flatMap(TaskKey.init)
         let entryID = (content.userInfo["entry"] as? String).flatMap(Int.init)
+        let opensReview = content.userInfo[WeekReviewReminder.openKey] as? String == WeekReviewReminder.openValue
         await MainActor.run {
             switch category {
             case Notifier.autotrackCategory where action != UNNotificationDismissActionIdentifier:
@@ -415,6 +418,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 }
             default:
                 showPanel()
+                if opensReview { WeekReviewPresenter.shared.isPresented = true }
             }
         }
     }

@@ -352,6 +352,7 @@ struct TrackerView: View {
             }
         }
         .environment(dimmer)
+        .weekReviewSheet(selectedDay: $selectedDay)
         .onChange(of: selectedDay.dayTitle(today: LocalDate()), initial: true) { _, title in
             windowActions?.setTitle(title)
         }
@@ -820,6 +821,7 @@ struct TrackerView: View {
                     }
                 ))
                 Divider()
+                Button("Review Week…") { WeekReviewPresenter.shared.isPresented = true }
                 if let open = windowActions?.openPreferences {
                     Button("Preferences…") { open() }
                         .keyboardShortcut(",", modifiers: .command)

@@ -6,10 +6,14 @@ public actor DemoHarvestService: HarvestService {
     private var assignments: [ProjectAssignment]
     private var entries: [TimeEntry]
     private var nextID = 10_000
+    private let tracksStartAndEnd: Bool
 
     /// `includesArchivedWork` adds an archived Northwind project with recent
-    /// entries, for snapshots of how archived work looks.
-    public init(now: Date = .now, includesArchivedWork: Bool = false) {
+    /// entries, for snapshots of how archived work looks. `reviewWeek` makes
+    /// it a start-and-end account whose current week has something for each
+    /// part of the Week Review (see `reviewWeekEntries`).
+    public init(now: Date = .now, includesArchivedWork: Bool = false, reviewWeek: Bool = false) {
+        tracksStartAndEnd = reviewWeek
         let tractorbeam = NamedRef(id: 1, name: "Tractorbeam")
         let acme = NamedRef(id: 2, name: "Acme Co")
         let northwind = NamedRef(id: 3, name: "Northwind")
@@ -44,6 +48,10 @@ public actor DemoHarvestService: HarvestService {
             taskAssignments: [design, meetings].map { .init(id: 10_700 + $0.id, task: $0) }
         )
         if includesArchivedWork { assignments.append(springCampaign) }
+        if reviewWeek {
+            assignments.append(assignment(108, "Digital Products", code: nil, client: tractorbeam, tasks: [design, development]))
+            assignments.append(assignment(109, "Business Dev", code: nil, client: tractorbeam, tasks: [strategy]))
+        }
 
         // Deterministic history: a weighted handful of tasks most days.
         let pattern: [(Int, NamedRef, NamedRef, Double)] = [
@@ -101,7 +109,61 @@ public actor DemoHarvestService: HarvestService {
             hours: 0.78, hoursWithoutTimer: 0, notes: "Menu bar timer explorations",
             isRunning: true, timerStartedAt: now.addingTimeInterval(-47 * 60), createdAt: now, updatedAt: now
         ))
+        if reviewWeek {
+            let monday = today.startOfWeek(firstWeekday: 2)
+            generated.removeAll { $0.spentDate >= monday }
+            generated += Self.reviewWeekEntries(monday: monday, now: now, firstID: id + 1)
+        }
         entries = generated
+    }
+
+    /// A start-and-end week, as of its Friday at 4 PM: Monday has a retired
+    /// "Digital Products" entry; Tuesday is short, with a gap under a meeting
+    /// and one with nothing; Wednesday is empty; Thursday has a legacy
+    /// "Business Dev" entry and a timer still running; Friday has an entry
+    /// with no notes.
+    static func reviewWeekEntries(monday: LocalDate, now: Date, firstID: Int) -> [TimeEntry] {
+        let projects: [Int: (String, NamedRef)] = [
+            101: ("Website Redesign", NamedRef(id: 1, name: "Tractorbeam")), 102: ("Context Launch", NamedRef(id: 1, name: "Tractorbeam")),
+            103: ("Brand Refresh", NamedRef(id: 2, name: "Acme Co")), 104: ("Mobile App", NamedRef(id: 2, name: "Acme Co")),
+            105: ("Data Platform", NamedRef(id: 3, name: "Northwind")), 106: ("Internal", NamedRef(id: 1, name: "Tractorbeam")),
+            108: ("Digital Products", NamedRef(id: 1, name: "Tractorbeam")), 109: ("Business Dev", NamedRef(id: 1, name: "Tractorbeam")),
+        ]
+        let tasks: [Int: String] = [11: "Design", 12: "Development", 13: "Meetings", 15: "Strategy", 16: "QA & Testing"]
+        let plan: [(day: Int, from: String, to: String?, project: Int, task: Int, notes: String?)] = [
+            (0, "9:00am", "9:30am", 106, 13, "Standup"),
+            (0, "9:30am", "1:00pm", 101, 11, "Homepage hero"),
+            (0, "1:00pm", "3:30pm", 102, 12, "API wiring"),
+            (0, "3:30pm", "6:00pm", 108, 11, "Banner set"),
+            (1, "9:00am", "9:30am", 106, 13, "Standup"),
+            (1, "9:30am", "11:00am", 103, 11, "Logo options"),
+            (1, "11:00am", "1:00pm", 104, 16, nil),
+            (1, "2:00pm", "3:30pm", 101, 11, "Nav states"),
+            (3, "9:00am", "12:00pm", 102, 15, "Launch brief"),
+            (3, "12:00pm", "1:00pm", 109, 15, "Intro call with Globex"),
+            (3, "1:00pm", nil, 105, 12, "Pipeline migration"),
+            (4, "9:00am", "9:30am", 106, 13, "Standup"),
+            (4, "9:30am", "12:00pm", 104, 11, "Onboarding screens"),
+            (4, "12:00pm", "4:00pm", 104, 12, nil),
+        ]
+        return plan.enumerated().map { index, item in
+            let day = monday.adding(days: item.day)
+            let start = ClockTime.minutes(item.from)!
+            let created = day.date().addingTimeInterval(Double(start) * 60)
+            let (project, client) = projects[item.project]!
+            let task = NamedRef(id: item.task, name: tasks[item.task]!)
+            guard let to = item.to else {
+                // Left running since Thursday afternoon: five hours so far.
+                return TimeEntry(id: firstID + index, spentDate: day, project: NamedRef(id: item.project, name: project), task: task,
+                                 client: client, hours: 5, hoursWithoutTimer: 0, notes: item.notes, isRunning: true,
+                                 timerStartedAt: now.addingTimeInterval(-5 * 3600), startedTime: item.from,
+                                 createdAt: created, updatedAt: created)
+            }
+            let hours = Double(ClockTime.minutes(to)! - start) / 60
+            return TimeEntry(id: firstID + index, spentDate: day, project: NamedRef(id: item.project, name: project), task: task,
+                             client: client, hours: hours, notes: item.notes, startedTime: item.from, endedTime: to,
+                             createdAt: created, updatedAt: created)
+        }
     }
 
     public func currentUser() async throws -> HarvestUser {
@@ -109,7 +171,8 @@ public actor DemoHarvestService: HarvestService {
     }
 
     public func company() async throws -> Company {
-        Company(baseUri: "https://example.harvestapp.com", name: "Tractorbeam (demo)", weekStartDay: "Monday")
+        Company(baseUri: "https://example.harvestapp.com", name: "Tractorbeam (demo)",
+                wantsTimestampTimers: tracksStartAndEnd, weekStartDay: "Monday")
     }
 
     public func projectAssignments() async throws -> [ProjectAssignment] {

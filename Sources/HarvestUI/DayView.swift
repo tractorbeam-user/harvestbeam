@@ -186,6 +186,10 @@ private struct DayEntriesList: View {
                             Rectangle().fill(Color.hairline).frame(height: 1).padding(.horizontal, 14)
                         }
                     }
+                    #if os(macOS)
+                    // "1:00–2:30 not logged", on accounts that track start and end times.
+                    DayGapRows(day: day)
+                    #endif
                 }
             }
         }

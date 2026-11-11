@@ -134,6 +134,7 @@ struct GeneralPrefs: View {
                 }
                 Text("Reminders are macOS notifications from Harvestbeam itself; click one to open the window. Turning one on asks for permission once.")
                     .prefsNote()
+                WeekReviewPrefsRow()
                 Toggle("Point out short days earlier in the week", isOn: $nudgesShortDays)
                 Text("A day under three quarters of your usual day (your Harvest weekly capacity ÷ 5) gets a dot in the week strip and a note above your entries.")
                     .prefsNote()
