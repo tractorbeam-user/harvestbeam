@@ -75,7 +75,8 @@ public actor DemoHarvestService: HarvestService {
                     hours: (random() * 3 + 0.25).rounded(toPlaces: 2),
                     createdAt: stamp, updatedAt: stamp,
                     isLocked: invoiced || approved, isClosed: approved, isBilled: invoiced,
-                    invoice: invoiced ? .init(id: 1042, number: "1042") : nil
+                    invoice: invoiced ? .init(id: 1042, number: "1042") : nil,
+                    billable: client != tractorbeam
                 ))
                 id += 1
             }

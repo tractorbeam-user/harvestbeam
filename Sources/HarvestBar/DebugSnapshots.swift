@@ -113,6 +113,30 @@ enum DebugSnapshots {
             write(summaryWindow, to: url.appendingPathComponent("7-summary-\(suffix).png"))
             summaryWindow.close()
 
+            // The Weekly Summary: last week (finished), this week so far,
+            // and the card as Save as Image writes it.
+            let thisWeek = today.startOfWeek(firstWeekday: tracker.firstWeekday)
+            for (name, start) in [("last-week", thisWeek.adding(days: -7)), ("this-week", thisWeek)] {
+                let summaryWindow = makeWindow(debugWeeklySummary(weekStart: start).environment(tracker)
+                    .frame(width: 600, height: 980), appearance: appearance)
+                summaryWindow.setContentSize(NSSize(width: 600, height: 980))
+                await settle()
+                write(summaryWindow, to: url.appendingPathComponent("11-weekly-summary-\(name)-\(suffix).png"))
+                summaryWindow.close()
+            }
+            try? debugWeeklySummaryPNG(tracker, weekStart: thisWeek.adding(days: -7), dark: appearance == .darkAqua)?
+                .write(to: url.appendingPathComponent("11-weekly-summary-image-\(suffix).png"))
+            // The title bar's Summary button, by the week total.
+            var actions = WindowActions(close: {}, snapToMenuBar: {}, resetSize: {}, isKeptOnTop: { false },
+                                        setKeptOnTop: { _ in }, setTitle: { _ in })
+            actions.openWeeklySummary = { _ in }
+            let titled = makeWindow(RootView().environment(tracker).environment(\.windowActions, actions)
+                .frame(width: 440, height: 300, alignment: .top), appearance: appearance)
+            titled.setContentSize(NSSize(width: 440, height: 300))
+            await settle()
+            write(titled, to: url.appendingPathComponent("11-weekly-summary-button-\(suffix).png"))
+            titled.close()
+
             let weekWindow = makeWindow(debugWeekCalendar().environment(tracker).frame(width: 1100, height: 760), appearance: appearance)
             weekWindow.setContentSize(NSSize(width: 1100, height: 760))
             await settle()
