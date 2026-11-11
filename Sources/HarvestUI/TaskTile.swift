@@ -32,6 +32,7 @@ struct TaskTile: View {
         // the tile could never be dragged. A tap starts or pauses instead.
         content
             .modifier(TileChrome(isRunning: isRunning, isSelected: isSelected, isHovered: isHovered))
+            .unavailableTask(task.key)
             .onTapGesture { Task { await tracker.toggle(task) } }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)

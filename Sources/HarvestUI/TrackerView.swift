@@ -621,7 +621,7 @@ struct TrackerView: View {
     /// running timer: Return on the first row should start something, never
     /// pause what you're doing.
     private var askRecentItems: [AskItem] {
-        tracker.recentTasks.filter { $0.key != tracker.running?.key }
+        tracker.recentTasks.filter { $0.key != tracker.running?.key && tracker.isAvailable($0.key) }
             .map { AskItem(task: $0, reason: tracker.lastTrackedLabel($0.key), isSuggestion: false) }
     }
 
@@ -665,7 +665,7 @@ struct TrackerView: View {
     /// What the ask box suggests you can type: a search, then a few entries
     /// built from your own recent work.
     private var askExamples: [String] {
-        let recent = tracker.recentTasks.prefix(3)
+        let recent = tracker.recentTasks.filter { tracker.isAvailable($0.key) }.prefix(3)
         var out = ["What are you working on?"]
         let minutes = ["10 min", "an hour", "30 min"]
         for (i, task) in recent.enumerated() {
@@ -719,11 +719,12 @@ struct TrackerView: View {
                     Task { await tracker.toggle(task) }
                 } label: {
                     Label {
-                        Text(task.projectNameParts.name + " · " + task.task.name)
+                        Text(task.projectNameParts.name + " · " + task.task.name + (tracker.isAvailable(task.key) ? "" : " (Archived)"))
                     } icon: {
                         Image(systemName: isRunning ? "pause.fill" : "play.fill")
                     }
                 }
+                .disabled(!tracker.isAvailable(task.key))
             }
         } label: {
             Image(systemName: "star")

@@ -173,7 +173,7 @@ struct NewEntryEditor: View {
                 // Ready to log; keep the project list closed.
                 hoursFocused = true
             // Start from the most recently used task.
-            } else if let recent = tracker.recentTasks.first ?? tracker.favoriteTasks.first {
+            } else if let recent = (tracker.recentTasks + tracker.favoriteTasks).first(where: { tracker.isAvailable($0.key) }) {
                 projectID = recent.project.id
                 taskKey = recent.key
             }

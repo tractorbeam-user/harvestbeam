@@ -60,6 +60,11 @@ public final class TimeTracker {
     /// Latest day `entries` covers; later weeks are fetched on demand.
     @ObservationIgnored private var loadedThrough: LocalDate?
     @ObservationIgnored private var isLoadingHistory = false
+    /// Tasks Harvest still lists but marks archived, with which part is.
+    private var archivedByKey: [TaskKey: (task: TrackableTask, kind: TaskUnavailability.Kind)] = [:]
+    /// Favorites' names as of the last time Harvest listed them.
+    @ObservationIgnored private var rememberedTasks: [TaskKey: TrackableTask]
+    @ObservationIgnored private let defaults: UserDefaults
 
     static let historyDays = 60
     /// Entries logged ahead (meetings later this week, next week's plans).
@@ -68,8 +73,10 @@ public final class TimeTracker {
     public init(
         service: (any HarvestService)?, accountName: String?, favorites: FavoritesStore,
         meetingMemory: MeetingMemory = MeetingMemory(), contextMemory: ContextMemory = ContextMemory(),
-        isDemo: Bool = false
+        isDemo: Bool = false, defaults: UserDefaults = .standard
     ) {
+        self.defaults = defaults
+        self.rememberedTasks = RememberedTasks.load(from: defaults)
         self.service = service
         self.accountName = accountName
         self.favorites = favorites
@@ -98,9 +105,27 @@ public final class TimeTracker {
             favorites: FavoritesStore(defaults: defaults, syncWithICloud: false),
             meetingMemory: MeetingMemory(defaults: defaults),
             contextMemory: ContextMemory(defaults: defaults),
-            isDemo: true
+            isDemo: true, defaults: defaults
         )
     }
+
+    #if DEBUG
+    /// The demo with an archived project in its history and favorites, for
+    /// snapshots of how archived work looks.
+    public static func demoWithArchivedWork() -> TimeTracker {
+        let defaults = UserDefaults(suiteName: "HarvestBarDemoArchived") ?? .standard
+        defaults.removeObject(forKey: "favorites.v1")
+        defaults.removeObject(forKey: RememberedTasks.key)
+        return TimeTracker(
+            service: DemoHarvestService(includesArchivedWork: true),
+            accountName: "Tractorbeam (demo)",
+            favorites: FavoritesStore(defaults: defaults, syncWithICloud: false),
+            meetingMemory: MeetingMemory(defaults: defaults),
+            contextMemory: ContextMemory(defaults: defaults),
+            isDemo: true, defaults: defaults
+        )
+    }
+    #endif
 
     // MARK: Derived lists
 
@@ -165,8 +190,38 @@ public final class TimeTracker {
         }
     }
 
+    /// Starred tasks in order. Archived ones stay, so they can show as
+    /// archived instead of quietly vanishing; check `unavailability(of:)`.
     public var favoriteTasks: [TrackableTask] {
-        favorites.keys.compactMap { tasksByKey[$0] }
+        favorites.keys.compactMap { tasksByKey[$0] ?? unavailableTask($0) }
+    }
+
+    /// Why time can't be tracked to `key` any more, or nil when it can (or
+    /// before Harvest has said what you're assigned to).
+    public func unavailability(of key: TaskKey) -> TaskUnavailability? {
+        guard phase == .ready, !tasks.isEmpty, key.taskID >= 0, tasksByKey[key] == nil else { return nil }
+        return TaskUnavailability(kind: archivedByKey[key]?.kind ?? .notAssigned)
+    }
+
+    public func isAvailable(_ key: TaskKey) -> Bool { unavailability(of: key) == nil }
+
+    /// Names for a task Harvest no longer offers: from its archived
+    /// assignment, your entries on it, or what was remembered when starred.
+    private func unavailableTask(_ key: TaskKey) -> TrackableTask? {
+        guard unavailability(of: key) != nil else { return nil }
+        if let archived = archivedByKey[key] { return archived.task }
+        if let entry = entries.first(where: { $0.key == key }) { return task(for: entry) }
+        return rememberedTasks[key]
+    }
+
+    /// Keeps the names of today's favorites, so they can still be shown if
+    /// their project is archived later.
+    private func rememberFavorites() {
+        let known = favorites.keys.compactMap { tasksByKey[$0] ?? rememberedTasks[$0] }
+        let updated = Dictionary(known.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+        guard updated != rememberedTasks else { return }
+        rememberedTasks = updated
+        RememberedTasks.save(known, to: defaults)
     }
 
     public func tasks(for keys: [TaskKey]) -> [TrackableTask] {
@@ -181,7 +236,7 @@ public final class TimeTracker {
     }
 
     public var recentTasks: [TrackableTask] {
-        Ranking.recent(from: entries, excluding: favorites.set, limit: 4).compactMap { tasksByKey[$0] }
+        Ranking.recent(from: entries, excluding: favorites.set, limit: 4).compactMap { tasksByKey[$0] ?? unavailableTask($0) }
     }
 
     /// Tasks removed from Suggested; the next best ones take their place.
@@ -248,6 +303,7 @@ public final class TimeTracker {
             async let history = service.timeEntries(userID: me.id, from: from, to: through)
             let (loadedAssignments, loadedEntries) = try await (assignments, history)
 
+            archivedByKey = ProjectAssignment.archivedTasks(from: loadedAssignments)
             tasks = ProjectAssignment.trackableTasks(from: loadedAssignments)
             // Keep any older or later weeks already paged in.
             entries = Self.sorted(loadedEntries + entries.filter { $0.spentDate < from || $0.spentDate > through })
@@ -256,6 +312,7 @@ public final class TimeTracker {
             lastRefresh = .now
             phase = .ready
             errorMessage = nil
+            rememberFavorites()
         } catch HarvestError.unauthorized where !isDemo {
             signOut()
             errorMessage = HarvestError.unauthorized.errorDescription
@@ -271,6 +328,10 @@ public final class TimeTracker {
     public func toggle(_ task: TrackableTask) async {
         if running?.key == task.key {
             await pause()
+            return
+        }
+        if let reason = unavailability(of: task.key) {
+            errorMessage = "Can't start \(task.projectNameParts.name) · \(task.task.name). " + reason.detail
             return
         }
         guard let service, busyKey == nil else { return }
@@ -328,6 +389,10 @@ public final class TimeTracker {
             await pause()
             return
         }
+        if let message = cantChangeMessage(entry) {
+            errorMessage = message
+            return
+        }
         guard let service, busyKey == nil else { return }
         busyKey = entry.key
         defer { busyKey = nil }
@@ -372,8 +437,24 @@ public final class TimeTracker {
         return entry.timerStartedAt.flatMap { ClockTime.times(from: $0, hours: hours) }
     }
 
+    /// What to say when someone tries to restart or change an entry Harvest
+    /// won't let change; nil when it can.
+    public func cantChangeMessage(_ entry: TimeEntry) -> String? {
+        if let lock = entry.lock { return "Can't change this entry: it's \(lock.title.lowercased()). " + lock.detail }
+        if let reason = unavailability(of: entry.key) { return "Can't restart this entry. " + reason.detail }
+        return nil
+    }
+
     public func updateEntry(_ entry: TimeEntry, task: TrackableTask, notes: String, hours: Double?) async {
         guard let service else { return }
+        if let lock = entry.lock {
+            errorMessage = "Can't change this entry: it's \(lock.title.lowercased()). " + lock.detail
+            return
+        }
+        if task.key != entry.key, let reason = unavailability(of: task.key) {
+            errorMessage = "Can't move this entry there. " + reason.detail
+            return
+        }
         do {
             var target = entry
             var newHours = entry.isRunning ? nil : hours
@@ -486,6 +567,10 @@ public final class TimeTracker {
     @discardableResult
     public func addEntry(task: TrackableTask, on day: LocalDate, notes: String, hours: Double?, startingAt: Date? = nil) async -> TimeEntry? {
         guard let service else { return nil }
+        if let reason = unavailability(of: task.key) {
+            errorMessage = "Can't add time to \(task.projectNameParts.name) · \(task.task.name). " + reason.detail
+            return nil
+        }
         // Saving right after starting or pausing a timer waits its turn,
         // instead of quietly doing nothing.
         guard await waitUntilIdle() else {
@@ -520,6 +605,10 @@ public final class TimeTracker {
 
     public func deleteEntry(_ entry: TimeEntry) async {
         guard let service else { return }
+        if let lock = entry.lock {
+            errorMessage = "Can't delete this entry: it's \(lock.title.lowercased()). " + lock.detail
+            return
+        }
         do {
             try await service.deleteEntry(id: entry.id)
             entries = entries.filter { $0.id != entry.id }

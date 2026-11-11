@@ -202,11 +202,15 @@ private struct EntryRow: View {
     @Environment(\.openURL) private var openURL
     @State private var isHovered = false
     @State private var isEditing = false
-    @State private var isShowingLock = false
+    @State private var isExplaining = false
     @State private var isSplitting = false
     private var isFavorite: Bool { tracker.favorites.contains(entry.key) }
     /// Approved, invoiced or locked: Harvest won't let it change.
     private var lock: EntryLock? { entry.lock }
+    /// Its project or task is archived: it stays, but can't be restarted.
+    private var archived: TaskUnavailability? { tracker.unavailability(of: entry.key) }
+    /// Locked or archived: shown muted, with its play button disabled.
+    private var isSettled: Bool { lock != nil || archived != nil }
 
     var body: some View {
         // Double-click (or double-tap) edits; only the round button starts or
@@ -220,10 +224,15 @@ private struct EntryRow: View {
                     }
                     MarqueeText(text: task.project.name, isActive: isHovered)
                         .font(.system(size: 13.5, weight: .semibold))
-                        .foregroundStyle(lock == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                    Text(task.task.name)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isSettled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                    HStack(spacing: 6) {
+                        Text(task.task.name)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .layoutPriority(-1)
+                        if let lock { StatusTag.lock(lock, invoice: lock.kind == .invoiced ? entry.invoice?.number : nil) }
+                        if let archived { StatusTag.archived(archived) }
+                    }
                     if let notes = entry.notes, !notes.isEmpty {
                         Text(notes)
                             .font(.system(size: 11.5))
@@ -244,18 +253,18 @@ private struct EntryRow: View {
                         .foregroundStyle(.harvestOrange)
                     } else {
                         Text(TimeFormat.hoursMinutes(entry.elapsed()))
-                            .foregroundStyle(lock == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                            .foregroundStyle(isSettled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                     }
                 }
                 .font(.system(size: 18, weight: .medium, design: .rounded).monospacedDigit())
 
-                if let lock {
-                    // A lock where play would be; it says why.
-                    Button { isShowingLock = true } label: { lockIndicator }
+                if isSettled && !entry.isRunning {
+                    // Play, greyed out with a lock: it can't start. Clicking says why.
+                    Button { isExplaining = true } label: { disabledIndicator }
                         .buttonStyle(.plain)
-                        .help("\(lock.title) · can't be edited")
-                        .accessibilityLabel("\(lock.title), can't be edited")
-                        .popover(isPresented: $isShowingLock, arrowEdge: .bottom) { LockExplanation(lock: lock, day: entry.spentDate) }
+                        .help(settledHelp + " · click to see why")
+                        .accessibilityLabel("Start timer, unavailable: \(settledTitle)")
+                        .accessibilityHint("Explains why")
                 } else {
                     Button {
                         Task { await tracker.toggle(entry) }
@@ -272,33 +281,46 @@ private struct EntryRow: View {
             .padding(.vertical, 8)
             .frame(minHeight: 54)
             .background(background)
+            // A stripe down the left edge marks it at a glance.
+            .overlay(alignment: .leading) {
+                if isSettled {
+                    Rectangle().fill(lock != nil ? Color.lockedTint.opacity(0.55) : Color.archivedTint.opacity(0.7)).frame(width: 3)
+                }
+            }
             .contentShape(Rectangle())
-            .onTapGesture(count: 2) { if lock == nil { isEditing = true } else { isShowingLock = true } }
-            .help(lock == nil ? "Double-click to edit" : "\(lock!.title) · double-click to see why it's locked")
+            .onTapGesture(count: 2) { if lock == nil { isEditing = true } else { isExplaining = true } }
+            .help(lock == nil ? (archived.map { $0.help + " Double-click to edit." } ?? "Double-click to edit")
+                  : "\(lock!.title) · can't be edited. Double-click to see why.")
             // Drag an entry into Favorites, like a tile.
             .draggable(entry.key.description)
+            .popover(isPresented: $isExplaining, arrowEdge: .bottom) {
+                StatusExplanation(lock: lock, archived: archived, day: entry.spentDate)
+            }
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
         .contextMenu {
+            if isSettled {
+                Button("Why Is This \(settledTitle)?") { isExplaining = true }
+                Divider()
+            }
             // A new timer today for the same project and task, leaving this entry alone.
             Button(entry.spentDate == LocalDate() ? "Start a Fresh Timer" : "Start Again Today") {
                 Task { await tracker.addEntry(task: task, on: LocalDate(), notes: "", hours: nil) }
             }
+            .disabled(archived != nil)
             Divider()
-            if let lock {
-                Button("Why Is This \(lock.title)?") { isShowingLock = true }
-                Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
-            } else {
-                Button("Edit Entry") { isEditing = true }
-                Button("Split Entry…") { isSplitting = true }
-                    .disabled(entry.elapsed() < 120)
-                Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
-                Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
-                    Task { await tracker.toggle(entry) }
-                }
-                Button("Delete Entry", role: .destructive) { Task { await tracker.deleteEntry(entry) } }
+            // Locked entries keep these, greyed out, so it's clear they can't change.
+            Button("Edit Entry") { isEditing = true }.disabled(lock != nil)
+            Button("Split Entry…") { isSplitting = true }
+                .disabled(lock != nil || entry.elapsed() < 120)
+            Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
+            Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
+                Task { await tracker.toggle(entry) }
             }
+            .disabled(isSettled && !entry.isRunning)
+            Button("Delete Entry", role: .destructive) { Task { await tracker.deleteEntry(entry) } }
+                .disabled(lock != nil)
             Divider()
             Button("View in Harvest") {
                 if let url = tracker.harvestURL(for: entry.spentDate) { openURL(url) }
@@ -306,21 +328,42 @@ private struct EntryRow: View {
         }
         .popover(isPresented: $isEditing, arrowEdge: .bottom) { NewEntryEditor(day: entry.spentDate, entry: entry) }
         .popover(isPresented: $isSplitting, arrowEdge: .bottom) { SplitEntryView(entry: entry, task: task) }
-        .accessibilityAction(named: "Edit Entry") { isEditing = true }
+        .accessibilityValue([lock.map { "\($0.title), can't be edited" }, archived.map { _ in "Archived, can't be restarted" }]
+            .compactMap { $0 }.joined(separator: ", "))
+        .accessibilityAction(named: lock == nil ? "Edit Entry" : "Why It Can't Be Edited") {
+            if lock == nil { isEditing = true } else { isExplaining = true }
+        }
+    }
+
+    /// "Invoiced", "Approved", "Locked" or "Archived".
+    private var settledTitle: String { lock?.title ?? archived?.title ?? "" }
+
+    private var settledHelp: String {
+        if let lock { return "\(lock.title) · can't be started or edited" }
+        return "Archived in Harvest · can't be started"
     }
 
     private var background: Color {
         if entry.isRunning { return .orangeSoft }
-        if lock != nil { return Color.primary.opacity(isHovered ? 0.04 : 0.02) }
+        if isSettled { return Color.primary.opacity(isHovered ? 0.05 : 0.03) }
         return isHovered ? Color.primary.opacity(0.03) : .clear
     }
 
-    private var lockIndicator: some View {
-        Image(systemName: "lock.fill")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
+    private var disabledIndicator: some View {
+        Image(systemName: "play.fill")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(.quaternary)
             .frame(width: 28, height: 28)
-            .background(Circle().fill(Color.primary.opacity(isHovered ? 0.09 : 0.05)))
+            .background(Circle().strokeBorder(Color.primary.opacity(isHovered ? 0.18 : 0.12), style: StrokeStyle(lineWidth: 1, dash: [3, 2.5])))
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: lock?.icon ?? "archivebox.fill")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(lock != nil ? Color.lockedTint : Color.archivedTint)
+                    .frame(width: 15, height: 15)
+                    .background(Circle().fill(Color.tileBackground))
+                    .overlay(Circle().strokeBorder(Color.hairline))
+                    .offset(x: 2, y: 2)
+            }
             .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 
@@ -380,62 +423,36 @@ struct SoftPillButtonStyle: ButtonStyle {
     }
     .padding(14)
 }
+
+/// For offscreen snapshots: days with entries on an archived project, one
+/// of them also approved, and what clicking one says.
+@MainActor public func debugArchivedDays(_ days: [LocalDate], explaining entry: TimeEntry?) -> some View {
+    VStack(spacing: 12) {
+        ForEach(days, id: \.self) { DayEntriesList(day: $0) }
+        if let entry {
+            DebugStatusExplanation(entry: entry)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.tileBackground))
+        }
+    }
+    .padding(14)
+}
+
+private struct DebugStatusExplanation: View {
+    @Environment(TimeTracker.self) private var tracker
+    let entry: TimeEntry
+    var body: some View {
+        StatusExplanation(lock: entry.lock, archived: tracker.unavailability(of: entry.key), day: entry.spentDate)
+    }
+}
 #endif
 
 /// Why an entry can't be edited, and where to go about it.
 struct LockExplanation: View {
-    @Environment(TimeTracker.self) private var tracker
-    @Environment(\.openURL) private var openURL
     let lock: EntryLock
     let day: LocalDate
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.harvestOrange)
-                .frame(width: 18)
-                .padding(.top, 1)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(lock.title)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(lock.detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let url = tracker.harvestURL(for: day) {
-                    Button { openURL(url) } label: {
-                        Label("View in Harvest", systemImage: "arrow.up.forward")
-                            .labelStyle(TrailingIconLabelStyle())
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.harvestOrange)
-                    .padding(.top, 4)
-                }
-            }
-        }
-        .padding(14)
-        .frame(width: 280, alignment: .leading)
-        .dimsWindow()
-        .presentationBackground(Color.tileBackground)
-    }
-
-    private var icon: String {
-        switch lock.kind {
-        case .invoiced: "doc.text"
-        case .approved: "checkmark.seal"
-        case .locked: "lock"
-        }
-    }
-}
-
-private struct TrailingIconLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 3) {
-            configuration.title
-            configuration.icon.font(.system(size: 10, weight: .bold))
-        }
+        StatusExplanation(lock: lock, day: day)
     }
 }
 
