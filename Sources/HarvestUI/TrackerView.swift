@@ -58,8 +58,6 @@ struct TrackerView: View {
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
-    @AppStorage(FavoritesStyle.key) private var favoritesStyleRaw = FavoritesStyle.panel.rawValue
-    private var favoritesStyle: FavoritesStyle { FavoritesStyle(rawValue: favoritesStyleRaw) ?? .panel }
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
     @State private var selectedDay = LocalDate()
     /// The date when the window last checked, to notice a new day.
@@ -265,8 +263,6 @@ struct TrackerView: View {
                                 RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
                                     .strokeBorder(Color.harvestOrange.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             )
-                    } else if section.id == "favorites" && favoritesStyle != .panel {
-                        FavoritesListView(tasks: section.tasks)
                     } else {
                         LazyVGrid(
                             columns: [GridItem(.adaptive(minimum: Metrics.tileMinWidth), spacing: Metrics.spacing)],
@@ -298,9 +294,7 @@ struct TrackerView: View {
                 .padding(section.id == "favorites" ? 10 : 0)
                 .background(
                     RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
-                        .fill(section.id != "favorites" ? Color.clear
-                              : favoritesTargeted ? Color.harvestOrange.opacity(0.18)
-                              : favoritesStyle == .panel ? Color.orangeSoft : Color.clear)
+                        .fill(section.id != "favorites" ? Color.clear : favoritesTargeted ? Color.harvestOrange.opacity(0.18) : Color.orangeSoft)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
@@ -800,10 +794,6 @@ struct TrackerView: View {
                         Button("Show Removed Suggestions") { tracker.showHiddenSuggestions() }
                     }
                     Divider()
-                }
-                // A style that's since gone (Chips) shows as Panel, checked.
-                Picker("Favorites", selection: Binding(get: { favoritesStyle.rawValue }, set: { favoritesStyleRaw = $0 })) {
-                    ForEach(FavoritesStyle.allCases) { Text($0.label).tag($0.rawValue) }
                 }
                 Menu("Menu Bar") {
                     Picker("Show", selection: $menuBarContent) {

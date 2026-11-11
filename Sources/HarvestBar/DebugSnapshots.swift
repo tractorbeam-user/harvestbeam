@@ -47,16 +47,14 @@ enum DebugSnapshots {
             for (task, icon) in zip(tracker.favoriteTasks, demoIcons) { iconMap[task.key.description] = icon }
             UserDefaults.standard.set(iconMap, forKey: "favoriteIcons.v1")
             FavoriteIcons.shared.reload()
-            let savedStyle = UserDefaults.standard.string(forKey: "favoritesStyle")
-            for style in ["panel", "list"] {
-                UserDefaults.standard.set(style, forKey: "favoritesStyle")
+            do {
+                let style = "panel"
                 let styleWindow = makeWindow(RootView().environment(tracker), appearance: appearance)
                 styleWindow.setContentSize(NSSize(width: 440, height: 1060))
                 await settle()
                 write(styleWindow, to: url.appendingPathComponent("2-favorites-\(style)-\(suffix).png"))
                 styleWindow.close()
             }
-            UserDefaults.standard.set(savedStyle, forKey: "favoritesStyle")
             UserDefaults.standard.set(savedIcons, forKey: "favoriteIcons.v1")
             FavoriteIcons.shared.reload()
 
