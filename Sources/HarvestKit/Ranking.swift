@@ -81,6 +81,10 @@ public enum Ranking {
     /// Words of four letters or more also forgive typos ("researhc", "desgin"):
     /// a query word may be a few edits away from a whole word in a field. Tasks
     /// that need a typo to match always rank below tasks that match exactly.
+    ///
+    /// Words from the policy's description of a task (`TaskDefinitions`) count
+    /// too, so "invoice" finds Billing, but only as the start of a word, and
+    /// tasks found that way rank below every task found by name.
     public struct SearchIndex: Sendable {
         struct Field: Sendable {
             let text: String
@@ -91,6 +95,21 @@ public enum Ranking {
         struct Item: Sendable {
             let task: TrackableTask
             let fields: [Field]
+            /// The policy's description, matched by word prefix only.
+            let description: Field?
+        }
+
+        /// How a task matched: by name, by its description, or only with a typo.
+        public enum MatchKind: Int, Comparable, Sendable {
+            case name, description, typo
+            public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+        }
+
+        public struct Match: Sendable {
+            public let task: TrackableTask
+            public let kind: MatchKind
+            /// How well the words matched, before usage or favorites.
+            public let score: Double
         }
 
         let items: [Item]
@@ -105,12 +124,13 @@ public enum Ranking {
                 return Field(text: text, words: words, weight: weight)
             }
             items = tasks.map { task in
-                Item(task: task, fields: [
+                let definition = TaskDefinitions.definition(for: task)
+                return Item(task: task, fields: [
                     field(task.task.name, 3),
                     field(task.project.name, 2),
                     field(task.projectCode, 2),
                     field(task.client?.name, 1),
-                ].compactMap { $0 })
+                ].compactMap { $0 }, description: field(definition.map { $0.isRetired ? $0.name : $0.name + " " + $0.summary }, 0.5))
             }
             var seen = Set<String>()
             var vocabulary: [Int: [(word: String, scalars: [Unicode.Scalar])]] = [:]
@@ -126,20 +146,41 @@ public enum Ranking {
         }
 
         public func search(_ query: String, usage: [TaskKey: Double] = [:], favorites: Set<TaskKey> = []) -> [TrackableTask] {
+            matches(query)
+                .map { match -> (Match, Double) in
+                    var total = match.score + min(usage[match.task.key] ?? 0, 5) * 0.4
+                    if favorites.contains(match.task.key) { total += 1.5 }
+                    return (match, total)
+                }
+                .sorted {
+                    if $0.0.kind != $1.0.kind { return $0.0.kind < $1.0.kind }
+                    return $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.task.task.name < $1.0.task.task.name
+                }
+                .map(\.0.task)
+        }
+
+        /// Every task the query matches, with how and how well, unsorted.
+        /// Usage and favorites don't count here.
+        public func matches(_ query: String) -> [Match] {
             let tokens = normalize(query).split(whereSeparator: \.isWhitespace).map(String.init)
             guard !tokens.isEmpty else { return [] }
             // Words within reach of each query word, worked out once per query
             // rather than once per task.
             let near = tokens.map(nearWords)
 
-            var scored: [(task: TrackableTask, fuzzy: Bool, score: Double)] = []
+            var result: [Match] = []
             items: for item in items {
                 var total = 0.0
-                var fuzzy = false
+                var kind = MatchKind.name
                 for (token, near) in zip(tokens, near) {
                     var best = 0.0
                     for field in item.fields {
                         best = max(best, matchScore(token, in: field) * field.weight)
+                    }
+                    if best == 0, token.count >= 3, let description = item.description,
+                       description.words.contains(where: { $0.hasPrefix(token) }) {
+                        best = description.weight
+                        kind = max(kind, .description)
                     }
                     if best == 0, !near.isEmpty {
                         for field in item.fields {
@@ -147,21 +188,14 @@ public enum Ranking {
                                 if let distance = near[word] { best = max(best, field.weight / Double(distance + 1) / 2) }
                             }
                         }
-                        fuzzy = best > 0
+                        if best > 0 { kind = .typo }
                     }
                     guard best > 0 else { continue items }
                     total += best
                 }
-                total += min(usage[item.task.key] ?? 0, 5) * 0.4
-                if favorites.contains(item.task.key) { total += 1.5 }
-                scored.append((item.task, fuzzy, total))
+                result.append(Match(task: item.task, kind: kind, score: total))
             }
-            return scored
-                .sorted {
-                    if $0.fuzzy != $1.fuzzy { return !$0.fuzzy }
-                    return $0.score != $1.score ? $0.score > $1.score : $0.task.task.name < $1.task.task.name
-                }
-                .map(\.task)
+            return result
         }
 
         private func matchScore(_ token: String, in field: Field) -> Double {

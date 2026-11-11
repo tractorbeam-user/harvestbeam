@@ -70,10 +70,19 @@ struct TrackerView: View {
     @FocusState private var searchFocused: Bool
 
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
+    /// "move 20 min from X to Y", "note: …", "stop": a change to today's
+    /// time, previewed in the ask box until Return.
+    private var askCommand: AskCommandPreview? { isSearching ? tracker.askCommand(query) : nil }
     /// "10 min on tb corporate": what typing a duration in the ask box would add.
-    private var quickPlan: [PlannedEntry] { isSearching ? tracker.quickPlan(query) : [] }
+    private var quickPlan: [PlannedEntry] { isSearching && askCommand == nil ? tracker.quickPlan(query) : [] }
+    /// Shown after starting a retired bucket from search.
+    @State private var retiredPick: TrackableTask?
 
     private func sections() -> [TaskSection] {
+        // A command shows only its preview, so ↑↓ and Return stay with it.
+        if isSearching, askCommand != nil {
+            return [TaskSection(id: "results", title: "Results", systemImage: "magnifyingglass", tasks: [])]
+        }
         if isSearching {
             // One row per matching project; the open one lists its tasks right
             // below it, like an accordion.
@@ -130,7 +139,9 @@ struct TrackerView: View {
 
     /// Search results as a compact list, otherwise the tile sections.
     @ViewBuilder private func content(_ sections: [TaskSection]) -> some View {
-        if isSearching {
+        if let command = askCommand {
+            AskCommandRow(preview: command) { applyCommand(command) }
+        } else if isSearching {
             #if os(macOS)
             let plan = quickPlan
             if !plan.isEmpty {
@@ -155,7 +166,8 @@ struct TrackerView: View {
         platformBody(sections)
             .onChange(of: query) {
                 pickedProject = nil
-                selection = isSearching && quickPlan.isEmpty ? sections.first?.tasks.first?.key : nil
+                selection = isSearching && quickPlan.isEmpty && askCommand == nil ? sections.first?.tasks.first?.key : nil
+                if isSearching { retiredPick = nil }
             }
             .onChange(of: tracker.focusRequest, initial: true) {
                 query = ""
@@ -436,6 +448,9 @@ struct TrackerView: View {
             if let error = tracker.errorMessage {
                 ErrorBanner(message: error) { tracker.errorMessage = nil }
             }
+            if let picked = retiredPick, let definition = picked.definition {
+                RetiredBucketNote(task: picked, definition: definition) { retiredPick = nil }
+            }
             if let deleted = tracker.lastDeleted {
                 UndoBanner(entry: deleted, task: tracker.task(for: deleted))
             }
@@ -517,6 +532,7 @@ struct TrackerView: View {
                     return .handled
                 }
                 .onSubmit {
+                    if let command = askCommand { return applyCommand(command) }
                     let plan = quickPlan
                     if selection == nil, !plan.isEmpty { return addQuickPlan(plan) }
                     guard let key = selection ?? (isSearching || listsTasks ? flat.first?.key : nil),
@@ -614,7 +630,16 @@ struct TrackerView: View {
         pickedProject = nil
         selection = nil
         askListOpen = false
+        retiredPick = task.definition?.isRetired == true && tracker.running?.key != task.key ? task : nil
         Task { await tracker.toggle(task) }
+    }
+
+    /// Return on a command's preview: does it, if it can.
+    private func applyCommand(_ command: AskCommandPreview) {
+        guard command.plan.isReady else { return }
+        query = ""
+        selection = nil
+        Task { await tracker.perform(command.plan) }
     }
 
     #if os(macOS)

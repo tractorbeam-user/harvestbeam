@@ -98,7 +98,8 @@ struct AskDropdown: View {
         }
         .buttonStyle(.plain)
         .onHover { if $0 { highlight(item.id) } }
-        .help("\(item.task.task.name) · \(item.task.subtitle)")
+        .help(["\(item.task.task.name) · \(item.task.subtitle)", item.task.definition.map { "\($0.title): \($0.detail)" }]
+            .compactMap { $0 }.joined(separator: "\n"))
     }
 }
 #endif
