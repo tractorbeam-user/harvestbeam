@@ -165,6 +165,12 @@ public extension Notification.Name {
     static let askFieldClicked = Notification.Name("HarvestUI.askFieldClicked")
 }
 
+/// Escape anywhere in the main window asks this first: it closes the ask
+/// box's list (and says it did) before Escape puts the window away.
+@MainActor public enum EscapeRouter {
+    public static var closeInnermost: (() -> Bool)?
+}
+
 /// Counts open popovers so the window behind them can dim, like Harvest's.
 @MainActor @Observable
 final class PopoverDimmer {

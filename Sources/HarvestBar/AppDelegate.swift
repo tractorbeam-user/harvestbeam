@@ -562,6 +562,12 @@ final class TrackerPanel: NSPanel {
         super.sendEvent(event)
     }
 
+    /// Escape closes the ask box's list first, then the window as before.
+    override func cancelOperation(_ sender: Any?) {
+        if EscapeRouter.closeInnermost?() == true { return }
+        super.cancelOperation(sender)
+    }
+
     private static func isInTextField(_ view: NSView) -> Bool {
         sequence(first: view, next: \.superview).contains { $0 is NSTextField || $0 is NSTextView }
     }

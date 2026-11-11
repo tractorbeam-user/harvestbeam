@@ -192,6 +192,15 @@ struct TrackerView: View {
             #if os(macOS)
             // A click in the ask box opens Recent and Suggested; just opening
             // the window, which also puts you in the box, doesn't.
+            .onAppear {
+                // Escape closes the ask box's list first, wherever focus is.
+                EscapeRouter.closeInnermost = {
+                    guard askListOpen else { return false }
+                    askListOpen = false
+                    selection = nil
+                    return true
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .askFieldClicked)) { _ in
                 guard asksFirst, !isSearching else { return }
                 selection = nil
@@ -257,10 +266,7 @@ struct TrackerView: View {
                                     .strokeBorder(Color.harvestOrange.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                             )
                     } else if section.id == "favorites" && favoritesStyle != .panel {
-                        switch favoritesStyle {
-                        case .list: FavoritesListView(tasks: section.tasks)
-                        default: FavoritesTilesView(tasks: section.tasks)
-                        }
+                        FavoritesListView(tasks: section.tasks)
                     } else {
                         LazyVGrid(
                             columns: [GridItem(.adaptive(minimum: Metrics.tileMinWidth), spacing: Metrics.spacing)],

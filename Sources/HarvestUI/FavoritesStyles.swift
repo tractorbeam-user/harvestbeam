@@ -7,8 +7,6 @@ enum FavoritesStyle: String, CaseIterable, Identifiable {
     case panel
     /// One quiet row each: star, name, today's time.
     case list
-    /// Large tiles with today's time on each.
-    case tiles
 
     static let key = "favoritesStyle"
     var id: String { rawValue }
@@ -16,7 +14,6 @@ enum FavoritesStyle: String, CaseIterable, Identifiable {
         switch self {
         case .panel: return "Panel"
         case .list: return "List"
-        case .tiles: return "Big Tiles"
         }
     }
 }
@@ -124,22 +121,5 @@ private struct FavoriteRow: View {
         .onHover { isHovered = $0 }
         #endif
         .modifier(FavoriteChrome(task: task, picksIcon: $picksIcon))
-    }
-}
-
-// MARK: Big tiles
-
-struct FavoritesTilesView: View {
-    @Environment(TimeTracker.self) private var tracker
-    let tasks: [TrackableTask]
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
-                ForEach(tasks) { task in
-                    BigTile(task: task, seconds: tracker.secondsToday(for: task, at: context.date))
-                }
-            }
-        }
     }
 }
