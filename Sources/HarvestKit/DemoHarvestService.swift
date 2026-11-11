@@ -38,6 +38,12 @@ public actor DemoHarvestService: HarvestService {
             assignment(104, "Mobile App", code: "ACME-APP", client: acme, tasks: [design, development, qa, pm]),
             assignment(105, "Data Platform", code: "NW-DATA", client: northwind, tasks: [development, meetings, pm]),
             assignment(106, "Internal", code: nil, client: tractorbeam, tasks: [admin, meetings]),
+            // Buckets from the team's time-tracking policy (`TaskDefinitions`),
+            // one of them retired.
+            assignment(108, "[TB-DP-12] Billing", code: nil, client: tractorbeam, tasks: [admin]),
+            assignment(109, "[TB-DP-14] Hiring", code: nil, client: tractorbeam, tasks: [admin, meetings]),
+            assignment(110, "[TB-DP-19] Business Dev", code: nil, client: tractorbeam, tasks: [strategy, meetings]),
+            assignment(111, "Digital Products", code: nil, client: tractorbeam, tasks: [admin]),
         ]
         let springCampaign = ProjectAssignment(
             id: 107, isActive: false, project: .init(id: 107, name: "Spring Campaign", code: "NW-SPR"), client: northwind,

@@ -186,6 +186,27 @@ enum DebugSnapshots {
                 welcome.close()
             }
 
+            // Ask-box commands, and the policy's definitions in search.
+            if let source = tracker.todayEntries.filter({ !$0.isRunning }).max(by: { $0.elapsed() < $1.elapsed() }) {
+                let from = tracker.task(for: source)
+                let name = "\(from.projectNameParts.name) \(from.task.name)"
+                let to = tracker.tasks.first { $0.key != from.key && $0.project.id != from.project.id && $0.project.id < 107 }!
+                let target = "\(to.projectNameParts.name) \(to.task.name)"
+                for (file, text) in [
+                    ("2-command-move", "move 20 min from \(name) to \(target)"),
+                    ("2-command-not-enough", "move 9h from \(name) to \(target)"),
+                    ("2-command-ambiguous", "take 15 from \(name) give to hiring"),
+                    ("2-command-note", "note: client feedback round 2"),
+                    ("2-definition-invoice", "invoice"),
+                    ("2-definition-retired", "digital"),
+                    ("2-definition-admin", "admin"),
+                ] {
+                    type(text, in: window)
+                    await settle()
+                    write(window, to: url.appendingPathComponent("\(file)-\(suffix).png"))
+                }
+            }
+
             if let field = firstTextField(in: window.contentView!) {
                 window.makeFirstResponder(field)
                 field.stringValue = "10 min on website"
@@ -284,6 +305,15 @@ enum DebugSnapshots {
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
+    }
+
+    private static func type(_ text: String, in window: NSWindow) {
+        guard let field = firstTextField(in: window.contentView!) else { return }
+        window.makeFirstResponder(field)
+        field.stringValue = text
+        field.currentEditor()?.string = text
+        NotificationCenter.default.post(name: NSControl.textDidChangeNotification, object: field)
+        (field.currentEditor() as? NSTextView)?.didChangeText()
     }
 
     private static func firstTextField(in view: NSView) -> NSTextField? {

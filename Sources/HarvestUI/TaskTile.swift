@@ -84,7 +84,7 @@ struct TaskTile: View {
             }
         }
         .modifier(FavoriteIconPopover(key: task.key, isPresented: $picksIcon))
-        .help([task.client?.name, task.projectCode].compactMap { $0 }.joined(separator: " · "))
+        .help(task.helpText)
         .accessibilityLabel("\(task.project.name), \(task.task.name), \(task.client?.name ?? "")")
         .accessibilityHint(isRunning ? "Pauses the timer" : "Starts a timer")
     }

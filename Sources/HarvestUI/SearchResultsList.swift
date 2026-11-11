@@ -35,11 +35,15 @@ struct SearchResultsList: View {
                                 .padding(.top, index == 0 ? 2 : 10)
                                 .padding(.bottom, 3)
                         }
-                        ResultRow(task: task, title: Text(projectLabel(task)), isSelected: selection == task.key,
+                        let definition = task.definition
+                        ResultRow(task: task, title: Text(projectLabel(task)), definition: definition, isSelected: selection == task.key,
                                   isProject: true, isOpen: pickedProject == task.project.id) { pick(task) }
                             .id(task.key)
                     } else {
-                        ResultRow(task: task, title: Text(task.task.name), isSelected: selection == task.key,
+                        // Only when the task says more than its project.
+                        let definition = task.definition
+                        let shown = definition != task.projectRow.definition ? definition : nil
+                        ResultRow(task: task, title: Text(task.task.name), definition: shown, isSelected: selection == task.key,
                                   isProject: false, isOpen: false) { pick(task) }
                             .padding(.leading, 16)
                             .id(task.key)
@@ -62,6 +66,8 @@ private struct ResultRow: View {
     @Environment(TimeTracker.self) private var tracker
     let task: TrackableTask
     let title: Text
+    /// The team policy's description, as a gray second line.
+    var definition: TaskDefinition?
     let isSelected: Bool
     /// Project rows open the project's tasks instead of starting a timer.
     let isProject: Bool
@@ -75,7 +81,17 @@ private struct ResultRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                title
+                if let definition {
+                    VStack(alignment: .leading, spacing: 1) {
+                        title
+                        Text(definition.detail)
+                            .font(.system(size: rowFont - 2))
+                            .foregroundStyle(definition.isRetired && !isSelected ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(secondary))
+                    }
+                    .padding(.vertical, 3)
+                } else {
+                    title
+                }
                 Spacer(minLength: 6)
                 if !isProject && isFavorite {
                     Image(systemName: "star.fill")
@@ -101,6 +117,7 @@ private struct ResultRow: View {
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
+        .help(definition.map { "\($0.title): \($0.detail)" } ?? "")
         .contextMenu {
             if !isProject {
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: isFavorite ? "star.slash" : "star") {
