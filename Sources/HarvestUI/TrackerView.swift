@@ -432,12 +432,18 @@ struct TrackerView: View {
             }
             .opacity(showsAskList ? 0.35 : 1)
             .animation(.easeOut(duration: 0.12), value: showsAskList)
+            .overlay(alignment: .bottom) {
+                if let toast = tracker.toast {
+                    UndoToastView(toast: toast)
+                        .padding(.horizontal, Metrics.padding)
+                        .padding(.bottom, 12)
+                        .transition(.opacity.combined(with: .offset(y: 8)))
+                }
+            }
+            .animation(.snappy(duration: 0.2), value: tracker.toast)
 
             if let error = tracker.errorMessage {
                 ErrorBanner(message: error) { tracker.errorMessage = nil }
-            }
-            if let deleted = tracker.lastDeleted {
-                UndoBanner(entry: deleted, task: tracker.task(for: deleted))
             }
 
             Rectangle().fill(Color.hairline).frame(height: 1)
@@ -858,9 +864,8 @@ struct TrackerView: View {
                         ErrorBanner(message: error) { tracker.errorMessage = nil }
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
-                    if let deleted = tracker.lastDeleted {
-                        UndoBanner(entry: deleted, task: tracker.task(for: deleted))
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    if let toast = tracker.toast {
+                        UndoToastView(toast: toast)
                     }
                     if !isSearching { DayView(selectedDay: $selectedDay) }
                     content(sections)
@@ -936,33 +941,44 @@ private struct SectionLabelStyle: LabelStyle {
     }
 }
 
-/// "Deleted … · Undo", shown after deleting an entry instead of asking first.
-/// Goes away on its own after a few seconds.
-private struct UndoBanner: View {
+/// "Moved 0:20 to Dallas Art Fair · Undo", after any change to time, so
+/// nothing needs asking first. Redo after an undo. Goes away on its own.
+private struct UndoToastView: View {
     @Environment(TimeTracker.self) private var tracker
-    let entry: TimeEntry
-    let task: TrackableTask
+    let toast: UndoToast
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "trash").foregroundStyle(.secondary)
-            Text("Deleted \(task.project.name) · \(TimeFormat.hoursMinutes(entry.elapsed()))")
-                .font(.callout)
+        HStack(spacing: 10) {
+            Text(toast.message)
+                .font(.system(size: 12.5))
                 .lineLimit(1)
-            Spacer()
-            Button("Undo") { Task { await tracker.undoDelete() } }
-                .buttonStyle(SoftPillButtonStyle())
-                .keyboardShortcut("z", modifiers: .command)
-            Button { tracker.lastDeleted = nil } label: { Image(systemName: "xmark") }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Dismiss")
+                .truncationMode(.middle)
+            Button(toast.action == .undo ? "Undo" : "Redo") {
+                Task { toast.action == .undo ? await tracker.undo() : await tracker.redo() }
+            }
+            .buttonStyle(SoftPillButtonStyle())
+            .disabled(toast.action == .undo ? !tracker.canUndo : !tracker.canRedo)
+            .help(toast.action == .undo ? "Undo (⌘Z)" : "Redo (⇧⌘Z)")
+            Button { tracker.dismissToast() } label: {
+                Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Dismiss")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Color.primary.opacity(0.05))
-        .task(id: entry.id) {
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .padding(.vertical, 6)
+        .background {
+            Capsule().fill(Color.tileBackground)
+                .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
+        }
+        .overlay(Capsule().strokeBorder(Color.hairline))
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .contain)
+        .task(id: toast.id) {
             try? await Task.sleep(for: .seconds(8))
-            if tracker.lastDeleted?.id == entry.id { tracker.lastDeleted = nil }
+            if tracker.toast?.id == toast.id { tracker.dismissToast() }
         }
     }
 }

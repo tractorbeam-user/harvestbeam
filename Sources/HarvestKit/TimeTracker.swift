@@ -29,8 +29,13 @@ public final class TimeTracker {
     public private(set) var isRefreshing = false
     /// The task whose start/stop request is in flight.
     public private(set) var busyKey: TaskKey?
-    /// The entry most recently deleted, until it's undone or dismissed.
-    public var lastDeleted: TimeEntry?
+    /// The note after a change, offering to undo it (or redo an undo).
+    public internal(set) var toast: UndoToast?
+    /// Changes this session can put back, oldest first; `undo()` takes the last.
+    var undoStack: [UndoStep] = []
+    var redoStack: [UndoStep] = []
+    /// While an undo or redo is on its way to Harvest.
+    var isUndoing = false
     public var errorMessage: String?
     /// Bumped whenever the panel opens so the search field can grab focus.
     public private(set) var focusRequest = 0
@@ -48,7 +53,12 @@ public final class TimeTracker {
     /// Never carries anything from Harvest: just which thing happened.
     public var onUsage: ((UsageEvent) -> Void)?
 
-    @ObservationIgnored private var service: (any HarvestService)?
+    @ObservationIgnored var service: (any HarvestService)?
+    @ObservationIgnored var toastCounter = 0
+    /// Above zero while a change made of smaller ones records itself as one.
+    @ObservationIgnored var recordingPaused = 0
+    /// Old entry ID → new, for entries deleted and made again by undo.
+    @ObservationIgnored var idAliases: [Int: Int] = [:]
     @ObservationIgnored private var lastRefresh: Date?
     // Derived from `tasks` and `entries` when they change, not on every
     // keystroke or redraw.
@@ -84,6 +94,7 @@ public final class TimeTracker {
         self.contextMemory = contextMemory
         self.isDemo = isDemo
         self.phase = service == nil ? .signedOut : .loading
+        favorites.onChange = { [weak self] before, after in self?.favoritesChanged(from: before, to: after) }
     }
 
     /// Signs in with the token saved in the Keychain, if any.
@@ -338,18 +349,21 @@ public final class TimeTracker {
         busyKey = task.key
         defer { busyKey = nil }
         do {
+            let stopped = running
             if let current = running {
                 upsert(try await service.stopTimer(id: current.id))
             }
             let today = LocalDate()
             let started: TimeEntry
-            if let existing = entries.first(where: { $0.key == task.key && $0.spentDate == today }) {
+            let existing = entries.first(where: { $0.key == task.key && $0.spentDate == today })
+            if let existing {
                 started = try await service.restartTimer(id: existing.id)
             } else {
                 started = try await service.startTimer(projectID: task.project.id, taskID: task.task.id, spentDate: today, notes: nil)
             }
             upsert(started)
             errorMessage = nil
+            record("Started \(shortName(for: task))", startOp(started: started, wasNew: existing == nil, stopped: stopped))
             onUsage?(.timerStarted)
         } catch {
             await recover(from: error)
@@ -365,6 +379,7 @@ public final class TimeTracker {
         do {
             upsert(try await service.stopTimer(id: current.id))
             errorMessage = nil
+            record("Paused \(shortName(for: current))", .restart(entryID: current.id))
         } catch {
             await recover(from: error)
         }
@@ -397,11 +412,14 @@ public final class TimeTracker {
         busyKey = entry.key
         defer { busyKey = nil }
         do {
+            let stopped = running
             if let current = running {
                 upsert(try await service.stopTimer(id: current.id))
             }
-            upsert(try await service.restartTimer(id: entry.id))
+            let started = try await service.restartTimer(id: entry.id)
+            upsert(started)
             errorMessage = nil
+            record("Started \(shortName(for: entry))", startOp(started: started, wasNew: false, stopped: stopped))
         } catch {
             await recover(from: error)
         }
@@ -469,6 +487,7 @@ public final class TimeTracker {
                 hours: newHours, times: newHours.flatMap { times(for: target, hours: $0) }
             )
             upsert(updated)
+            if let label = editLabel(from: entry, to: updated) { record(label, .revert(entry)) }
             // Say so when Harvest kept a different length, rather than
             // quietly showing the old time again.
             if let newHours, abs(updated.hours - newHours) > 1.0 / 60 {
@@ -517,7 +536,10 @@ public final class TimeTracker {
             )
             if wasRunning { shortened = try await service.restartTimer(id: shortened.id) }
             upsert(shortened)
-            if await addEntry(task: task, on: entry.spentDate, notes: notes, hours: moving) == nil {
+            let added = await withoutRecording {
+                await addEntry(task: task, on: entry.spentDate, notes: notes, hours: moving)
+            }
+            guard let added else {
                 // Put the time back rather than lose it.
                 var restored = try await service.updateEntry(
                     id: shortened.id, projectID: shortened.project.id, taskID: shortened.task.id,
@@ -535,6 +557,10 @@ public final class TimeTracker {
                 return false
             }
             errorMessage = nil
+            // One undo puts both halves back: the new entry goes, the old one
+            // gets its time back.
+            record("Moved \(TimeFormat.hoursMinutes(moving * 3600)) to \(shortName(for: task))",
+                   .group([.delete(entryID: added.id), .revert(entry)]))
             return true
         } catch {
             await recover(from: error)
@@ -555,6 +581,7 @@ public final class TimeTracker {
             if keepRunning { updated = try await service.restartTimer(id: updated.id) }
             upsert(updated)
             errorMessage = nil
+            record("Removed \(TimeFormat.hoursMinutes(seconds)) idle time from \(shortName(for: current))", .revert(current))
         } catch {
             await recover(from: error)
         }
@@ -582,6 +609,7 @@ public final class TimeTracker {
         let notes = notes.isEmpty ? nil : notes
         do {
             let added: TimeEntry
+            var stopped: TimeEntry?
             if let hours {
                 var times: ClockTimes?
                 if tracksStartAndEnd {
@@ -591,11 +619,17 @@ public final class TimeTracker {
                 added = try await service.createEntry(projectID: task.project.id, taskID: task.task.id, spentDate: day,
                                                       notes: notes, hours: hours, times: times)
             } else {
+                stopped = running
                 if let current = running { upsert(try await service.stopTimer(id: current.id)) }
                 added = try await service.startTimer(projectID: task.project.id, taskID: task.task.id, spentDate: day, notes: notes)
             }
             upsert(added)
             errorMessage = nil
+            if let hours {
+                record("Added \(TimeFormat.hoursMinutes(hours * 3600)) to \(shortName(for: task))", .delete(entryID: added.id))
+            } else {
+                record("Started \(shortName(for: task))", startOp(started: added, wasNew: true, stopped: stopped))
+            }
             return added
         } catch {
             errorMessage = error.localizedDescription
@@ -612,29 +646,9 @@ public final class TimeTracker {
         do {
             try await service.deleteEntry(id: entry.id)
             entries = entries.filter { $0.id != entry.id }
-            lastDeleted = entry
             errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    /// Puts the last deleted entry back: same task, day, notes and hours, and
-    /// its timer running again if it was. Harvest gives it a new ID.
-    public func undoDelete() async {
-        guard let service, let entry = lastDeleted else { return }
-        lastDeleted = nil
-        do {
-            var restored = try await service.createEntry(
-                projectID: entry.project.id, taskID: entry.task.id, spentDate: entry.spentDate,
-                notes: entry.notes, hours: entry.elapsed() / 3600, times: times(for: entry, hours: entry.elapsed() / 3600)
-            )
-            if entry.isRunning {
-                if let current = running { upsert(try await service.stopTimer(id: current.id)) }
-                restored = try await service.restartTimer(id: restored.id)
-            }
-            upsert(restored)
-            errorMessage = nil
+            // Undo makes it again: same task, day, notes and time.
+            record("Deleted \(shortName(for: entry)) · \(TimeFormat.hoursMinutes(entry.elapsed()))", .recreate(entry))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -650,6 +664,7 @@ public final class TimeTracker {
         guard let service, notes != (entry.notes ?? "") else { return }
         do {
             upsert(try await service.updateNotes(id: entry.id, notes: notes))
+            record("Changed notes on \(shortName(for: entry))", .revert(entry))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -687,6 +702,17 @@ public final class TimeTracker {
         loadedThrough = nil
         lastRefresh = nil
         phase = .signedOut
+        clearUndoHistory()
+    }
+
+    /// Words for an edit, or nil when nothing changed.
+    private func editLabel(from old: TimeEntry, to new: TimeEntry) -> String? {
+        if old.key != new.key { return "Moved an entry to \(shortName(for: new))" }
+        if old.isRunning != new.isRunning || abs(old.elapsed() - new.elapsed()) >= 60 {
+            return "Changed \(shortName(for: new)) to \(TimeFormat.hoursMinutes(new.elapsed()))"
+        }
+        if (old.notes ?? "") != (new.notes ?? "") { return "Changed notes on \(shortName(for: new))" }
+        return nil
     }
 
     // MARK: Helpers
@@ -702,7 +728,11 @@ public final class TimeTracker {
         return busyKey == nil
     }
 
-    private func upsert(_ entry: TimeEntry) {
+    func removeEntry(id: Int) {
+        entries = entries.filter { $0.id != id }
+    }
+
+    func upsert(_ entry: TimeEntry) {
         var updated = entries.filter { $0.id != entry.id }
         updated.append(entry)
         entries = Self.sorted(updated)
