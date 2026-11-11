@@ -35,11 +35,36 @@ enum DebugSnapshots {
             entryWindow.close()
 
             let today = LocalDate()
-            let locksWindow = makeWindow(debugShortDayAndLocks(today: today.adding(days: -3), lockedDay: today.adding(days: -10))
+            // A day with invoiced entries next to editable ones.
+            let lockedDay = (14..<35).map { today.adding(days: -$0) }.first { day in
+                let entries = tracker.entries(on: day)
+                return entries.contains { $0.lock != nil } && entries.contains { $0.lock == nil }
+            } ?? today.adding(days: -14)
+            let locksWindow = makeWindow(debugShortDayAndLocks(today: today.adding(days: -3), lockedDay: lockedDay)
                 .environment(tracker).frame(width: 440, height: 680, alignment: .top), appearance: appearance)
             await settle()
             write(locksWindow, to: url.appendingPathComponent("5-short-day-locks-\(suffix).png"))
             locksWindow.close()
+
+            // An archived project in favorites, recents and on two days,
+            // one of them approved too.
+            let archived = TimeTracker.demoWithArchivedWork()
+            await archived.refresh(force: true)
+            for key in [TaskKey(projectID: 101, taskID: 11), TaskKey(projectID: 107, taskID: 13), TaskKey(projectID: 103, taskID: 15)] {
+                archived.favorites.toggle(key)
+            }
+            let archivedPanel = makeWindow(RootView().environment(archived).frame(width: 440, height: 1180), appearance: appearance)
+            archivedPanel.setContentSize(NSSize(width: 440, height: 1180))
+            await settle()
+            write(archivedPanel, to: url.appendingPathComponent("10-archived-panel-\(suffix).png"))
+            archivedPanel.close()
+            let approvedArchived = archived.entries(on: today.adding(days: -10)).first { $0.project.id == 107 }
+            let archivedDays = makeWindow(debugArchivedDays([today.adding(days: -1), today.adding(days: -10)], explaining: approvedArchived)
+                .environment(archived).frame(width: 440, height: 1000, alignment: .top), appearance: appearance)
+            archivedDays.setContentSize(NSSize(width: 440, height: 1000))
+            await settle()
+            write(archivedDays, to: url.appendingPathComponent("10-archived-days-\(suffix).png"))
+            archivedDays.close()
 
             let summaryWindow = makeWindow(debugTimeSummary().environment(tracker).frame(width: 300, height: 200), appearance: appearance)
             summaryWindow.setContentSize(NSSize(width: 300, height: 200))

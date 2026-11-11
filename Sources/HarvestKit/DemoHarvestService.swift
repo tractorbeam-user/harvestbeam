@@ -7,7 +7,9 @@ public actor DemoHarvestService: HarvestService {
     private var entries: [TimeEntry]
     private var nextID = 10_000
 
-    public init(now: Date = .now) {
+    /// `includesArchivedWork` adds an archived Northwind project with recent
+    /// entries, for snapshots of how archived work looks.
+    public init(now: Date = .now, includesArchivedWork: Bool = false) {
         let tractorbeam = NamedRef(id: 1, name: "Tractorbeam")
         let acme = NamedRef(id: 2, name: "Acme Co")
         let northwind = NamedRef(id: 3, name: "Northwind")
@@ -37,6 +39,11 @@ public actor DemoHarvestService: HarvestService {
             assignment(105, "Data Platform", code: "NW-DATA", client: northwind, tasks: [development, meetings, pm]),
             assignment(106, "Internal", code: nil, client: tractorbeam, tasks: [admin, meetings]),
         ]
+        let springCampaign = ProjectAssignment(
+            id: 107, isActive: false, project: .init(id: 107, name: "Spring Campaign", code: "NW-SPR"), client: northwind,
+            taskAssignments: [design, meetings].map { .init(id: 10_700 + $0.id, task: $0) }
+        )
+        if includesArchivedWork { assignments.append(springCampaign) }
 
         // Deterministic history: a weighted handful of tasks most days.
         let pattern: [(Int, NamedRef, NamedRef, Double)] = [
@@ -69,6 +76,20 @@ public actor DemoHarvestService: HarvestService {
                     createdAt: stamp, updatedAt: stamp,
                     isLocked: invoiced || approved, isClosed: approved, isBilled: invoiced,
                     invoice: invoiced ? .init(id: 1042, number: "1042") : nil
+                ))
+                id += 1
+            }
+        }
+        if includesArchivedWork {
+            // Work on the now-archived Spring Campaign: yesterday, and an
+            // approved stretch the week before last.
+            for (daysAgo, task, hours, approved) in [(1, design, 1.5, false), (10, design, 2.25, true), (10, meetings, 0.5, true)] {
+                let day = today.adding(days: -daysAgo)
+                let stamp = day.date().addingTimeInterval(8 * 3600)
+                generated.append(TimeEntry(
+                    id: id, spentDate: day, project: NamedRef(id: 107, name: "Spring Campaign"), task: task, client: northwind,
+                    hours: hours, notes: daysAgo == 1 ? "Final asset handoff" : nil, createdAt: stamp, updatedAt: stamp,
+                    isLocked: approved, isClosed: approved
                 ))
                 id += 1
             }

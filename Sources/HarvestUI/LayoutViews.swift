@@ -129,6 +129,7 @@ private struct BigTile: View {
         )
         .shadow(color: .black.opacity(isHovered ? 0.10 : 0.04), radius: isHovered ? 6 : 2, y: isHovered ? 2 : 1)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .unavailableTask(task.key, cornerRadius: 16)
         .onTapGesture { Task { await tracker.toggle(task) } }
         #if os(macOS)
         .onHover { isHovered = $0 }
@@ -245,6 +246,7 @@ private struct StartRow: View {
             if isDropTarget { Rectangle().fill(Color.harvestOrange).frame(height: 2) }
         }
         .contentShape(Rectangle())
+        .unavailableTask(task.key, cornerRadius: 0)
         .onTapGesture { Task { await tracker.toggle(task) } }
         #if os(macOS)
         .onHover { isHovered = $0 }

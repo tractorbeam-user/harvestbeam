@@ -428,7 +428,8 @@ private struct AddRuleSheet: View {
     @State private var picked: TaskKey?
 
     var body: some View {
-        let results = query.isEmpty ? tracker.recentTasks + tracker.favoriteTasks : Array(tracker.search(query).prefix(30))
+        let results = query.isEmpty ? (tracker.recentTasks + tracker.favoriteTasks).filter { tracker.isAvailable($0.key) }
+            : Array(tracker.search(query).prefix(30))
         VStack(alignment: .leading, spacing: 12) {
             Text("New Autotracker Rule").font(.headline)
             TextField("Keywords, e.g. Figma, Pinstripes", text: $keywords)
