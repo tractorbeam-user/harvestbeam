@@ -16,6 +16,8 @@ struct NewEntryEditor: View {
     var entry: TimeEntry?
     /// Set when logging a meeting from the week calendar.
     var meeting: CalendarMeeting?
+    /// Set when logging unlogged time from the Week Review or a day's gap row.
+    var gap: TimeGap?
     @FocusState private var hoursFocused: Bool
 
     @State private var projectID: Int?
@@ -32,7 +34,7 @@ struct NewEntryEditor: View {
     private var hoursEmpty: Bool { hours.trimmingCharacters(in: .whitespaces).isEmpty }
     /// Something's typed in the time box that can't be read as a time.
     private var hoursInvalid: Bool { !hoursEmpty && parsedHours == nil }
-    private var startsTimer: Bool { entry == nil && meeting == nil && isToday && hoursEmpty }
+    private var startsTimer: Bool { entry == nil && meeting == nil && gap == nil && isToday && hoursEmpty }
     private var isTimerRunning: Bool { entry?.isRunning ?? false }
     private var selectedTask: TrackableTask? {
         guard let taskKey else { return nil }
@@ -45,7 +47,7 @@ struct NewEntryEditor: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text((meeting?.isActivity == true ? "Log Activity" : meeting != nil ? "Log Meeting" : entry == nil ? "New Time Entry" : "Edit Time Entry") + (isToday ? "" : " · \(day.dayTitle(today: LocalDate()))"))
+            Text((meeting?.isActivity == true ? "Log Activity" : meeting != nil ? "Log Meeting" : gap.map { "Log \($0.fullLabel)" } ?? (entry == nil ? "New Time Entry" : "Edit Time Entry")) + (isToday ? "" : " · \(day.dayTitle(today: LocalDate()))"))
                 .font(.system(size: 13, weight: .semibold))
                 .padding(.top, 14)
                 .padding(.bottom, meeting == nil ? 12 : 6)
@@ -140,7 +142,7 @@ struct NewEntryEditor: View {
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                     .buttonStyle(PillButtonStyle(prominent: false))
-                Button(startsTimer ? "Start Timer" : meeting != nil ? "Log It" : "Save Entry") { save() }
+                Button(startsTimer ? "Start Timer" : meeting != nil || gap != nil ? "Log It" : "Save Entry") { save() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(PillButtonStyle(prominent: true))
                     .disabled(isSaving || taskKey == nil || (!startsTimer && !isTimerRunning && hoursInvalid))
@@ -173,9 +175,15 @@ struct NewEntryEditor: View {
                 // Ready to log; keep the project list closed.
                 hoursFocused = true
             // Start from the most recently used task.
-            } else if let recent = (tracker.recentTasks + tracker.favoriteTasks).first(where: { tracker.isAvailable($0.key) }) {
-                projectID = recent.project.id
-                taskKey = recent.key
+            } else {
+                if let gap {
+                    hours = TimeFormat.hoursMinutes(gap.hours * 3600)
+                    hoursFocused = true
+                }
+                if let recent = (tracker.recentTasks + tracker.favoriteTasks).first(where: { tracker.isAvailable($0.key) && !RetiredBuckets.isRetired($0) }) {
+                    projectID = recent.project.id
+                    taskKey = recent.key
+                }
             }
         }
     }
@@ -270,6 +278,8 @@ struct NewEntryEditor: View {
                 await tracker.updateEntry(entry, task: task, notes: notes, hours: parsedHours)
             } else if let meeting {
                 await tracker.log(meeting, task: task, notes: notes, hours: parsedHours ?? meeting.hours, remember: alwaysHere)
+            } else if let gap {
+                await tracker.addEntry(task: task, on: day, notes: notes, hours: parsedHours ?? gap.hours, startingAt: gap.interval().start)
             } else {
                 // Empty hours on another day adds a 0:00 entry to fill in later.
                 await tracker.addEntry(task: task, on: day, notes: notes, hours: startsTimer ? nil : (parsedHours ?? 0))

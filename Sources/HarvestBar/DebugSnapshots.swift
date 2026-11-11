@@ -86,6 +86,37 @@ enum DebugSnapshots {
             write(locksWindow, to: url.appendingPathComponent("5-short-day-locks-\(suffix).png"))
             locksWindow.close()
 
+            // The Week Review on a start-and-end account, as of Friday at
+            // 4 PM: every kind of item, then nothing left; and Tuesday's
+            // gap rows in the day list.
+            let reviewDefaults = UserDefaults(suiteName: "HarvestBarDemoReview") ?? .standard
+            let reviewFriday = today.startOfWeek(firstWeekday: 2).adding(days: 4)
+            let reviewNow = reviewFriday.date().addingTimeInterval(16 * 3600)
+            let review = TimeTracker(
+                service: DemoHarvestService(now: reviewNow, reviewWeek: true), accountName: "Tractorbeam (demo)",
+                favorites: FavoritesStore(defaults: reviewDefaults, syncWithICloud: false),
+                meetingMemory: MeetingMemory(defaults: reviewDefaults), contextMemory: ContextMemory(defaults: reviewDefaults),
+                isDemo: true, defaults: reviewDefaults
+            )
+            await review.refresh(force: true)
+            UserDefaults.standard.removeObject(forKey: WeekReview.ignoredGapsKey)
+            for (name, view, height) in [
+                ("items", AnyView(debugWeekReview(review, today: reviewFriday, now: reviewNow)), 760.0),
+                ("all-set", AnyView(debugWeekReviewAllSet()), 420.0),
+            ] {
+                let reviewWindow = makeWindow(view.environment(review).frame(width: 500, height: height, alignment: .top), appearance: appearance)
+                reviewWindow.setContentSize(NSSize(width: 500, height: height))
+                await settle()
+                write(reviewWindow, to: url.appendingPathComponent("11-week-review-\(name)-\(suffix).png"))
+                reviewWindow.close()
+            }
+            let gapsWindow = makeWindow(debugDayWithGaps(review, day: reviewFriday.adding(days: -3), today: reviewFriday, now: reviewNow)
+                .environment(review).frame(width: 440, height: 470, alignment: .top), appearance: appearance)
+            gapsWindow.setContentSize(NSSize(width: 440, height: 470))
+            await settle()
+            write(gapsWindow, to: url.appendingPathComponent("11-day-gaps-\(suffix).png"))
+            gapsWindow.close()
+
             // An archived project in favorites, recents and on two days,
             // one of them approved too.
             let archived = TimeTracker.demoWithArchivedWork()

@@ -118,6 +118,7 @@ struct GeneralPrefs: View {
     @AppStorage(ShortDays.enabledKey) private var nudgesShortDays = true
     @State private var openAtLogin = SMAppService.mainApp.status == .enabled
     @AppStorage(Analytics.enabledKey) private var sharesUsage = true
+    @AppStorage(AppAppearance.key) private var appearanceRaw = AppAppearance.system.rawValue
     @Environment(TimeTracker.self) private var tracker
 
     var body: some View {
@@ -130,6 +131,13 @@ struct GeneralPrefs: View {
                 CardDivider()
                 SettingsRow("Show in Dock and app switcher", icon: RowIcon("dock.rectangle", .blue), isOn: $showInDock)
                     .onChange(of: showInDock) { Prefs.applyDockVisibility() }
+                CardDivider()
+                SettingsRow("Appearance", icon: RowIcon("circle.lefthalf.filled", .gray)) {
+                    SettingsPopup(selection: Binding(
+                        get: { AppAppearance(rawValue: appearanceRaw) ?? .system },
+                        set: { appearanceRaw = $0.rawValue; AppAppearance.set($0) }
+                    ), options: AppAppearance.allCases) { $0.label }
+                }
             }
             SettingsSection("Idle Time") {
                 SettingsRow("Detect idle time",
@@ -161,6 +169,8 @@ struct GeneralPrefs: View {
                     SettingsPopup(selection: $remindLongTimerHours, options: Array(1...12)) { "\($0) \($0 == 1 ? "hour" : "hours")" }
                 }
                 .disabled(!remindLongTimer)
+                CardDivider()
+                WeekReviewPrefsRow()
                 CardDivider()
                 SettingsRow("Point out short days earlier in the week",
                             description: "A day under three quarters of your usual day (your Harvest weekly capacity ÷ 5) gets a dot in the week strip and a note above your entries.",
