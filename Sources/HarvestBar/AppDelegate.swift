@@ -200,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         // an ordinary window, in the Window menu and Mission Control.
         panel.isExcludedFromWindowsMenu = false
         panel.delegate = self
+        panel.tracker = tracker
         setKeptOnTop(UserDefaults.standard.bool(forKey: Self.keepOnTopKey))
 
         let actions = WindowActions(
@@ -547,6 +548,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
 final class TrackerPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+    /// Whose changes to time ⌘Z and ⇧⌘Z undo and redo.
+    var tracker: TimeTracker?
+
+    // MARK: Undo
+
+    // The Edit menu sends undo: and redo: down the responder chain. While
+    // you're typing, the field has its own undo; otherwise they go to the
+    // time you changed.
+
+    /// The text field you're typing in, when it has something to undo or redo.
+    private var editorUndo: UndoManager? {
+        guard let editor = firstResponder as? NSText else { return nil }
+        return editor.undoManager ?? undoManager
+    }
+
+    @objc func undo(_ sender: Any?) {
+        if let text = editorUndo, text.canUndo { text.undo(); return }
+        guard let tracker, tracker.canUndo else { NSSound.beep(); return }
+        Task { await tracker.undo() }
+    }
+
+    @objc func redo(_ sender: Any?) {
+        if let text = editorUndo, text.canRedo { text.redo(); return }
+        guard let tracker, tracker.canRedo else { NSSound.beep(); return }
+        Task { await tracker.redo() }
+    }
+
+    override func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case Selector(("undo:")):
+            if let text = editorUndo, text.canUndo {
+                item.title = text.undoMenuItemTitle
+                return true
+            }
+            item.title = tracker?.undoLabel.map { "Undo \($0)" } ?? "Undo"
+            return tracker?.canUndo == true
+        case Selector(("redo:")):
+            if let text = editorUndo, text.canRedo {
+                item.title = text.redoMenuItemTitle
+                return true
+            }
+            item.title = tracker?.redoLabel.map { "Redo \($0)" } ?? "Redo"
+            return tracker?.canRedo == true
+        default:
+            return super.validateMenuItem(item)
+        }
+    }
 
     /// A click anywhere but a text field takes focus out of the field you were
     /// typing in, like clicking off a field on a web page. The click itself

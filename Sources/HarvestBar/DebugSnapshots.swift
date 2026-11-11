@@ -22,6 +22,8 @@ enum DebugSnapshots {
                 tracker.favorites.toggle(first.key)
                 tracker.favorites.toggle(second.key)
             }
+            // Setting up isn't something to undo; keep the toast out of the shots.
+            tracker.clearUndoHistory()
 
             let tour = TourModel(shortcut: "⌥H")
             let window = makeWindow(RootView().environment(tracker).environment(tour), appearance: appearance)
@@ -41,6 +43,7 @@ enum DebugSnapshots {
             for task in tracker.tasks.dropFirst(5).prefix(3) where !tracker.favorites.contains(task.key) {
                 tracker.favorites.toggle(task.key)
             }
+            tracker.clearUndoHistory()
             let savedIcons = UserDefaults.standard.dictionary(forKey: "favoriteIcons.v1")
             let demoIcons = ["e:🎨", "s:person.2:1", "e:🧾", "s:paperplane:3", "e:💻"]
             var iconMap: [String: String] = [:]
@@ -90,6 +93,7 @@ enum DebugSnapshots {
             for key in [TaskKey(projectID: 101, taskID: 11), TaskKey(projectID: 107, taskID: 13), TaskKey(projectID: 103, taskID: 15)] {
                 archived.favorites.toggle(key)
             }
+            archived.clearUndoHistory()
             let archivedPanel = makeWindow(RootView().environment(archived).frame(width: 440, height: 1180), appearance: appearance)
             archivedPanel.setContentSize(NSSize(width: 440, height: 1180))
             await settle()
@@ -169,12 +173,25 @@ enum DebugSnapshots {
             write(window, to: url.appendingPathComponent("2-search-\(suffix).png"))
 
             await tracker.pause()
+            tracker.clearUndoHistory()
             if let field = firstTextField(in: window.contentView!) {
                 field.currentEditor()?.string = ""
                 (field.currentEditor() as? NSTextView)?.didChangeText()
             }
             await settle()
             write(window, to: url.appendingPathComponent("3-idle-\(suffix).png"))
+
+            // The undo toast after moving time, then Redo after undoing it.
+            if let entry = tracker.entries(on: today).first(where: { !$0.isRunning && $0.lock == nil && $0.elapsed() > 1800 }),
+               let target = tracker.tasks.first(where: { $0.key != entry.key && $0.project.id != entry.project.id }) {
+                await tracker.moveTime(20 * 60, from: entry, to: target)
+                await settle()
+                write(window, to: url.appendingPathComponent("11-undo-toast-\(suffix).png"))
+                await tracker.undo()
+                await settle()
+                write(window, to: url.appendingPathComponent("11-redo-toast-\(suffix).png"))
+                tracker.clearUndoHistory()
+            }
 
             tracker.signOut()
             await settle()

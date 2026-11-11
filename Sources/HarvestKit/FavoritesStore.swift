@@ -10,6 +10,9 @@ import Observation
 public final class FavoritesStore {
     public private(set) var keys: [TaskKey] = []
 
+    /// Told after you change favorites (not when iCloud or undo does), with
+    /// the order before and after, so the change can be undone.
+    @ObservationIgnored public var onChange: ((_ before: [TaskKey], _ after: [TaskKey]) -> Void)?
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let cloud: NSUbiquitousKeyValueStore?
     @ObservationIgnored private var observer: NSObjectProtocol?
@@ -40,20 +43,22 @@ public final class FavoritesStore {
     public func contains(_ key: TaskKey) -> Bool { keys.contains(key) }
 
     public func toggle(_ key: TaskKey) {
+        let before = keys
         if let index = keys.firstIndex(of: key) {
             keys.remove(at: index)
         } else {
             keys.append(key)
         }
-        persist()
+        commit(from: before)
     }
 
     public func move(fromOffsets source: IndexSet, toOffset destination: Int) {
+        let before = keys
         let moving = source.map { keys[$0] }
         let insertAt = destination - source.filter { $0 < destination }.count
         for index in source.reversed() { keys.remove(at: index) }
         keys.insert(contentsOf: moving, at: insertAt)
-        persist()
+        commit(from: before)
     }
 
     /// Drops `key` on `target` (or at the end when nil), starring it if it
@@ -62,6 +67,7 @@ public final class FavoritesStore {
     /// before it, so you can move a tile either way, even one step.
     public func place(_ key: TaskKey, before target: TaskKey?) {
         guard key != target else { return }
+        let before = keys
         let from = keys.firstIndex(of: key)
         let targetIndex = target.flatMap { keys.firstIndex(of: $0) }
         keys.removeAll { $0 == key }
@@ -71,7 +77,7 @@ public final class FavoritesStore {
         } else {
             keys.append(key)
         }
-        persist()
+        commit(from: before)
     }
 
     /// Moves a favorite one place earlier (-1) or later (+1).
@@ -79,12 +85,24 @@ public final class FavoritesStore {
         guard let index = keys.firstIndex(of: key) else { return }
         let target = min(max(index + offset, 0), keys.count - 1)
         guard target != index else { return }
+        let before = keys
         keys.remove(at: index)
         keys.insert(key, at: target)
+        commit(from: before)
+    }
+
+    /// Sets the whole list, as undo does, without reporting it as a change.
+    public func replace(with keys: [TaskKey]) {
+        self.keys = keys
         persist()
     }
 
     // MARK: Storage
+
+    private func commit(from before: [TaskKey]) {
+        persist()
+        if keys != before { onChange?(before, keys) }
+    }
 
     private func persist() {
         let raw = keys.map(\.description)
