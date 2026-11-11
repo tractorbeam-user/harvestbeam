@@ -130,13 +130,16 @@ enum DebugSnapshots {
             write(meetingWindow, to: url.appendingPathComponent("9-log-meeting-\(suffix).png"))
             meetingWindow.close()
 
-            for (name, view) in [("general", AnyView(GeneralPrefs())), ("shortcuts", AnyView(ShortcutPrefs())),
-                                 ("tracking", AnyView(TrackingPrefs())), ("support", AnyView(SupportPrefs(resetLayout: {})))] {
-                let prefsWindow = makeWindow(view.environment(tracker).environment(Updates()).environment(ActivityRecorder(tracker: tracker))
-                    .frame(width: 480, height: name == "tracking" ? 1000 : 560, alignment: .top), appearance: appearance)
-                prefsWindow.setContentSize(NSSize(width: 480, height: name == "tracking" ? 1000 : 560))
+            for pane in PrefsPane.allCases {
+                let height: CGFloat = pane == .tracking ? 1500 : pane == .general ? 1000 : 640
+                let root = PrefsRoot(panes: PrefsPane.allCases, initial: pane, resetLayout: {})
+                    .environment(tracker).environment(Updates()).environment(ActivityRecorder(tracker: tracker))
+                let prefsWindow = PreferencesWindowController.makeWindow(root, size: NSSize(width: PreferencesWindowController.size.width, height: height))
+                prefsWindow.appearance = NSAppearance(named: appearance)
+                prefsWindow.orderFrontRegardless()
+                prefsWindow.setFrameOrigin(NSPoint(x: -3000, y: 0))
                 await settle()
-                write(prefsWindow, to: url.appendingPathComponent("8-prefs-\(name)-\(suffix).png"))
+                write(prefsWindow, to: url.appendingPathComponent("8-prefs-\(pane.rawValue)-\(suffix).png"), includingFrame: true)
                 prefsWindow.close()
             }
 
@@ -237,8 +240,8 @@ enum DebugSnapshots {
         try? await Task.sleep(for: .milliseconds(700))
     }
 
-    private static func write(_ window: NSWindow, to url: URL) {
-        guard let view = window.contentView,
+    private static func write(_ window: NSWindow, to url: URL, includingFrame: Bool = false) {
+        guard let view = includingFrame ? window.contentView?.superview : window.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
