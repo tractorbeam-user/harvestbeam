@@ -246,6 +246,24 @@ public struct TimeEntry: Codable, Identifiable, Hashable, Sendable {
 
     public var key: TaskKey { TaskKey(projectID: project.id, taskID: task.id) }
 
+    /// This entry as it'll be once its timer stops at `now`.
+    func locallyStopped(at now: Date) -> TimeEntry {
+        copy(hours: elapsed(at: now) / 3600, hoursWithoutTimer: nil, isRunning: false, timerStartedAt: nil, updatedAt: now)
+    }
+
+    /// This entry as it'll be once its timer restarts at `now`.
+    func locallyRestarted(at now: Date) -> TimeEntry {
+        copy(hours: hours, hoursWithoutTimer: hours, isRunning: true, timerStartedAt: now, updatedAt: now)
+    }
+
+    private func copy(hours: Double, hoursWithoutTimer: Double?, isRunning: Bool, timerStartedAt: Date?, updatedAt: Date) -> TimeEntry {
+        TimeEntry(id: id, spentDate: spentDate, project: project, task: task, client: client, hours: hours,
+                  hoursWithoutTimer: hoursWithoutTimer, notes: notes, isRunning: isRunning, timerStartedAt: timerStartedAt,
+                  startedTime: startedTime, endedTime: endedTime, createdAt: createdAt, updatedAt: updatedAt,
+                  isLocked: isLocked, lockedReason: lockedReason, isClosed: isClosed, isBilled: isBilled,
+                  invoice: invoice, billable: billable)
+    }
+
     /// Seconds tracked, counting a running timer up to `now`.
     public func elapsed(at now: Date = .now) -> TimeInterval {
         guard isRunning, let started = timerStartedAt else { return hours * 3600 }

@@ -183,6 +183,7 @@ struct GeneralPrefs: View {
     @AppStorage(Analytics.enabledKey) private var sharesUsage = true
     @AppStorage(AppAppearance.key) private var appearanceRaw = AppAppearance.system.rawValue
     @AppStorage(FavoritesStyle.key) private var favoritesStyleRaw = FavoritesStyle.classic.rawValue
+    @AppStorage(TileText.key) private var tileTextRaw = TileText.entry.rawValue
     @AppStorage("keepOnTop") private var keepOnTop = false
     @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.task.rawValue
     @AppStorage(MenuBarDisplay.lengthKey) private var menuBarLength = 28
@@ -207,6 +208,13 @@ struct GeneralPrefs: View {
                         get: { AppAppearance(rawValue: appearanceRaw) ?? .system },
                         set: { appearanceRaw = $0.rawValue; AppAppearance.set($0) }
                     ), options: AppAppearance.allCases) { $0.label }
+                }
+                CardDivider()
+                SettingsRow("Tiles show", icon: RowIcon("square.grid.2x2", .orange)) {
+                    SettingsPopup(selection: Binding(
+                        get: { TileText(rawValue: tileTextRaw) ?? .entry },
+                        set: { tileTextRaw = $0.rawValue }
+                    ), options: TileText.allCases) { $0.label }
                 }
                 CardDivider()
                 SettingsRow("Keep the window on top", description: "Stays above other windows while you work.",

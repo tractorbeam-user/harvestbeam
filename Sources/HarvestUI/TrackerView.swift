@@ -62,6 +62,7 @@ struct TrackerView: View {
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
+    @AppStorage(TileText.key) private var tileTextRaw = TileText.entry.rawValue
     @AppStorage(FavoritesStyle.key) private var favoritesStyleRaw = FavoritesStyle.classic.rawValue
     @AppStorage(AppAppearance.key) private var appearanceRaw = AppAppearance.system.rawValue
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
@@ -90,7 +91,14 @@ struct TrackerView: View {
     /// The section being dragged by its title, and where it would land.
     @State private var draggingSection: String?
     @State private var sectionDrop: SectionDrop?
-    private var askReading: AskCache.Reading { askCache.reading(query, isSearching: isSearching, tracker: tracker) }
+    /// What's typed, once typing pauses. Reading it means scoring every task
+    /// (thousands, for some), so it waits a beat rather than holding up
+    /// each letter; the field itself always shows what you typed.
+    @State private var settledQuery = ""
+    @State private var settleWork: Task<Void, Never>?
+    private var askReading: AskCache.Reading {
+        askCache.reading(settledQuery, isSearching: isSearching && !settledQuery.isEmpty, tracker: tracker)
+    }
     private var askCommand: AskCommandPreview? { askReading.command }
     /// "10 min on tb corporate": what typing a duration in the ask box would add.
     /// A sentence about the day rather than a search: Return opens the planner.
@@ -208,8 +216,20 @@ struct TrackerView: View {
         platformBody(sections)
             .onChange(of: query) {
                 pickedProject = nil
-                selection = isSearching && quickPlan.isEmpty && askCommand == nil && !describesDay && helpAnswers.isEmpty ? sections.first?.tasks.first?.key : nil
                 if isSearching { retiredPick = nil }
+                settleWork?.cancel()
+                if query.isEmpty {
+                    settledQuery = ""
+                } else {
+                    settleWork = Task {
+                        try? await Task.sleep(for: .milliseconds(110))
+                        if !Task.isCancelled { settledQuery = query }
+                    }
+                }
+            }
+            .onChange(of: settledQuery) {
+                let sections = self.sections()
+                selection = isSearching && quickPlan.isEmpty && askCommand == nil && !describesDay && helpAnswers.isEmpty ? sections.first?.tasks.first?.key : nil
             }
             .onChange(of: tracker.focusRequest, initial: true) {
                 query = ""
@@ -306,6 +326,9 @@ struct TrackerView: View {
             .disabled(!groups.canMove(section.id, by: -1))
         Button("Move Down", systemImage: "arrow.down") { withAnimation(.snappy(duration: 0.2)) { groups.move(section.id, by: 1) } }
             .disabled(!groups.canMove(section.id, by: 1))
+        Picker("Tile Text", selection: $tileTextRaw) {
+            ForEach(TileText.allCases) { Text($0.label).tag($0.rawValue) }
+        }
         Divider()
         if TaskGroups.customGroupsEnabled {
             Button("New Group", systemImage: "folder.badge.plus") { withAnimation(.snappy(duration: 0.2)) { _ = groups.create() } }
@@ -849,6 +872,13 @@ struct TrackerView: View {
                     return .handled
                 }
                 .onSubmit {
+                    // Return before the pause: read what's typed now.
+                    if settledQuery != query {
+                        settleWork?.cancel()
+                        settledQuery = query
+                        selection = isSearching && quickPlan.isEmpty && askCommand == nil && !describesDay && helpAnswers.isEmpty
+                            ? sections().first?.tasks.first?.key : nil
+                    }
                     if let command = askCommand { return applyCommand(command) }
                     if describesDay { return openPlanner(with: query) }
                     if !helpAnswers.isEmpty { return }
@@ -1136,8 +1166,8 @@ struct TrackerView: View {
             FooterButton(systemImage: "bubble.left", help: "Send feedback: a bug, a question or an idea") {
                 openURL(Self.feedbackURL)
             }
-            FooterButton(help: "Open Harvest", action: { if let url = tracker.harvestWebURL { openURL(url) } }) {
-                HarvestMark()
+            FooterButton(systemImage: "globe", help: "Open Harvest on the web") {
+                if let url = tracker.harvestWebURL { openURL(url) }
             }
 
             Menu {

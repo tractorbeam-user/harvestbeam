@@ -348,14 +348,24 @@ public final class TimeTracker {
         guard let service, busyKey == nil else { return }
         busyKey = task.key
         defer { busyKey = nil }
+        let stopped = running
+        let today = LocalDate()
+        let existing = entries.first(where: { $0.key == task.key && $0.spentDate == today })
+        // Show the switch straight away, then fill in Harvest's own numbers
+        // when it answers: the old timer stops and the new one runs (a
+        // stand-in entry until Harvest gives the real one).
+        let now = Date()
+        if let current = stopped { upsert(current.locallyStopped(at: now)) }
+        upsert(existing?.locallyRestarted(at: now) ?? TimeEntry(
+            id: Self.pendingEntryID, spentDate: today, project: task.project, task: task.task, client: task.client,
+            hours: 0, hoursWithoutTimer: 0, isRunning: true, timerStartedAt: now, createdAt: now, updatedAt: now
+        ))
+        defer { entries.removeAll { $0.id == Self.pendingEntryID } }
         do {
-            let stopped = running
-            if let current = running {
+            if let current = stopped {
                 upsert(try await service.stopTimer(id: current.id))
             }
-            let today = LocalDate()
             let started: TimeEntry
-            let existing = entries.first(where: { $0.key == task.key && $0.spentDate == today })
             if let existing {
                 started = try await service.restartTimer(id: existing.id)
             } else {
@@ -780,6 +790,9 @@ public final class TimeTracker {
     func removeEntry(id: Int) {
         entries = entries.filter { $0.id != id }
     }
+
+    /// The stand-in for a timer that's starting, until Harvest says its id.
+    static let pendingEntryID = -1
 
     func upsert(_ entry: TimeEntry) {
         var updated = entries.filter { $0.id != entry.id }

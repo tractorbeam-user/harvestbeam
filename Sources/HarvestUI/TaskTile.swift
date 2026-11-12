@@ -20,6 +20,7 @@ struct TaskTile: View {
     /// Set in a group's panel, for "Remove from <group>".
     var groupID: String?
     @State private var isDropTarget = false
+    @AppStorage(TileText.key) private var tileTextRaw = TileText.entry.rawValue
     @State private var isHovered = false
     /// The client's name, shown after the pointer rests on the tile. A
     /// popover rather than .help, which doesn't show in the floating panel.
@@ -153,29 +154,20 @@ struct TaskTile: View {
     private var content: some View {
         HStack(spacing: 6) {
             let (code, name) = task.projectNameParts
-            // Every tile is as tall as one with a code; without one, the
-            // name and task sit centered in that height.
-            ZStack(alignment: .leading) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(" ").font(.system(size: codeFont, weight: .medium).monospaced()).padding(.bottom, 1)
-                    Text(" ").font(.system(size: titleFont, weight: .semibold))
-                    Text(" ").font(.system(size: subtitleFont))
-                }
-                .hidden()
-                VStack(alignment: .leading, spacing: 1) {
-                    if let code {
-                        Text(code)
-                            .font(.system(size: codeFont, weight: .medium).monospaced())
-                            .opacity(isRunning ? 0.82 : 0.5)
-                            .padding(.bottom, 1)
-                    }
-                    // Hover slides a name that doesn't fit across to show the rest.
-                    MarqueeText(text: name, isActive: isHovered)
-                        .font(.system(size: titleFont, weight: .semibold))
-                    MarqueeText(text: task.task.name, isActive: isHovered)
-                        .font(.system(size: subtitleFont))
-                        .opacity(isRunning ? 0.82 : 0.6)
-                }
+            let entryLike = TileText(rawValue: tileTextRaw) != .codeOnTop
+            // Like a tracked entry: client, "[code] name", task. Or the code
+            // on top: code, name, task. Three lines either way, so every
+            // tile is the same height.
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entryLike ? task.client?.name ?? " " : code ?? " ")
+                    .font(entryLike ? .system(size: codeFont) : .system(size: codeFont, weight: .medium).monospaced())
+                    .opacity(isRunning ? 0.82 : 0.55)
+                // Hover slides a name that doesn't fit across to show the rest.
+                MarqueeText(text: entryLike ? code.map { "[\($0)] \(name)" } ?? name : name, isActive: isHovered)
+                    .font(.system(size: titleFont, weight: .semibold))
+                MarqueeText(text: task.task.name, isActive: isHovered)
+                    .font(.system(size: subtitleFont))
+                    .opacity(isRunning ? 0.82 : 0.6)
             }
             .lineLimit(1)
             Spacer(minLength: 0)
