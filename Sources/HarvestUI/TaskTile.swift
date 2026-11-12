@@ -175,11 +175,8 @@ struct TaskTile: View {
                 Button(action: onRemove) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(TileIconButtonStyle())
                 .help("Remove from Suggested")
                 .accessibilityLabel("Remove \(task.task.name) from Suggested")
             }
@@ -216,11 +213,10 @@ struct TaskTile: View {
         } label: {
             Image(systemName: isFavorite ? "star.fill" : "star")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(starStyle)
-                .frame(width: 22, height: 22)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TileIconButtonStyle(tint: starStyle,
+                                         hoverTint: isFavorite ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.secondary),
+                                         onOrange: isRunning))
         .help(isFavorite ? "Remove from Favorites" : "Add to Favorites")
         .accessibilityLabel(isFavorite ? "Remove \(task.task.name) from Favorites" : "Add \(task.task.name) to Favorites")
     }
@@ -264,5 +260,39 @@ private struct TileChrome: ViewModifier {
         if isSelected { return .harvestOrange }
         if isRunning { return .clear }
         return isHovered ? Color.primary.opacity(0.18) : .hairline
+    }
+}
+
+/// The small × and ☆ on a tile: faint at rest; on hover a soft circle
+/// shows behind it and it darkens, so it reads as its own button.
+private struct TileIconButtonStyle: ButtonStyle {
+    var tint: AnyShapeStyle = AnyShapeStyle(.tertiary)
+    var hoverTint: AnyShapeStyle = AnyShapeStyle(.secondary)
+    var onOrange = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        Hovering { isHovered in
+            configuration.label
+                .foregroundStyle(isHovered && !onOrange ? hoverTint : tint)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(onOrange ? Color.white.opacity(isHovered ? 0.25 : 0)
+                                          : Color.primary.opacity(isHovered ? 0.09 : 0)))
+                .scaleEffect(configuration.isPressed ? 0.9 : 1)
+                .contentShape(Circle())
+                .animation(.easeOut(duration: 0.12), value: isHovered)
+        }
+    }
+}
+
+/// Hands its content whether the pointer is over it.
+private struct Hovering<Content: View>: View {
+    @ViewBuilder let content: (Bool) -> Content
+    @State private var isHovered = false
+
+    var body: some View {
+        content(isHovered)
+        #if os(macOS)
+            .onHover { isHovered = $0 }
+        #endif
     }
 }
