@@ -179,6 +179,9 @@ public final class ActivityRecorder {
         let script: String
         if id == "com.apple.Safari" {
             script = "tell application \"Safari\" to return URL of front document"
+        } else if id == "company.thebrowser.dia" {
+            // Dia has no "mode" to check for private windows.
+            script = "tell application \"Dia\" to return URL of active tab of front window"
         } else if let name = Self.chromiumBrowsers[id] {
             script = """
             tell application "\(name)"

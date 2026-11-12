@@ -12,28 +12,43 @@ struct TaskTile: View {
     var showsStar = true
     /// Set in Suggested: an × on hover removes the task from that list.
     var onRemove: (() -> Void)?
-    /// In Favorites, dropping another tile on this one puts it just before.
-    var acceptsDrops = false
+    /// Dropping another tile on this one puts it just before, in the same
+    /// section. Returns whether the drop was taken.
+    var dropBefore: ((TaskKey) -> Bool)?
+    /// Set in Favorites: the launcher and icon-row looks.
+    var style: FavoritesStyle = .classic
+    /// Set in a group's panel, for "Remove from <group>".
+    var groupID: String?
     @State private var isDropTarget = false
     @State private var isHovered = false
-    @State private var picksIcon = false
+    /// The client's name, shown after the pointer rests on the tile. A
+    /// popover rather than .help, which doesn't show in the floating panel.
+    @State private var showsClient = false
+    @State private var hoverWait: Task<Void, Never>?
 
     private var isBusy: Bool { tracker.busyKey == task.key }
     /// Shows the state you just asked for while Harvest confirms it, instead
     /// of a spinner.
     private var isRunning: Bool {
         let running = tracker.running?.key == task.key
-        return isBusy ? !running : running
+        if isBusy { return !running }
+        // Another tile is starting: this one stops with it, so let it go
+        // right away rather than when Harvest confirms.
+        if running, let busy = tracker.busyKey, busy != task.key { return false }
+        return running
     }
     private var isFavorite: Bool { tracker.favorites.contains(task.key) }
 
     var body: some View {
         // Not a Button: on macOS a button keeps the mouse press to itself, so
         // the tile could never be dragged. A tap starts or pauses instead.
-        content
+        styledContent
             .modifier(TileChrome(isRunning: isRunning, isSelected: isSelected, isHovered: isHovered))
             .unavailableTask(task.key)
-            .onTapGesture { Task { await tracker.toggle(task) } }
+            .onTapGesture {
+                showsClient = false
+                Task { await tracker.toggle(task) }
+            }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { Task { await tracker.toggle(task) } }
@@ -47,11 +62,12 @@ struct TaskTile: View {
                 .foregroundStyle(.white)
         }
         .dropDestination(for: String.self) { items, _ in
-            guard acceptsDrops, let key = items.first.flatMap(TaskKey.init) else { return false }
-            withAnimation(.snappy(duration: 0.2)) { tracker.favorites.place(key, before: task.key) }
-            return true
+            guard let dropBefore, let key = items.first.flatMap(TaskKey.init), key != task.key else { return false }
+            var taken = false
+            withAnimation(.snappy(duration: 0.2)) { taken = dropBefore(key) }
+            return taken
         } isTargeted: { targeted in
-            withAnimation(.snappy(duration: 0.15)) { isDropTarget = acceptsDrops && targeted }
+            withAnimation(.snappy(duration: 0.15)) { isDropTarget = dropBefore != nil && targeted }
         }
         // While a tile is dragged over this one, an insertion line in the gap
         // before it shows where it'll land, and this tile makes a little room.
@@ -67,43 +83,84 @@ struct TaskTile: View {
             }
         }
         #if os(macOS)
-        .onHover { isHovered = $0 }
+        .onHover { hovering in
+            isHovered = hovering
+            hoverWait?.cancel()
+            guard hovering, task.client?.name.isEmpty == false else { return showsClient = false }
+            hoverWait = Task {
+                try? await Task.sleep(for: .milliseconds(700))
+                if !Task.isCancelled { showsClient = true }
+            }
+        }
+        .background {
+            Color.clear.popover(isPresented: $showsClient, arrowEdge: .top) {
+                Text(task.client?.name ?? "")
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .frame(maxWidth: 260)
+                    .fixedSize()
+            }
+        }
         #endif
         .contextMenu {
             Button(isRunning ? "Pause Timer" : "Start Timer", systemImage: isRunning ? "pause.fill" : "play.fill") {
                 Task { await tracker.toggle(task) }
             }
-            if isFavorite {
-                Button("Choose Icon…", systemImage: "face.smiling") { picksIcon = true }
-            }
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: isFavorite ? "star.slash" : "star") {
                 tracker.favorites.toggle(task.key)
             }
+            if TaskGroups.customGroupsEnabled { groupMenu }
             if let onRemove {
                 Button("Remove from Suggested", systemImage: "xmark", action: onRemove)
             }
         }
-        .modifier(FavoriteIconPopover(key: task.key, isPresented: $picksIcon))
+        #if !os(macOS)
         .help(task.helpText)
+        #endif
         .accessibilityLabel("\(task.project.name), \(task.task.name), \(task.client?.name ?? "")")
         .accessibilityHint(isRunning ? "Pauses the timer" : "Starts a timer")
     }
 
+    /// Add to Group › each group (checked when it's in it) and New Group.
+    @ViewBuilder private var groupMenu: some View {
+        let groups = TaskGroups.shared
+        if let groupID, let group = groups.groups.first(where: { $0.id == groupID }) {
+            Button("Remove from \(group.name)", systemImage: "folder.badge.minus") {
+                withAnimation(.snappy(duration: 0.2)) { groups.toggle(task.key, in: groupID) }
+            }
+        }
+        Menu("Add to Group", systemImage: "folder.badge.plus") {
+            ForEach(groups.groups) { group in
+                Toggle(group.name, isOn: Binding(
+                    get: { groups.contains(task.key, in: group.id) },
+                    set: { _ in withAnimation(.snappy(duration: 0.2)) { groups.toggle(task.key, in: group.id) } }
+                ))
+            }
+            if !groups.groups.isEmpty { Divider() }
+            Button("New Group…") { withAnimation(.snappy(duration: 0.2)) { _ = groups.create(with: task.key) } }
+        }
+    }
+
+    @ViewBuilder private var styledContent: some View {
+        switch style {
+        case .classic: content
+        case .launcher: LauncherTileContent(task: task, isRunning: isRunning)
+        case .rows: IconRowContent(task: task, isRunning: isRunning)
+        }
+    }
+
     private var content: some View {
         HStack(spacing: 6) {
-            if isFavorite, let icon = FavoriteIcons.shared.icon(for: task.key) {
-                FavoriteIconView(icon: icon, size: 17, onOrange: isRunning)
-                    .padding(.trailing, 3)
-                    .onTapGesture { picksIcon = true }
-            }
             VStack(alignment: .leading, spacing: 1) {
                 let (code, name) = task.projectNameParts
-                if let code {
-                    Text(code)
-                        .font(.system(size: codeFont, weight: .medium).monospaced())
-                        .opacity(isRunning ? 0.82 : 0.5)
-                        .padding(.bottom, 1)
-                }
+                // The code line is kept even when there's no code, so every
+                // tile is the same height.
+                Text(code ?? " ")
+                    .font(.system(size: codeFont, weight: .medium).monospaced())
+                    .opacity(isRunning ? 0.82 : 0.5)
+                    .padding(.bottom, 1)
+                    .accessibilityHidden(code == nil)
                 // Hover slides a name that doesn't fit across to show the rest.
                 MarqueeText(text: name, isActive: isHovered)
                     .font(.system(size: titleFont, weight: .semibold))
@@ -128,9 +185,9 @@ struct TaskTile: View {
             if showsStar && (isHovered || isFavorite) { favoriteButton }
             actionIndicator
         }
-        .padding(.leading, 12)
-        .padding(.trailing, 9)
-        .padding(.vertical, 8)
+        .padding(.leading, 10)
+        .padding(.trailing, 7)
+        .padding(.vertical, 5)
         .frame(maxWidth: .infinity, minHeight: Metrics.tileHeight, maxHeight: .infinity, alignment: .leading)
         .foregroundStyle(isRunning ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
     }
@@ -147,8 +204,11 @@ struct TaskTile: View {
                     .background(Circle().fill(isHovered || isSelected ? Color.harvestOrange : Color.orangeSoft).frame(width: indicatorSize, height: indicatorSize))
             }
         }
-        .font(.system(size: 9, weight: .bold))
+        .font(.system(size: 8, weight: .bold))
         .frame(width: indicatorSize, height: indicatorSize)
+        // Play shows on hover (or when picked with the keyboard), keeping
+        // the grid quiet; pause always shows on the running one.
+        .opacity(isRunning || isHovered || isSelected || isBusy ? 1 : 0)
         .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 
@@ -176,8 +236,8 @@ struct TaskTile: View {
     #if os(macOS)
     private let codeFont: CGFloat = 10.5
     private let titleFont: CGFloat = 12.5
-    private let subtitleFont: CGFloat = 11.5
-    private let indicatorSize: CGFloat = 28
+    private let subtitleFont: CGFloat = 11
+    private let indicatorSize: CGFloat = 22
     #else
     private let codeFont: CGFloat = 12
     private let titleFont: CGFloat = 15

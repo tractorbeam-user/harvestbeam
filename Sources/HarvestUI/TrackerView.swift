@@ -1,5 +1,6 @@
 import HarvestKit
 import SwiftUI
+import UniformTypeIdentifiers
 #if os(macOS)
 import ServiceManagement
 #endif
@@ -33,9 +34,12 @@ struct TrackerView: View {
     @State private var pickedProject: Int?
     @State private var isAddingEntry = false
     @State private var isPlanning = false
+    /// What the ask box hands the planner ("I did the LP site and a call").
+    @State private var planText = ""
     /// Search starts as an icon and opens into a field when you need it.
     @State private var isSearchOpen = false
-    @State private var favoritesTargeted = false
+    /// The Favorites or group panel something is dragged over.
+    @State private var targetedPanel: String?
     /// Recent and Suggested drop down from the empty ask box while it's focused.
     @State private var askListOpen = false
     /// Keeps the list up while the pointer is on it: a click there takes
@@ -58,6 +62,7 @@ struct TrackerView: View {
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
+    @AppStorage(FavoritesStyle.key) private var favoritesStyleRaw = FavoritesStyle.classic.rawValue
     @AppStorage(AppAppearance.key) private var appearanceRaw = AppAppearance.system.rawValue
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
     @State private var selectedDay = LocalDate()
@@ -73,15 +78,32 @@ struct TrackerView: View {
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
     /// "move 20 min from X to Y", "note: …", "stop": a change to today's
     /// time, previewed in the ask box until Return.
-    private var askCommand: AskCommandPreview? { isSearching ? tracker.askCommand(query) : nil }
+    /// What the ask box's text means, worked out once per keystroke: a body
+    /// pass reads these several times, and each one searches every task.
+    @State private var askCache = AskCache()
+    private let tileOrder = TileOrder.shared
+    private let groups = TaskGroups.shared
+    @State private var renameText = ""
+    @State private var deletingGroup: TaskGroups.Group?
+    @State private var showingGuide = false
+    @State private var hoveredHeader: String?
+    /// The section being dragged by its title, and where it would land.
+    @State private var draggingSection: String?
+    @State private var sectionDrop: SectionDrop?
+    private var askReading: AskCache.Reading { askCache.reading(query, isSearching: isSearching, tracker: tracker) }
+    private var askCommand: AskCommandPreview? { askReading.command }
     /// "10 min on tb corporate": what typing a duration in the ask box would add.
-    private var quickPlan: [PlannedEntry] { isSearching && askCommand == nil ? tracker.quickPlan(query) : [] }
+    /// A sentence about the day rather than a search: Return opens the planner.
+    private var describesDay: Bool { askReading.describesDay }
+    private var quickPlan: [PlannedEntry] { askReading.quickPlan }
+    /// "How do I split an entry?": answers about the app instead of results.
+    private var helpAnswers: [HelpTopic] { askReading.help }
     /// Shown after starting a retired bucket from search.
     @State private var retiredPick: TrackableTask?
 
     private func sections() -> [TaskSection] {
         // A command shows only its preview, so ↑↓ and Return stay with it.
-        if isSearching, askCommand != nil {
+        if isSearching, askCommand != nil || describesDay || !helpAnswers.isEmpty {
             return [TaskSection(id: "results", title: "Results", systemImage: "magnifyingglass", tasks: [])]
         }
         if isSearching {
@@ -91,7 +113,7 @@ struct TrackerView: View {
             var tasks: [TrackableTask] = []
             // The best 40 projects are plenty, and keep a one-letter search
             // from building hundreds of rows on every keystroke.
-            for match in Self.groupedByClient(tracker.search(query)) where seen.insert(match.project.id).inserted {
+            for match in Self.groupedByClient(askReading.results) where seen.insert(match.project.id).inserted {
                 if seen.count > 40 { break }
                 tasks.append(match.projectRow)
                 if match.project.id == pickedProject {
@@ -103,14 +125,27 @@ struct TrackerView: View {
                 tasks: tasks, emptyHint: "No projects match “\(query)”"
             )]
         }
-        return [
-            TaskSection(
-                id: "favorites", title: "Favorites", systemImage: "star.fill",
-                tasks: tracker.favoriteTasks, emptyHint: "Drag a task here, or star it, to keep it handy"
-            ),
-            TaskSection(id: "recent", title: "Recent", systemImage: "clock.arrow.circlepath", tasks: tracker.recentTasks),
-            TaskSection(id: "suggested", title: "Suggested", systemImage: "sparkles", tasks: tracker.suggestedTasks),
-        ]
+        let byKey = Dictionary(tracker.tasks.map { ($0.key.description, $0) }, uniquingKeysWith: { first, _ in first })
+        return groups.order.compactMap { id -> TaskSection? in
+            switch id {
+            case TaskGroups.favoritesID:
+                return TaskSection(
+                    id: "favorites", title: "Favorites", systemImage: "star.fill",
+                    tasks: tracker.favoriteTasks, emptyHint: "Drag a task here, or star it, to keep it handy"
+                )
+            case "recent":
+                return TaskSection(id: "recent", title: "Recent", systemImage: "clock.arrow.circlepath",
+                                   tasks: tileOrder.arranged(tracker.recentTasks, in: "recent"))
+            case "suggested":
+                return TaskSection(id: "suggested", title: "Suggested", systemImage: "sparkles",
+                                   tasks: tileOrder.arranged(tracker.suggestedTasks, in: "suggested"))
+            default:
+                guard let group = groups.group(forSection: id) else { return nil }
+                return TaskSection(id: id, title: group.name, systemImage: "folder.fill",
+                                   tasks: group.keys.compactMap { byKey[$0] },
+                                   emptyHint: "Drag tasks here")
+            }
+        }
         .filter { !$0.tasks.isEmpty || $0.emptyHint != nil }
     }
 
@@ -142,6 +177,12 @@ struct TrackerView: View {
     @ViewBuilder private func content(_ sections: [TaskSection]) -> some View {
         if let command = askCommand {
             AskCommandRow(preview: command) { applyCommand(command) }
+        } else if !helpAnswers.isEmpty {
+            VStack(spacing: 6) {
+                ForEach(helpAnswers) { HelpAnswerRow(topic: $0) }
+            }
+        } else if describesDay {
+            PlanSentenceRow(day: selectedDay) { openPlanner(with: query) }
         } else if isSearching {
             #if os(macOS)
             let plan = quickPlan
@@ -167,7 +208,7 @@ struct TrackerView: View {
         platformBody(sections)
             .onChange(of: query) {
                 pickedProject = nil
-                selection = isSearching && quickPlan.isEmpty && askCommand == nil ? sections.first?.tasks.first?.key : nil
+                selection = isSearching && quickPlan.isEmpty && askCommand == nil && !describesDay && helpAnswers.isEmpty ? sections.first?.tasks.first?.key : nil
                 if isSearching { retiredPick = nil }
             }
             .onChange(of: tracker.focusRequest, initial: true) {
@@ -234,86 +275,317 @@ struct TrackerView: View {
         max(1, Int((gridWidth + Metrics.spacing) / (Metrics.tileMinWidth + Metrics.spacing)))
     }
 
+    /// A tile dropped on another: Favorites keeps its own order; Recent and
+    /// Suggested remember yours. Tiles from another section are ignored here
+    /// (dropping on Favorites' panel adds them).
+    private func dropTile(_ key: TaskKey, before target: TaskKey, in section: TaskSection) -> Bool {
+        if section.id == "favorites" {
+            tracker.favorites.place(key, before: target)
+            return true
+        }
+        if let group = groups.group(forSection: section.id) {
+            groups.place(key, before: target, in: group.id)
+            return true
+        }
+        guard section.tasks.contains(where: { $0.key == key }) else { return false }
+        tileOrder.place(key, before: target, in: section.id, current: section.tasks.map(\.key))
+        return true
+    }
+
+    /// Right-click on Favorites' or a group's title.
+    @ViewBuilder private func panelMenu(_ section: TaskSection) -> some View {
+        let group = groups.group(forSection: section.id)
+        if let group {
+            Button("Rename…", systemImage: "pencil") { groups.renaming = group.id }
+        }
+        Button(groups.isHalf(section.id) ? "Full Width" : "Half Width",
+               systemImage: groups.isHalf(section.id) ? "rectangle" : "rectangle.split.2x1") {
+            withAnimation(.snappy(duration: 0.25)) { groups.toggleHalf(section.id) }
+        }
+        Button("Move Up", systemImage: "arrow.up") { withAnimation(.snappy(duration: 0.2)) { groups.move(section.id, by: -1) } }
+            .disabled(!groups.canMove(section.id, by: -1))
+        Button("Move Down", systemImage: "arrow.down") { withAnimation(.snappy(duration: 0.2)) { groups.move(section.id, by: 1) } }
+            .disabled(!groups.canMove(section.id, by: 1))
+        Divider()
+        if TaskGroups.customGroupsEnabled {
+            Button("New Group", systemImage: "folder.badge.plus") { withAnimation(.snappy(duration: 0.2)) { _ = groups.create() } }
+        }
+        if let group {
+            Button("Delete Group…", systemImage: "trash", role: .destructive) {
+                if group.keys.isEmpty { withAnimation { groups.delete(group.id) } } else { deletingGroup = group }
+            }
+        }
+    }
+
     private func toggleCollapsed(_ id: String) {
         var set = collapsed
         if !set.insert(id).inserted { set.remove(id) }
         withAnimation(.snappy(duration: 0.2)) { collapsedRaw = set.sorted().joined(separator: ",") }
     }
 
-    private func tileGrid(_ sections: [TaskSection]) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            ForEach(sections) { section in
-                let isCollapsed = !isSearching && collapsed.contains(section.id)
-                VStack(alignment: .leading, spacing: 8) {
-                    Button { toggleCollapsed(section.id) } label: {
-                        HStack(spacing: 6) {
-                            Label(section.title, systemImage: section.systemImage)
-                                .labelStyle(SectionLabelStyle(isPanel: section.id == "favorites"))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.tertiary)
-                                .rotationEffect(.degrees(isCollapsed ? -90 : 0))
-                            if isCollapsed {
-                                Text("\(section.tasks.count)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.leading, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(isCollapsed ? "Show \(section.title)" : "Hide \(section.title)")
+    /// Sections in rows: two half-width ones in a row share it as columns.
+    private func moduleRows(_ sections: [TaskSection]) -> [[TaskSection]] {
+        guard !isSearching else { return sections.map { [$0] } }
+        var rows: [[TaskSection]] = []
+        var index = 0
+        while index < sections.count {
+            let section = sections[index]
+            if groups.isHalf(section.id), index + 1 < sections.count, groups.isHalf(sections[index + 1].id) {
+                rows.append([section, sections[index + 1]])
+                index += 2
+            } else {
+                rows.append([section])
+                index += 1
+            }
+        }
+        return rows
+    }
 
-                    if isCollapsed {
-                        EmptyView()
-                    } else if section.tasks.isEmpty, let hint = section.emptyHint {
-                        Text(hint)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 64)
-                            .background(
-                                RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
-                                    .strokeBorder(Color.harvestOrange.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                            )
-                    } else {
-                        LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: Metrics.tileMinWidth), spacing: Metrics.spacing)],
-                            spacing: Metrics.spacing
-                        ) {
-                            ForEach(section.tasks) { task in
-                                TaskTile(
-                                    task: task, isSelected: selection == task.key, showsStar: section.id != "favorites",
-                                    onRemove: section.id == "suggested"
-                                        ? { withAnimation(.snappy(duration: 0.2)) { tracker.hideSuggestion(task.key) } }
-                                        : nil,
-                                    acceptsDrops: section.id == "favorites"
-                                )
-                                    .id(task.key)
-                            }
-                        }
+    /// Tiles across: one in a half-width column, two at full width.
+    private func tilesAcross(_ id: String) -> Int {
+        groups.isHalf(id) ? 1 : 2
+    }
+
+    /// Each section's own look. Favorites keeps the one in Preferences.
+    private func sectionStyle(_ id: String) -> FavoritesStyle {
+        // Tiles everywhere for now; the other looks are parked.
+        .classic
+    }
+
+    private func sectionDropAlignment(_ id: String) -> Alignment {
+        guard let drop = sectionDrop, drop.target == id else { return .top }
+        if groups.isHalf(id) { return drop.after ? .trailing : .leading }
+        return drop.after ? .bottom : .top
+    }
+
+    /// Starts a section drag. A drag let go somewhere else never says so, so
+    /// this watches for the mouse button coming up to tidy away.
+    private func beginSectionDrag(_ id: String) {
+        draggingSection = id
+        #if os(macOS)
+        func check() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                guard draggingSection != nil else { return }
+                if NSEvent.pressedMouseButtons & 1 == 0 {
+                    draggingSection = nil
+                    sectionDrop = nil
+                } else {
+                    check()
+                }
+            }
+        }
+        check()
+        #endif
+    }
+
+    nonisolated static func draggedSection(_ payload: String) -> String? {
+        payload.hasPrefix("section:") ? String(payload.dropFirst("section:".count)) : nil
+    }
+
+    /// A section's title: click to fold it, drag it to move the section. On
+    /// hover, a width switch and a menu show at the right.
+    private func sectionHeader(_ section: TaskSection, isPanel: Bool, isCollapsed: Bool) -> some View {
+        let isHalf = groups.isHalf(section.id)
+        return HStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Label(section.title, systemImage: section.systemImage)
+                    .labelStyle(SectionLabelStyle(isPanel: isPanel))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+                if isCollapsed {
+                    Text("\(section.tasks.count)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { toggleCollapsed(section.id) }
+            .onDrag {
+                beginSectionDrag(section.id)
+                return NSItemProvider(object: ("section:" + section.id) as NSString)
+            } preview: {
+                Label(section.title, systemImage: section.systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(Capsule().fill(Color.harvestOrange))
+                    .foregroundStyle(.white)
+            }
+            .help(isCollapsed ? "Show \(section.title)" : "Hide \(section.title). Drag to move it.")
+            Spacer(minLength: 4)
+            // Always there (faded in on hover), so a click never lands while
+            // they're still appearing.
+            HStack(spacing: 2) {
+                Button {
+                    withAnimation(.snappy(duration: 0.25)) { groups.toggleHalf(section.id) }
+                } label: {
+                    Image(systemName: isHalf ? "rectangle" : "rectangle.split.2x1")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(isHalf ? "Full width" : "Half width: sits beside another half-width section")
+                Menu {
+                    panelMenu(section)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 18)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
+            .opacity(hoveredHeader == section.id ? 1 : 0)
+            .animation(.easeOut(duration: 0.12), value: hoveredHeader == section.id)
+        }
+        .padding(.leading, 4)
+        .frame(height: 20)
+        .contentShape(Rectangle())
+        .onHover { hoveredHeader = $0 ? section.id : (hoveredHeader == section.id ? nil : hoveredHeader) }
+        .contextMenu { panelMenu(section) }
+    }
+
+    private func panelFill(_ id: String, isPanel: Bool, isGroup: Bool) -> Color {
+        if !isPanel { return .clear }
+        if targetedPanel == id { return Color.harvestOrange.opacity(0.18) }
+        // Only Favorites is orange; the rest sit on a quiet gray.
+        return id == "favorites" ? .orangeSoft : Color.primary.opacity(0.045)
+    }
+
+    @ViewBuilder private func sectionBlock(_ section: TaskSection) -> some View {
+        let isCollapsed = !isSearching && collapsed.contains(section.id)
+        // Every section is the same kind of panel; only Favorites and your
+        // groups take tasks dropped on them.
+        let isPanel = true
+        let takesTasks = section.id == "favorites" || groups.group(forSection: section.id) != nil
+        let group = groups.group(forSection: section.id)
+        VStack(alignment: .leading, spacing: 5) {
+            if let group, groups.renaming == group.id {
+                GroupNameField(text: $renameText) {
+                    groups.rename(group.id, to: renameText)
+                    groups.renaming = nil
+                }
+                .onAppear { renameText = group.name }
+            } else {
+            sectionHeader(section, isPanel: isPanel, isCollapsed: isCollapsed)
+            }
+
+            if isCollapsed {
+                EmptyView()
+            } else if section.tasks.isEmpty, let hint = section.emptyHint {
+                Text(hint)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 64)
+                    .background(
+                        RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
+                            .strokeBorder(Color.harvestOrange.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    )
+            } else {
+                let style = sectionStyle(section.id)
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: Metrics.spacing),
+                                   count: tilesAcross(section.id)),
+                    spacing: Metrics.spacing
+                ) {
+                    ForEach(section.tasks) { task in
+                        TaskTile(
+                            task: task, isSelected: tileSelected(task.key), showsStar: section.id != "favorites",
+                            onRemove: section.id == "suggested"
+                                ? { withAnimation(.snappy(duration: 0.2)) { tracker.hideSuggestion(task.key) } }
+                                : nil,
+                            dropBefore: { key in dropTile(key, before: task.key, in: section) },
+                            style: style,
+                            groupID: group?.id
+                        )
+                            .id(task.key)
                     }
                 }
-                // Drop anywhere in Favorites (even when empty) to add at the end.
-                .dropDestination(for: String.self) { items, _ in
-                    guard section.id == "favorites", let key = items.first.flatMap(TaskKey.init) else { return false }
-                    withAnimation(.snappy(duration: 0.2)) { tracker.favorites.place(key, before: nil) }
-                    return true
-                } isTargeted: { targeted in
-                    if section.id == "favorites" { favoritesTargeted = targeted }
+            }
+        }
+        // Drop anywhere in Favorites (even when empty) to add at the end.
+        .dropDestination(for: String.self) { items, _ in
+            if let id = items.first.flatMap(Self.draggedSection) {
+                withAnimation(.snappy(duration: 0.25)) { groups.placeSection(id, before: section.id) }
+                return true
+            }
+            guard takesTasks, let key = items.first.flatMap(TaskKey.init) else { return false }
+            withAnimation(.snappy(duration: 0.2)) {
+                if let group { groups.place(key, before: nil, in: group.id) } else { tracker.favorites.place(key, before: nil) }
+            }
+            return true
+        } isTargeted: { targeted in
+            if targeted { targetedPanel = section.id } else if targetedPanel == section.id { targetedPanel = nil }
+        }
+        // Favorites sit on their own soft orange panel, brighter while
+        // something is dragged over it.
+        .padding(isPanel ? 7 : 0)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
+                .fill(panelFill(section.id, isPanel: isPanel, isGroup: group != nil))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
+                .strokeBorder(Color.harvestOrange.opacity(targetedPanel == section.id ? 0.5 : 0), lineWidth: 1.5)
+        )
+        // While a section is dragged, every other section shows where it
+        // would land: a line on the side it'll go (left or right of a
+        // half-width one, above or below a full-width one).
+        .overlay {
+            if let dragged = draggingSection, dragged != section.id {
+                GeometryReader { proxy in
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onDrop(of: [.text], delegate: SectionDropDelegate(
+                            target: section.id, size: proxy.size, sideBySide: groups.isHalf(section.id),
+                            dragged: dragged, drop: $sectionDrop,
+                            perform: { after in
+                                withAnimation(.snappy(duration: 0.25)) {
+                                    groups.placeSection(dragged, nextTo: section.id, after: after)
+                                }
+                                draggingSection = nil
+                                sectionDrop = nil
+                            }
+                        ))
                 }
-                // Favorites sit on their own soft orange panel, brighter while
-                // something is dragged over it.
-                .padding(section.id == "favorites" ? 10 : 0)
-                .background(
-                    RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
-                        .fill(section.id != "favorites" ? Color.clear : favoritesTargeted ? Color.harvestOrange.opacity(0.18) : Color.orangeSoft)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: Metrics.panelCorner, style: .continuous)
-                        .strokeBorder(Color.harvestOrange.opacity(section.id == "favorites" && favoritesTargeted ? 0.5 : 0), lineWidth: 1.5)
-                )
-                .tourStop(section.id == "favorites" ? .favorites : nil)
+            }
+        }
+        .overlay(alignment: sectionDropAlignment(section.id)) {
+            if let drop = sectionDrop, drop.target == section.id {
+                let sideBySide = groups.isHalf(section.id)
+                Capsule()
+                    .fill(Color.harvestOrange)
+                    .frame(width: sideBySide ? 3 : nil, height: sideBySide ? nil : 3)
+                    .offset(x: sideBySide ? (drop.after ? 6 : -6) : 0, y: sideBySide ? 0 : (drop.after ? 7 : -7))
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
+        }
+        .tourStop(section.id == "favorites" ? .favorites : nil)
+    }
+
+    private func tileGrid(_ sections: [TaskSection]) -> some View {
+        VStack(alignment: .leading, spacing: 13) {
+            ForEach(moduleRows(sections), id: \.first!.id) { row in
+                if row.count == 2 {
+                    HStack(alignment: .top, spacing: Metrics.spacing + 3) {
+                        sectionBlock(row[0])
+                        sectionBlock(row[1])
+                    }
+                } else {
+                    sectionBlock(row[0])
+                }
+            }
+            if !isSearching {
+                if TaskGroups.customGroupsEnabled { NewGroupDrop() }
             }
             if !isSearching {
                 #if os(macOS)
@@ -330,6 +602,16 @@ struct TrackerView: View {
                     .frame(maxWidth: .infinity)
                 #endif
             }
+        }
+        .confirmationDialog("Delete “\(deletingGroup?.name ?? "")”?", isPresented: Binding(
+            get: { deletingGroup != nil }, set: { if !$0 { deletingGroup = nil } }
+        )) {
+            Button("Delete Group", role: .destructive) {
+                if let id = deletingGroup?.id { withAnimation { groups.delete(id) } }
+                deletingGroup = nil
+            }
+        } message: {
+            Text("Its tasks stay in Harvest; only the group goes.")
         }
         .background(
             GeometryReader { proxy in
@@ -371,9 +653,16 @@ struct TrackerView: View {
         }
     }
 
+    /// A tile shows the keyboard selection, except while the ask box's list
+    /// is open: that selection belongs to the list.
+    private func tileSelected(_ key: TaskKey) -> Bool {
+        selection == key && !(asksFirst && askListOpen && !isSearching)
+    }
+
     private func mainColumn(_ sections: [TaskSection]) -> some View {
-        let askRecent = askRecentItems
-        let askSuggested = askSuggestedItems(excluding: Set(askRecent.map(\.id)))
+        // Only the empty box shows Recent and Suggested; skip them while typing.
+        let askRecent = isSearching ? [] : askRecentItems
+        let askSuggested = isSearching ? [] : askSuggestedItems(excluding: Set(askRecent.map(\.id)))
         let showsAskList = asksFirst && askListOpen && !isSearching && !(askRecent.isEmpty && askSuggested.isEmpty)
         // Keyboard selection walks the ask box's list when it's open, and
         // otherwise skips folded sections.
@@ -385,11 +674,25 @@ struct TrackerView: View {
                 // Ask first: the big box is always there, focused when the window opens.
                 searchField(flat, large: true, listsTasks: showsAskList)
                     .tourStop(.ask)
+                    .background {
+                        #if os(macOS)
+                        GeometryReader { geometry in
+                            let frame = geometry.frame(in: .global)
+                            Color.clear
+                                .onAppear { AskFieldGeometry.frame = frame }
+                                .onChange(of: frame) { _, new in AskFieldGeometry.frame = new }
+                                .onDisappear { AskFieldGeometry.frame = .zero }
+                        }
+                        #endif
+                    }
+                    .popover(isPresented: $isPlanning, arrowEdge: .bottom) {
+                        PlanDayView(day: selectedDay, initialText: planText)
+                    }
                     .overlay(alignment: .top) {
                         if showsAskList {
                             AskDropdown(
                                 recent: askRecent, suggested: askSuggested, selection: selection,
-                                runningKey: tracker.running?.key, pick: pick, highlight: { selection = $0 }
+                                runningKey: tracker.running?.key, pick: pick
                             )
                             .fixedSize(horizontal: false, vertical: true)
                             .offset(y: 50)
@@ -426,7 +729,9 @@ struct TrackerView: View {
                         }
                     }
                     .padding(.horizontal, Metrics.padding)
-                    .padding(.vertical, isSearching ? 10 : Metrics.padding)
+                    // Right under the ask box, the day strip sits a little closer.
+                    .padding(.top, isSearching ? 10 : (asksFirst ? 6 : Metrics.padding))
+                    .padding(.bottom, isSearching ? 10 : Metrics.padding)
                 }
                 // Scrolled content dissolves under the search box (and above
                 // the footer) instead of stopping at a hard edge.
@@ -440,7 +745,8 @@ struct TrackerView: View {
                     }
                 )
                 .onChange(of: selection) { _, key in
-                    guard let key else { return }
+                    // The ask list's selection is its own; the window behind stays put.
+                    guard let key, !showsAskList else { return }
                     withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(key) }
                 }
             }
@@ -474,6 +780,9 @@ struct TrackerView: View {
                     .disabled(tracker.running == nil)
                 Button("") { openSearch() }
                     .keyboardShortcut("f", modifiers: .command)
+                // The planner, with whatever's in the ask box.
+                Button("") { openPlanner(with: query) }
+                    .keyboardShortcut("p", modifiers: .command)
                 // No refresh button: it syncs every minute and when opened.
                 Button("") { Task { await tracker.refresh(force: true) } }
                     .keyboardShortcut("r", modifiers: .command)
@@ -541,6 +850,8 @@ struct TrackerView: View {
                 }
                 .onSubmit {
                     if let command = askCommand { return applyCommand(command) }
+                    if describesDay { return openPlanner(with: query) }
+                    if !helpAnswers.isEmpty { return }
                     let plan = quickPlan
                     if selection == nil, !plan.isEmpty { return addQuickPlan(plan) }
                     guard let key = selection ?? (isSearching || listsTasks ? flat.first?.key : nil),
@@ -710,6 +1021,16 @@ struct TrackerView: View {
         return out
     }
 
+    /// Hands the ask box's sentence to the planner, which matches each piece
+    /// of work to a task and lets you check them before anything's added.
+    private func openPlanner(with text: String) {
+        planText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        query = ""
+        selection = nil
+        askListOpen = false
+        isPlanning = true
+    }
+
     private func addQuickPlan(_ plan: [PlannedEntry]) {
         let day = selectedDay
         query = ""
@@ -777,15 +1098,15 @@ struct TrackerView: View {
             FooterButton(systemImage: "plus", help: "New time entry (⌘N)") { isAddingEntry = true }
                 .keyboardShortcut("n", modifiers: .command)
                 .popover(isPresented: $isAddingEntry, arrowEdge: .top) { NewEntryEditor(day: selectedDay) }
-            FooterButton(systemImage: "sparkles", help: "Plan your day in plain words (⌘P)") { isPlanning = true }
-                .keyboardShortcut("p", modifiers: .command)
-                .popover(isPresented: $isPlanning, arrowEdge: .top) { PlanDayView(day: selectedDay) }
             favoritesMenu
                 .padding(.trailing, 2)
             if asksFirst {
                 Spacer()
             } else if isSearchOpen || !query.isEmpty {
                 searchField(flat)
+                    .popover(isPresented: $isPlanning, arrowEdge: .top) {
+                        PlanDayView(day: selectedDay, initialText: planText)
+                    }
                     .padding(.trailing, 6)
                     .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .leading)))
             } else {
@@ -808,11 +1129,15 @@ struct TrackerView: View {
             .help("Layout: Classic, Tiles or List")
             }
 
+            FooterButton(systemImage: "book.closed", help: "Guide: what each time-tracking code is for") {
+                showingGuide.toggle()
+            }
+            .popover(isPresented: $showingGuide, arrowEdge: .bottom) { GuideView() }
             FooterButton(systemImage: "bubble.left", help: "Send feedback: a bug, a question or an idea") {
                 openURL(Self.feedbackURL)
             }
-            FooterButton(systemImage: "arrow.up.forward.app", help: "Open Harvest") {
-                if let url = tracker.harvestWebURL { openURL(url) }
+            FooterButton(help: "Open Harvest", action: { if let url = tracker.harvestWebURL { openURL(url) } }) {
+                HarvestMark()
             }
 
             Menu {
@@ -823,9 +1148,6 @@ struct TrackerView: View {
                     ))
                     Button("Move Below Menu Bar Icon") { windowActions.snapToMenuBar() }
                     Button("Reset Window Size") { windowActions.resetSize() }
-                    if !tracker.hiddenSuggestions.isEmpty {
-                        Button("Show Removed Suggestions") { tracker.showHiddenSuggestions() }
-                    }
                     Divider()
                 }
                 Picker("Appearance", selection: Binding(get: { appearanceRaw }, set: {
@@ -860,6 +1182,9 @@ struct TrackerView: View {
                 ))
                 Divider()
                 Button("Review Week…") { WeekReviewPresenter.shared.isPresented = true }
+                if TaskGroups.customGroupsEnabled {
+                    Button("New Group") { withAnimation(.snappy(duration: 0.2)) { _ = TaskGroups.shared.create() } }
+                }
                 if let openSummary = windowActions?.openWeeklySummary {
                     Button("Weekly Summary…") { openSummary(nil) }
                 }
@@ -955,6 +1280,98 @@ private struct HintLinkStyle: ButtonStyle {
 
 /// Section headings as on the landing page: Favorites in plain words on its
 /// orange panel, the others small caps-style labels.
+/// Where a dragged section would land: before or after `target`.
+struct SectionDrop: Equatable {
+    var target: String
+    var after: Bool
+}
+
+private struct SectionDropDelegate: DropDelegate {
+    let target: String
+    let size: CGSize
+    /// Half-width targets split left/right; full-width ones top/bottom.
+    let sideBySide: Bool
+    let dragged: String
+    @Binding var drop: SectionDrop?
+    let perform: (_ after: Bool) -> Void
+
+    private func after(_ info: DropInfo) -> Bool {
+        sideBySide ? info.location.x > size.width / 2 : info.location.y > size.height / 2
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        let next = SectionDrop(target: target, after: after(info))
+        if drop != next { withAnimation(.easeOut(duration: 0.12)) { drop = next } }
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        if drop?.target == target { withAnimation(.easeOut(duration: 0.12)) { drop = nil } }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        perform(after(info))
+        return true
+    }
+}
+
+/// "+ New Group" under the sections: click to make one and name it, or drop
+/// a task on it to start a group with that task.
+private struct NewGroupDrop: View {
+    @State private var isTargeted = false
+    @State private var isHovered = false
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.2)) { _ = TaskGroups.shared.create() }
+        } label: {
+            Label(isTargeted ? "Drop to start a new group" : "New Group", systemImage: "plus")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isTargeted || isHovered ? AnyShapeStyle(.harvestOrange) : AnyShapeStyle(.tertiary))
+                .frame(maxWidth: .infinity, minHeight: 34)
+                .background(
+                    RoundedRectangle(cornerRadius: Metrics.tileCorner, style: .continuous)
+                        .strokeBorder(Color.harvestOrange.opacity(isTargeted ? 0.6 : isHovered ? 0.35 : 0.15),
+                                      style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help("Make a group of your own, like Active Projects. Drop a task here to start one with it.")
+        .dropDestination(for: String.self) { items, _ in
+            guard let key = items.first.flatMap(TaskKey.init) else { return false }
+            withAnimation(.snappy(duration: 0.2)) { _ = TaskGroups.shared.create(with: key) }
+            return true
+        } isTargeted: { isTargeted = $0 }
+    }
+}
+
+/// A group's name being typed, in place of its title. Return or clicking
+/// away saves it; Escape keeps the old one.
+private struct GroupNameField: View {
+    @Binding var text: String
+    let done: () -> Void
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "folder.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.harvestOrange)
+            TextField("Group name", text: $text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .semibold))
+                .focused($focused)
+                .onSubmit(done)
+                .onExitCommand { TaskGroups.shared.renaming = nil }
+        }
+        .padding(.leading, 4)
+        .onAppear { DispatchQueue.main.async { focused = true } }
+        .onChange(of: focused) { _, isFocused in if !isFocused { done() } }
+    }
+}
+
 private struct SectionLabelStyle: LabelStyle {
     var isPanel = false
 
@@ -1040,15 +1457,27 @@ private struct ErrorBanner: View {
 }
 
 #if os(macOS)
-private struct FooterButton: View {
-    let systemImage: String
+private struct FooterButton<Icon: View>: View {
     let help: String
     let action: () -> Void
+    @ViewBuilder var icon: Icon
     @State private var isHovered = false
+
+    init(systemImage: String, help: String, action: @escaping () -> Void) where Icon == Image {
+        self.help = help
+        self.action = action
+        self.icon = Image(systemName: systemImage)
+    }
+
+    init(help: String, action: @escaping () -> Void, @ViewBuilder icon: () -> Icon) {
+        self.help = help
+        self.action = action
+        self.icon = icon()
+    }
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
+            icon
                 .frame(width: 30, height: 30)
                 .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(isHovered ? 0.06 : 0)))
                 .contentShape(Rectangle())
@@ -1068,7 +1497,9 @@ private struct TitleBar: View {
     @Environment(TimeTracker.self) private var tracker
     @Environment(\.windowActions) private var windowActions
     @Binding var selectedDay: LocalDate
-    @State private var showingHelp = false
+    /// The Time Summary, shown while the pointer rests on the week total.
+    @State private var showingSummary = false
+    @State private var hoverTask: Task<Void, Never>?
 
     var body: some View {
         let today = LocalDate()
@@ -1077,11 +1508,21 @@ private struct TitleBar: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(selectedDay.dayTitle(today: today))
                         .font(.system(size: 13, weight: .semibold))
-                    Text("Week \(TimeFormat.hoursMinutes(tracker.weekSeconds(containing: selectedDay, at: context.date)))")
-                        .font(.system(size: 12, weight: .medium).monospacedDigit())
-                        .opacity(0.8)
+                    let week = "Week \(TimeFormat.hoursMinutes(tracker.weekSeconds(containing: selectedDay, at: context.date)))"
                     if let openSummary = windowActions?.openWeeklySummary {
-                        WeeklySummaryButton { openSummary(selectedDay) }
+                        // The week total opens the Weekly Summary.
+                        WeeklySummaryButton(title: week) {
+                            showingSummary = false
+                            openSummary(selectedDay)
+                        }
+                        .onHover(perform: hoverWeek)
+                        .popover(isPresented: $showingSummary, arrowEdge: .bottom) { TimeSummary() }
+                    } else {
+                        Text(week)
+                            .font(.system(size: 12, weight: .medium).monospacedDigit())
+                            .opacity(0.8)
+                            .onHover(perform: hoverWeek)
+                            .popover(isPresented: $showingSummary, arrowEdge: .bottom) { TimeSummary() }
                     }
                 }
                 .lineLimit(1)
@@ -1116,12 +1557,6 @@ private struct TitleBar: View {
                     .help("Go to today (⌘T)")
                     .accessibilityLabel("Go to today")
 
-                    Button { showingHelp.toggle() } label: {
-                        Image(systemName: "info.circle")
-                    }
-                    .buttonStyle(TitleBarButtonStyle())
-                    .help("Time summary")
-                    .popover(isPresented: $showingHelp, arrowEdge: .bottom) { TimeSummary() }
                 }
                 .padding(.trailing, 10)
             }
@@ -1129,6 +1564,22 @@ private struct TitleBar: View {
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Self.barColor)
+    }
+}
+
+extension TitleBar {
+    /// Today, yesterday, this week and this month, after the pointer rests
+    /// on the week total for a moment; gone when it leaves.
+    func hoverWeek(_ inside: Bool) {
+        hoverTask?.cancel()
+        if inside {
+            hoverTask = Task {
+                try? await Task.sleep(for: .milliseconds(450))
+                if !Task.isCancelled { showingSummary = true }
+            }
+        } else {
+            showingSummary = false
+        }
     }
 }
 
@@ -1237,6 +1688,134 @@ private struct RotatingPrompt: View {
 
 /// Above the search results when what you typed says how long: "Add 0:10 ·
 /// TB Corporate · Product Design". Return (or a click) adds it.
+/// "Turn this into entries": the ask box read a sentence about your day.
+/// Return opens the planner with it, already matched.
+private struct PlanSentenceRow: View {
+    let day: LocalDate
+    let open: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: open) {
+            HStack(spacing: 8) {
+                Image(systemName: "text.badge.plus")
+                    .font(.system(size: 14))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(day == LocalDate() ? "Turn this into entries for today" : "Turn this into entries for \(day.dayTitle(today: LocalDate()))")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Matches each part to a task. You check them before anything's added.")
+                        .font(.system(size: 11.5))
+                        .opacity(0.8)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 6)
+                Text("⏎").font(.system(size: 11, weight: .medium)).opacity(0.8)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.harvestOrange.opacity(isHovered ? 0.9 : 1)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        #if os(macOS)
+        .onHover { isHovered = $0 }
+        #endif
+    }
+}
+
+/// One answer to a question about the app, typed into the ask box.
+private struct HelpAnswerRow: View {
+    let topic: HelpTopic
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "questionmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(Color.harvestOrange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(topic.question)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(topic.answer)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.05)))
+    }
+}
+
+/// Remembers what the ask box's text means for one keystroke: the command
+/// preview, whether it's a sentence for the planner, the quick "30m on X"
+/// plan, and the search results. A plain class, so filling it doesn't
+/// redraw anything. It starts over when the text or the day's data changes.
+final class AskCache {
+    struct Reading {
+        var command: AskCommandPreview?
+        var describesDay = false
+        var help: [HelpTopic] = []
+        var quickPlan: [PlannedEntry] = []
+        var results: [TrackableTask] = []
+    }
+
+    private var key: [AnyHashable] = []
+    private var cached = Reading()
+
+    @MainActor func reading(_ query: String, isSearching: Bool, tracker: TimeTracker) -> Reading {
+        guard isSearching else { return Reading() }
+        let key: [AnyHashable] = [query, tracker.tasks.count, tracker.todayEntries.map(\.id), tracker.running?.id,
+                                  tracker.favorites.set, Int(Date().timeIntervalSince1970 / 30)]
+        if key == self.key { return cached }
+        var reading = Reading()
+        reading.command = tracker.askCommand(query)
+        if reading.command == nil, AppHelp.isQuestion(query) {
+            reading.help = AppHelp.answers(for: query)
+        }
+        if reading.command == nil, reading.help.isEmpty {
+            reading.describesDay = DayPlanner.describesWork(query)
+            if !reading.describesDay {
+                reading.quickPlan = tracker.quickPlan(query)
+                reading.results = tracker.search(query)
+            }
+        }
+        self.key = key
+        cached = reading
+        return reading
+    }
+}
+
+/// Harvest's mark for "Open Harvest": its three rounded strokes, in one
+/// color like the other footer icons, so it follows light and dark.
+private struct HarvestMark: View {
+    var body: some View {
+        Canvas { context, size in
+            // Drawn on a 32 × 60 grid, then scaled to fit.
+            let scale = min(size.width / 32, size.height / 60)
+            let dx = (size.width - 32 * scale) / 2, dy = (size.height - 60 * scale) / 2
+            func bar(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> Path {
+                Path(roundedRect: CGRect(x: dx + x * scale, y: dy + y * scale, width: w * scale, height: h * scale),
+                     cornerRadius: w * scale / 2)
+            }
+            var path = Path()
+            path.addPath(bar(0, 22, 8, 26))      // short left stroke
+            path.addRect(CGRect(x: dx + 6 * scale, y: dy + 30 * scale, width: 9 * scale, height: 7 * scale))
+            path.addPath(bar(13, 15, 8, 45))     // middle stroke
+            path.addPath(bar(24, 0, 8, 60))      // tall right stroke
+            context.fill(path, with: .foreground)
+        }
+        .frame(width: 16, height: 16)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct QuickPlanRow: View {
     let entries: [PlannedEntry]
     let day: LocalDate

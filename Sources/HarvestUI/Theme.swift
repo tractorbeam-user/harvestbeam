@@ -82,8 +82,8 @@ extension Color {
 enum Metrics {
     #if os(macOS)
     static let tileMinWidth: CGFloat = 170
-    static let tileHeight: CGFloat = 46
-    static let spacing: CGFloat = 10
+    static let tileHeight: CGFloat = 36
+    static let spacing: CGFloat = 7
     static let padding: CGFloat = 14
     static let badgeSize: CGFloat = 30
     #else
@@ -93,7 +93,7 @@ enum Metrics {
     static let padding: CGFloat = 16
     static let badgeSize: CGFloat = 34
     #endif
-    static let tileCorner: CGFloat = 12
+    static let tileCorner: CGFloat = 10
     static let cardCorner: CGFloat = 14
     /// Favorites' orange panel.
     static let panelCorner: CGFloat = 16
@@ -167,6 +167,13 @@ public extension Notification.Name {
     /// The Mac window saw a click in a text field (its ask box), which opens
     /// Recent and Suggested.
     static let askFieldClicked = Notification.Name("HarvestUI.askFieldClicked")
+}
+
+/// Where the ask box is, in the window's content (top-left origin), so the
+/// window can tell a click landed in it even when the view under the mouse
+/// isn't the text field itself.
+@MainActor public enum AskFieldGeometry {
+    public static var frame: CGRect = .zero
 }
 
 /// Escape anywhere in the main window asks this first: it closes the ask

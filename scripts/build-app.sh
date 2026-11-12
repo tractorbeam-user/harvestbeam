@@ -84,7 +84,17 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 # Ad hoc, with no Developer ID: --deep re-signs Sparkle's helpers to match.
-codesign --force --deep --sign - "$APP"
+# Sign with a stable identity when there is one, so macOS keeps the Keychain
+# sign-in and Accessibility permission across builds; an ad-hoc signature
+# changes every build and makes macOS treat each one as a new app. Make
+# "Harvestbeam Dev" once in Keychain Access (Certificate Assistant › Create a
+# Certificate, type Code Signing), or set SIGN_IDENTITY.
+SIGN_IDENTITY="${SIGN_IDENTITY:-}"
+if [[ -z "$SIGN_IDENTITY" ]] && security find-identity -p codesigning 2>/dev/null | grep -q '"Harvestbeam Dev"'; then
+  SIGN_IDENTITY="Harvestbeam Dev"
+fi
+codesign --force --deep --sign "${SIGN_IDENTITY:--}" "$APP"
+[[ -n "$SIGN_IDENTITY" ]] && echo "Signed as $SIGN_IDENTITY"
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then

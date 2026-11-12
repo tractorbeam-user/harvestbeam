@@ -55,8 +55,8 @@ public actor DemoHarvestService: HarvestService {
         )
         if includesArchivedWork { assignments.append(springCampaign) }
         if reviewWeek {
-            assignments.append(assignment(108, "Digital Products", code: nil, client: tractorbeam, tasks: [design, development]))
-            assignments.append(assignment(109, "Business Dev", code: nil, client: tractorbeam, tasks: [strategy]))
+            assignments.append(assignment(120, "Digital Products", code: nil, client: tractorbeam, tasks: [design, development]))
+            assignments.append(assignment(121, "Business Dev", code: nil, client: tractorbeam, tasks: [strategy]))
         }
 
         // Deterministic history: a weighted handful of tasks most days.
@@ -134,20 +134,20 @@ public actor DemoHarvestService: HarvestService {
             101: ("Website Redesign", NamedRef(id: 1, name: "Tractorbeam")), 102: ("Context Launch", NamedRef(id: 1, name: "Tractorbeam")),
             103: ("Brand Refresh", NamedRef(id: 2, name: "Acme Co")), 104: ("Mobile App", NamedRef(id: 2, name: "Acme Co")),
             105: ("Data Platform", NamedRef(id: 3, name: "Northwind")), 106: ("Internal", NamedRef(id: 1, name: "Tractorbeam")),
-            108: ("Digital Products", NamedRef(id: 1, name: "Tractorbeam")), 109: ("Business Dev", NamedRef(id: 1, name: "Tractorbeam")),
+            120: ("Digital Products", NamedRef(id: 1, name: "Tractorbeam")), 121: ("Business Dev", NamedRef(id: 1, name: "Tractorbeam")),
         ]
         let tasks: [Int: String] = [11: "Design", 12: "Development", 13: "Meetings", 15: "Strategy", 16: "QA & Testing"]
         let plan: [(day: Int, from: String, to: String?, project: Int, task: Int, notes: String?)] = [
             (0, "9:00am", "9:30am", 106, 13, "Standup"),
             (0, "9:30am", "1:00pm", 101, 11, "Homepage hero"),
             (0, "1:00pm", "3:30pm", 102, 12, "API wiring"),
-            (0, "3:30pm", "6:00pm", 108, 11, "Banner set"),
+            (0, "3:30pm", "6:00pm", 120, 11, "Banner set"),
             (1, "9:00am", "9:30am", 106, 13, "Standup"),
             (1, "9:30am", "11:00am", 103, 11, "Logo options"),
             (1, "11:00am", "1:00pm", 104, 16, nil),
             (1, "2:00pm", "3:30pm", 101, 11, "Nav states"),
             (3, "9:00am", "12:00pm", 102, 15, "Launch brief"),
-            (3, "12:00pm", "1:00pm", 109, 15, "Intro call with Globex"),
+            (3, "12:00pm", "1:00pm", 121, 15, "Intro call with Globex"),
             (3, "1:00pm", nil, 105, 12, "Pipeline migration"),
             (4, "9:00am", "9:30am", 106, 13, "Standup"),
             (4, "9:30am", "12:00pm", 104, 11, "Onboarding screens"),

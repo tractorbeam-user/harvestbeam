@@ -81,22 +81,19 @@ struct BigTile: View {
     let seconds: TimeInterval
     @State private var isHovered = false
     @State private var isDropTarget = false
-    @State private var picksIcon = false
 
     private var isRunning: Bool {
         let running = tracker.running?.key == task.key
-        return tracker.busyKey == task.key ? !running : running
+        if tracker.busyKey == task.key { return !running }
+        if running, let busy = tracker.busyKey, busy != task.key { return false }
+        return running
     }
     private var isFavorite: Bool { tracker.favorites.contains(task.key) }
 
     var body: some View {
         let (code, name) = task.projectNameParts
         VStack(alignment: .leading, spacing: 0) {
-            if isFavorite, let icon = FavoriteIcons.shared.icon(for: task.key) {
-                FavoriteIconView(icon: icon, size: 20, onOrange: isRunning)
-                    .padding(.bottom, 4)
-                    .onTapGesture { picksIcon = true }
-            } else if let code {
+            if let code {
                 Text(code).font(.system(size: 10, weight: .medium).monospaced()).opacity(0.55)
             }
             Text(name)
@@ -154,10 +151,8 @@ struct BigTile: View {
         }
         .contextMenu {
             Button(isRunning ? "Pause Timer" : "Start Timer") { Task { await tracker.toggle(task) } }
-            if isFavorite { Button("Choose Icon…") { picksIcon = true } }
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(task.key) }
         }
-        .modifier(FavoriteIconPopover(key: task.key, isPresented: $picksIcon))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { Task { await tracker.toggle(task) } }
@@ -216,7 +211,9 @@ private struct StartRow: View {
 
     private var isRunning: Bool {
         let running = tracker.running?.key == task.key
-        return tracker.busyKey == task.key ? !running : running
+        if tracker.busyKey == task.key { return !running }
+        if running, let busy = tracker.busyKey, busy != task.key { return false }
+        return running
     }
     private var isFavorite: Bool { tracker.favorites.contains(task.key) }
 

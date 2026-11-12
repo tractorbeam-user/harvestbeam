@@ -40,6 +40,8 @@ enum Prefs {
 extension Notification.Name {
     /// Posted when the show/hide shortcut changes in Preferences.
     static let toggleShortcutChanged = Notification.Name("HarvestBar.toggleShortcutChanged")
+    /// Preferences changed Keep on Top; the window's level follows.
+    static let keepOnTopChanged = Notification.Name("HarvestBar.keepOnTopChanged")
 }
 
 /// The Preferences window: a full-height sidebar of panes with the traffic
@@ -98,9 +100,70 @@ struct PrefsRoot: View {
             case .general: GeneralPrefs()
             case .tracking: TrackingPrefs()
             case .shortcuts: ShortcutPrefs()
+            case .labs: LabsPrefs()
             case .support: SupportPrefs(resetLayout: resetLayout, showTour: showTour)
             }
         }
+    }
+}
+
+// MARK: Labs
+
+/// Beta features in the regular app, each on its own switch. Features that
+/// share a part are one switch: the Timeline, screen suggestions and
+/// Autotracker rules all run on the screen watcher.
+struct LabsPrefs: View {
+    @AppStorage(Beta.automaticTrackingKey) private var automaticTracking = false
+    @AppStorage(Beta.labsKey) private var legacyLabs = false
+    @AppStorage(ActivityRecorder.autoLogMeetingsKey) private var logsMeetings = false
+    @AppStorage(Beta.continueShortcutKey) private var continueShortcut = false
+
+    var body: some View {
+        PrefsPage {
+            if Beta.isEnabled {
+                SettingsCard {
+                    SettingsRow("You're using \(AppInfo.name)",
+                                description: "Every beta feature is on here.",
+                                icon: RowIcon("flask.fill", .indigo)) { EmptyView() }
+                }
+            } else {
+                SettingsSection("Labs",
+                                footer: "Still being tried out, and may change. Updates stay on regular releases.") {
+                    SettingsRow("Automatic tracking",
+                                description: "Records your Timeline, suggests tasks from what's on screen, and starts timers from your rules. Turn each part on in Tracking. Needs Accessibility access.",
+                                icon: RowIcon("wand.and.stars", .harvestOrange),
+                                isOn: Binding(get: { automaticTracking || legacyLabs },
+                                              set: { automaticTracking = $0; legacyLabs = false }))
+                    if (automaticTracking || legacyLabs) != Beta.automaticTracking {
+                        CardDivider()
+                        SettingsRow("Relaunch to turn it \(automaticTracking ? "on" : "off")") {
+                            Button("Relaunch") { Self.relaunch() }
+                        }
+                    }
+                    CardDivider()
+                    SettingsRow("Auto-logged meetings",
+                                description: "Within five minutes of a meeting starting, it's logged to its matched task, and a notification lets you undo. Meetings with no match or no length are left for you.",
+                                icon: RowIcon("calendar", .red), isOn: $logsMeetings)
+                        .onChange(of: logsMeetings) { _, on in if on { Notifier.requestPermission() } }
+                    CardDivider()
+                    SettingsRow("Continue shortcut",
+                                description: "One shortcut, anywhere on your Mac, picks up your last entry or stops the timer. Set the keys in Shortcuts.",
+                                icon: RowIcon("command", .gray), isOn: $continueShortcut)
+                        .onChange(of: continueShortcut) { NotificationCenter.default.post(name: .toggleShortcutChanged, object: nil) }
+                }
+            }
+        }
+    }
+
+    /// Quits, then opens the app again once this copy is gone, so there's
+    /// never two in the menu bar.
+    static func relaunch() {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", "while kill -0 $1 2>/dev/null; do sleep 0.2; done; open \"$2\"",
+                          "relaunch", "\(ProcessInfo.processInfo.processIdentifier)", Bundle.main.bundlePath]
+        try? task.run()
+        NSApp.terminate(nil)
     }
 }
 
@@ -119,6 +182,12 @@ struct GeneralPrefs: View {
     @State private var openAtLogin = SMAppService.mainApp.status == .enabled
     @AppStorage(Analytics.enabledKey) private var sharesUsage = true
     @AppStorage(AppAppearance.key) private var appearanceRaw = AppAppearance.system.rawValue
+    @AppStorage(FavoritesStyle.key) private var favoritesStyleRaw = FavoritesStyle.classic.rawValue
+    @AppStorage("keepOnTop") private var keepOnTop = false
+    @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.task.rawValue
+    @AppStorage(MenuBarDisplay.lengthKey) private var menuBarLength = 28
+    @AppStorage(MenuBarDisplay.truncationKey) private var menuBarTruncation = MenuBarDisplay.Truncation.end.rawValue
+    @AppStorage(MenuBarDisplay.showTimeKey) private var menuBarShowTime = true
     @Environment(TimeTracker.self) private var tracker
 
     var body: some View {
@@ -137,6 +206,31 @@ struct GeneralPrefs: View {
                         get: { AppAppearance(rawValue: appearanceRaw) ?? .system },
                         set: { appearanceRaw = $0.rawValue; AppAppearance.set($0) }
                     ), options: AppAppearance.allCases) { $0.label }
+                }
+                CardDivider()
+                SettingsRow("Keep the window on top", description: "Stays above other windows while you work.",
+                            icon: RowIcon("macwindow.on.rectangle", .purple), isOn: $keepOnTop)
+                    .onChange(of: keepOnTop) { NotificationCenter.default.post(name: .keepOnTopChanged, object: nil) }
+            }
+            SettingsSection("Menu Bar") {
+                SettingsRow("Show", icon: RowIcon("menubar.rectangle", .orange)) {
+                    SettingsPopup(selection: $menuBarContent, options: MenuBarDisplay.Content.allCases.map(\.rawValue)) { raw in
+                        MenuBarDisplay.Content(rawValue: raw)?.label ?? raw
+                    }
+                }
+                CardDivider()
+                SettingsRow("Show elapsed time", isOn: $menuBarShowTime)
+                CardDivider()
+                SettingsRow("Length") {
+                    SettingsPopup(selection: $menuBarLength, options: MenuBarDisplay.lengths.map(\.value)) { value in
+                        MenuBarDisplay.lengths.first { $0.value == value }?.label ?? "\(value)"
+                    }
+                }
+                CardDivider()
+                SettingsRow("Shorten long names") {
+                    SettingsPopup(selection: $menuBarTruncation, options: MenuBarDisplay.Truncation.allCases.map(\.rawValue)) { raw in
+                        MenuBarDisplay.Truncation(rawValue: raw)?.label ?? raw
+                    }
                 }
             }
             SettingsSection("Idle Time") {
@@ -209,7 +303,7 @@ private struct UpdatesSection: View {
         @Bindable var updates = updates
         SettingsSection("Updates",
                         footer: "\(AppInfo.name) looks for a new version on GitHub once a day. Unless it installs them automatically, it asks first."
-                            + (Beta.isEnabled ? " This is the beta, a separate app from Harvestbeam, so it gets new betas. To leave it, quit it and move it to the Trash." : "")) {
+                            + (Beta.isBetaBuild ? " This is the beta, a separate app from Harvestbeam, so it gets new betas. To leave it, quit it and move it to the Trash." : "")) {
             SettingsRow("Check for updates automatically", icon: RowIcon("arrow.triangle.2.circlepath", .teal),
                         isOn: $updates.checksAutomatically)
             CardDivider()
@@ -228,11 +322,13 @@ private struct UpdatesSection: View {
 // MARK: Shortcuts
 
 struct ShortcutPrefs: View {
+    @AppStorage(Beta.continueShortcutKey) private var continueLab = false
+    private var continueOn: Bool { Beta.isEnabled || continueLab }
     @AppStorage(Prefs.shortcutDisplay) private var display = "⌥H"
     @AppStorage(Prefs.continueShortcutDisplay) private var continueDisplay = ""
 
     private let inApp: [(String, String)] = [
-        ("New time entry", "⌘N"), ("Plan your day", "⌘P"), ("Search tasks", "⌘F"),
+        ("New time entry", "⌘N"), ("Turn a sentence into entries", "⌘P"), ("Search tasks", "⌘F"),
         ("Go to today", "⌘T"), ("Previous / next day", "⌘[ ⌘]"), ("Pause the timer", "⌘."),
         ("Undo delete", "⌘Z"), ("Refresh", "⌘R"), ("Reset window size", "⌘0"),
     ]
@@ -242,7 +338,7 @@ struct ShortcutPrefs: View {
             PrefsPage {
                 SettingsSection("Anywhere on your Mac") {
                     ShortcutRecorder(title: "Show or hide \(AppInfo.name)", name: "toggle", display: $display)
-                    if Beta.isEnabled {
+                    if continueOn {
                         CardDivider()
                         ShortcutRecorder(title: "Continue last entry, or stop the timer", name: "continue", display: $continueDisplay)
                     }
@@ -263,7 +359,7 @@ struct ShortcutPrefs: View {
             }
             VStack(alignment: .leading, spacing: 12) {
                 Text("Click a shortcut, then type the new keys. Use ⌘, ⌥ or ⌃ with a key. Esc cancels.")
-                if Beta.isEnabled {
+                if continueOn {
                     Text("Continue picks up your most recent entry; if a timer's running, it stops it.")
                 }
                 Text("Shortcuts in the window work while \(AppInfo.name) is in front.")
@@ -370,6 +466,7 @@ struct TrackingPrefs: View {
     @AppStorage(ActivityRecorder.autoLogMeetingsKey) private var logsMeetings = false
     @State private var hasAccessibility = ActivityRecorder.hasAccessibility
     @State private var isAddingRule = false
+    @State private var editingRule: AutotrackRule?
     @State private var confirmsDelete = false
 
     var body: some View {
@@ -377,7 +474,7 @@ struct TrackingPrefs: View {
             if (records || suggests || autotracks) && !hasAccessibility {
                 SettingsCard {
                     SettingsRow("Window titles need Accessibility access",
-                                description: "Without it, only app names are seen, so rules and suggestions can't tell one document or site from another.",
+                                description: "Without it, only app names are seen, so rules and suggestions can't tell one document or site from another. Already allowed? After an update macOS can need it again: turn \(AppInfo.name) off and on in the list.",
                                 icon: RowIcon("exclamationmark.triangle.fill", .orange)) {
                         Button("Allow…") { ActivityRecorder.requestAccessibility() }
                     }
@@ -391,11 +488,7 @@ struct TrackingPrefs: View {
                 SettingsRow("Include the website in browsers", description: "Just the domain", icon: RowIcon("globe", .blue), isOn: $websites)
                     .disabled(!records && !suggests && !autotracks)
                 CardDivider()
-                SettingsRow("Never record") {
-                    TextField("", text: $excluded, prompt: Text("App names, separated by commas"))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 240)
-                }
+                ExcludedAppsRows(excluded: $excluded)
                 CardDivider()
                 SettingsRow("Delete everything the Timeline has recorded") {
                     Button("Delete Timeline…") { confirmsDelete = true }
@@ -429,22 +522,132 @@ struct TrackingPrefs: View {
                 }
                 .disabled(!autotracks)
             }
+            SettingsSection("Seeing now",
+                            footer: "What rules and suggestions see in the app you were last in. A rule needs one of its keywords in one of these.") {
+                SeeingNowRows(hasAccessibility: hasAccessibility)
+            }
             SettingsSection("Rules") {
-                RulesList(isAdding: $isAddingRule)
+                RulesList(isAdding: $isAddingRule) { editingRule = $0 }
             }
             .disabled(!autotracks)
-            SettingsSection("Calendar") {
-                SettingsRow("Log meetings automatically",
-                            description: "Within five minutes of a meeting starting, it's logged to its matched task, and a notification lets you undo. Meetings with no match, no length, or added after they started are left for you.",
-                            icon: RowIcon("calendar", .red), isOn: $logsMeetings)
-                    .onChange(of: logsMeetings) { _, on in if on { Notifier.requestPermission() } }
-            }
         }
-        .sheet(isPresented: $isAddingRule) { AddRuleSheet().environment(tracker) }
+        .sheet(isPresented: $isAddingRule) { RuleSheet().environment(tracker) }
+        .sheet(item: $editingRule) { RuleSheet(rule: $0).environment(tracker) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             hasAccessibility = ActivityRecorder.hasAccessibility
         }
         .onAppear { hasAccessibility = ActivityRecorder.hasAccessibility }
+        // System Settings doesn't tell the app when access changes; look again
+        // every couple of seconds while the warning is up.
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            if !hasAccessibility { hasAccessibility = ActivityRecorder.hasAccessibility }
+        }
+    }
+}
+
+/// "Never record": the apps, with their icons, and Add App to pick from
+/// what's running or from Applications. Saved as names, which is what the
+/// recorder matches.
+private struct ExcludedAppsRows: View {
+    @Binding var excluded: String
+
+    private var names: [String] {
+        excluded.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    var body: some View {
+        SettingsRow("Never record", description: "Nothing is noted while one of these is in front.") {
+            Menu("Add App") {
+                let running = NSWorkspace.shared.runningApplications
+                    .filter { $0.activationPolicy == .regular }
+                    .compactMap(\.localizedName)
+                    .filter { name in !names.contains { $0.caseInsensitiveCompare(name) == .orderedSame } && name != AppInfo.name }
+                Section("Open now") {
+                    ForEach(Array(Set(running)).sorted(), id: \.self) { name in
+                        Button(name) { add(name) }
+                    }
+                }
+                Divider()
+                Button("Choose from Applications…") { chooseApp() }
+            }
+            .menuStyle(.button)
+            .fixedSize()
+        }
+        ForEach(names, id: \.self) { name in
+            CardDivider()
+            HStack(spacing: 10) {
+                Image(nsImage: Self.icon(for: name))
+                    .resizable()
+                    .frame(width: 22, height: 22)
+                Text(name)
+                Spacer()
+                Button { remove(name) } label: {
+                    Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Record \(name) again")
+            }
+            .padding(.horizontal, 12)
+            .padding(.leading, 34)
+            .frame(minHeight: 36)
+        }
+    }
+
+    private func add(_ name: String) {
+        excluded = (names + [name]).joined(separator: ", ")
+    }
+
+    private func remove(_ name: String) {
+        excluded = names.filter { $0 != name }.joined(separator: ", ")
+    }
+
+    private func chooseApp() {
+        let panel = NSOpenPanel()
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Never Record"
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls {
+            let name = Bundle(url: url)?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+                ?? Bundle(url: url)?.object(forInfoDictionaryKey: "CFBundleName") as? String
+                ?? url.deletingPathExtension().lastPathComponent
+            if !names.contains(name) { add(name) }
+        }
+    }
+
+    /// The app's icon, found by name where apps usually live; a generic app
+    /// icon otherwise.
+    static func icon(for name: String) -> NSImage {
+        if let app = NSWorkspace.shared.runningApplications.first(where: { $0.localizedName == name }), let icon = app.icon {
+            return icon
+        }
+        for folder in ["/Applications", "/System/Applications", "/System/Applications/Utilities", NSHomeDirectory() + "/Applications"] {
+            let path = "\(folder)/\(name).app"
+            if FileManager.default.fileExists(atPath: path) { return NSWorkspace.shared.icon(forFile: path) }
+        }
+        return NSWorkspace.shared.icon(for: .application)
+    }
+}
+
+/// The last app, window title and website the recorder saw, updated as it
+/// samples, so you can see why a rule does or doesn't match.
+private struct SeeingNowRows: View {
+    @Environment(ActivityRecorder.self) private var recorder
+    let hasAccessibility: Bool
+
+    var body: some View {
+        let context = recorder.lastExternal
+        SettingsRow("App") { Text(context?.app ?? "Nothing yet: switch to another app").foregroundStyle(.secondary) }
+        CardDivider()
+        SettingsRow("Window title") {
+            Text(!hasAccessibility ? "Needs Accessibility access" : (context?.title).flatMap { $0.isEmpty ? nil : $0 } ?? "–")
+                .foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+        }
+        CardDivider()
+        SettingsRow("Website") {
+            Text(context?.host ?? "–").foregroundStyle(.secondary).lineLimit(1)
+        }
     }
 }
 
@@ -452,6 +655,7 @@ struct TrackingPrefs: View {
 private struct RulesList: View {
     @Environment(TimeTracker.self) private var tracker
     @Binding var isAdding: Bool
+    let edit: (AutotrackRule) -> Void
 
     var body: some View {
         let rules = tracker.contextMemory.rules
@@ -462,12 +666,19 @@ private struct RulesList: View {
             let task = tracker.tasks(for: [rule.taskKey]).first
             SettingsRow(rule.keywords,
                         description: task.map { "→ \($0.projectNameParts.name) · \($0.task.name)" } ?? "→ a task you're no longer assigned to") {
-                Button { tracker.contextMemory.setRules(rules.filter { $0.id != rule.id }) } label: {
-                    Image(systemName: "minus.circle")
+                HStack(spacing: 10) {
+                    Button { edit(rule) } label: { Image(systemName: "pencil") }
+                        .buttonStyle(.borderless)
+                        .help("Edit this rule")
+                    Button { tracker.contextMemory.setRules(rules.filter { $0.id != rule.id }) } label: {
+                        Image(systemName: "minus.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Remove this rule")
                 }
-                .buttonStyle(.borderless)
-                .help("Remove this rule")
             }
+            .contentShape(Rectangle())
+            .onTapGesture { edit(rule) }
             CardDivider()
         }
         if rules.isEmpty { CardDivider() }
@@ -477,19 +688,30 @@ private struct RulesList: View {
     }
 }
 
-/// Keywords, then the task they mean.
-private struct AddRuleSheet: View {
+/// Keywords, then the task they mean. New, or `rule` to edit one.
+private struct RuleSheet: View {
     @Environment(TimeTracker.self) private var tracker
     @Environment(\.dismiss) private var dismiss
+    var rule: AutotrackRule?
     @State private var keywords = ""
     @State private var query = ""
     @State private var picked: TaskKey?
 
-    var body: some View {
-        let results = query.isEmpty ? (tracker.recentTasks + tracker.favoriteTasks).filter { tracker.isAvailable($0.key) }
+    private var results: [TrackableTask] {
+        var results = query.isEmpty ? (tracker.recentTasks + tracker.favoriteTasks).filter { tracker.isAvailable($0.key) }
             : Array(tracker.search(query).prefix(30))
+        // The rule's own task stays in the list, selected, until you pick another.
+        if let picked, !results.contains(where: { $0.key == picked }), let current = tracker.tasks(for: [picked]).first {
+            results.insert(current, at: 0)
+        }
+        var seen = Set<TaskKey>()
+        return results.filter { seen.insert($0.key).inserted }
+    }
+
+    var body: some View {
+        let results = results
         VStack(alignment: .leading, spacing: 12) {
-            Text("New Autotracker Rule").font(.headline)
+            Text(rule == nil ? "New Autotracker Rule" : "Edit Autotracker Rule").font(.headline)
             TextField("Keywords, e.g. Figma, Pinstripes", text: $keywords)
             Text("Matches when the app's name, window title or website contains any of them.").settingsNote()
             TextField("Search for the task", text: $query)
@@ -504,9 +726,16 @@ private struct AddRuleSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Add Rule") {
+                Button(rule == nil ? "Add Rule" : "Save") {
                     guard let picked else { return }
-                    tracker.contextMemory.setRules(tracker.contextMemory.rules + [AutotrackRule(keywords: keywords, taskKey: picked)])
+                    var rules = tracker.contextMemory.rules
+                    if let rule, let index = rules.firstIndex(where: { $0.id == rule.id }) {
+                        rules[index].keywords = keywords
+                        rules[index].taskKey = picked
+                    } else {
+                        rules.append(AutotrackRule(keywords: keywords, taskKey: picked))
+                    }
+                    tracker.contextMemory.setRules(rules)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -516,6 +745,12 @@ private struct AddRuleSheet: View {
         .padding(20)
         .frame(width: 420)
         .tint(.harvestOrange)
+        .onAppear {
+            if let rule, picked == nil {
+                keywords = rule.keywords
+                picked = rule.taskKey
+            }
+        }
     }
 }
 

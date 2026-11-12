@@ -67,6 +67,23 @@ public enum DayPlanner {
             .filter { !$0.isEmpty }
     }
 
+    /// Whether ask-box text describes work done or planned ("I did the LP site
+    /// and a client call", "worked on Context all morning") rather than
+    /// searching for a task. Searches are a few words; descriptions are
+    /// sentences, or start like one.
+    public static func describesWork(_ text: String) -> Bool {
+        let lower = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let words = lower.split(whereSeparator: \.isWhitespace)
+        guard words.count >= 3 else { return false }
+        let openers = ["i did ", "i worked ", "i spent ", "i had ", "i was ", "i've ", "ive ", "i'm ", "im ",
+                       "today i ", "this morning ", "this afternoon ", "yesterday ", "did ", "worked ",
+                       "spent ", "had a ", "had the ", "been "]
+        if openers.contains(where: lower.hasPrefix) { return true }
+        if words.count >= 6 { return true }
+        // "LP site 2h, client call 30m": several pieces with times.
+        return clauses(lower).count >= 2 && hours(in: lower) != nil
+    }
+
     /// Hours mentioned in a clause: "2h", "1.5 hours", "90 min", "1:30",
     /// "an hour", "half an hour", "all morning".
     static func hours(in clause: String) -> Double? {

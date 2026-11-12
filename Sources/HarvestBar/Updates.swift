@@ -48,7 +48,8 @@ final class Updates: NSObject, NSMenuItemValidation, SPUUpdaterDelegate {
     /// Beta builds also take appcast items marked for the beta channel;
     /// regular builds only ever see regular releases.
     nonisolated func allowedChannels(for updater: SPUUpdater) -> Set<String> {
-        Beta.isEnabled ? [Beta.channel] : []
+        // Labs turns features on, not beta updates.
+        Beta.isBetaBuild ? [Beta.channel] : []
     }
 
     @objc func checkForUpdates(_ sender: Any?) {

@@ -654,6 +654,55 @@ public final class TimeTracker {
         }
     }
 
+    /// The day's other entries for exactly the same project and task, which
+    /// Merge would fold into this one. Locked entries are left out.
+    public func sameTaskEntries(as entry: TimeEntry) -> [TimeEntry] {
+        entries(on: entry.spentDate).filter { $0.id != entry.id && $0.key == entry.key && $0.lock == nil }
+    }
+
+    /// Folds the day's entries for the same task into one: the running one
+    /// (or else the earliest) keeps all the time and every distinct note, the
+    /// rest are deleted. One undo puts them all back.
+    @discardableResult
+    public func mergeSameTaskEntries(into entry: TimeEntry) async -> Bool {
+        guard let service else { return false }
+        let group = [entry] + sameTaskEntries(as: entry)
+        guard group.count > 1, entry.lock == nil else { return false }
+        guard await waitUntilIdle() else {
+            errorMessage = "Harvest is still working on your last change. Try again in a moment."
+            return false
+        }
+        let keeper = group.first(where: \.isRunning) ?? group.min { $0.createdAt < $1.createdAt }!
+        let others = group.filter { $0.id != keeper.id }
+        var notes: [String] = []
+        for item in [keeper] + others {
+            let note = (item.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !note.isEmpty && !notes.contains(note) { notes.append(note) }
+        }
+        do {
+            let wasRunning = keeper.isRunning
+            let base = wasRunning ? try await service.stopTimer(id: keeper.id) : keeper
+            let total = base.hours + others.reduce(0) { $0 + $1.hours }
+            var merged = try await service.updateEntry(
+                id: base.id, projectID: base.project.id, taskID: base.task.id,
+                notes: notes.joined(separator: "; "), hours: total, times: times(for: base, hours: total)
+            )
+            if wasRunning { merged = try await service.restartTimer(id: merged.id) }
+            upsert(merged)
+            for other in others {
+                try await service.deleteEntry(id: other.id)
+                entries = entries.filter { $0.id != other.id }
+            }
+            errorMessage = nil
+            record("Merged \(group.count) \(shortName(for: keeper)) entries · \(TimeFormat.hoursMinutes(total * 3600))",
+                   .group([.revert(keeper)] + others.map { .recreate($0) }))
+            return true
+        } catch {
+            await recover(from: error)
+            return false
+        }
+    }
+
     /// Harvest's day view for an entry's date.
     public func harvestURL(for day: LocalDate) -> URL? {
         guard let base = company?.baseUri else { return harvestWebURL }

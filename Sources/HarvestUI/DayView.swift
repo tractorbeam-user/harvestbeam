@@ -319,6 +319,12 @@ private struct EntryRow: View {
             Button("Edit Entry") { isEditing = true }.disabled(lock != nil)
             Button("Split Entry…") { isSplitting = true }
                 .disabled(lock != nil || entry.elapsed() < 120)
+            let sameTask = tracker.sameTaskEntries(as: entry)
+            if !sameTask.isEmpty, lock == nil {
+                Button("Merge \(sameTask.count + 1) \(task.projectNameParts.name) Entries") {
+                    Task { await tracker.mergeSameTaskEntries(into: entry) }
+                }
+            }
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
             Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
                 Task { await tracker.toggle(entry) }

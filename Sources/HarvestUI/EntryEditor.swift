@@ -299,7 +299,11 @@ struct PillButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .labelStyle(PillLabelStyle())
             .font(.system(size: 13, weight: .semibold))
+            // A line box includes room for descenders, so centered text reads
+            // a touch low in a 30pt pill; lift it to the optical middle.
+            .offset(y: -0.5)
             .foregroundStyle(prominent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
             .padding(.horizontal, 14)
             .frame(height: 30)
@@ -312,6 +316,17 @@ struct PillButtonStyle: ButtonStyle {
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .onHover { isHovered = $0 }
             .animation(.easeOut(duration: 0.12), value: isHovered)
+    }
+}
+
+/// Icon and title centered on each other, not on the text baseline, which
+/// drops the title below the icon's middle.
+private struct PillLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .center, spacing: 6) {
+            configuration.icon.font(.system(size: 12, weight: .semibold))
+            configuration.title
+        }
     }
 }
 

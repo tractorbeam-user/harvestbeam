@@ -35,6 +35,11 @@ enum FavoriteIcon: Equatable {
         Color(red: 0.50, green: 0.47, blue: 0.87),
         Color(red: 0.83, green: 0.33, blue: 0.49),
         Color(red: 0.53, green: 0.53, blue: 0.50),
+        // Added later; saved icons refer to colors by position, so new ones go last.
+        Color(red: 0.89, green: 0.66, blue: 0.10),
+        Color(red: 0.10, green: 0.63, blue: 0.70),
+        Color(red: 0.36, green: 0.36, blue: 0.84),
+        Color(red: 0.55, green: 0.38, blue: 0.24),
     ]
 
     static let emoji = [
@@ -53,6 +58,20 @@ enum FavoriteIcon: Equatable {
         "shippingbox", "globe", "film", "camera",
         "music.note", "building.2", "airplane", "star",
         "dollarsign.circle", "checkmark.seal", "bubble.left.and.bubble.right", "sparkles",
+        "seal", "heart", "bolt", "flame",
+        "leaf", "paintbrush.pointed", "pencil.and.ruler", "square.on.square",
+        "photo", "video", "mic", "headphones",
+        "phone", "person.crop.circle", "person.3", "hand.raised",
+        "folder", "tray.full", "archivebox", "doc.on.doc",
+        "list.bullet.clipboard", "checklist", "chart.pie", "chart.line.uptrend.xyaxis",
+        "cart", "creditcard", "banknote", "tag",
+        "house", "storefront", "map", "mappin.and.ellipse",
+        "car", "tram", "bicycle", "graduationcap",
+        "laptopcomputer", "desktopcomputer", "iphone", "server.rack",
+        "terminal", "curlybraces", "ant", "wrench.and.screwdriver",
+        "cube", "puzzlepiece", "gift", "trophy",
+        "clock", "hourglass", "bell", "sun.max",
+        "moon", "cloud", "drop", "globe.americas",
     ]
 }
 
@@ -62,6 +81,8 @@ public final class FavoriteIcons {
     public static let shared = FavoriteIcons()
     private static let defaultsKey = "favoriteIcons.v1"
     private var raw: [String: String]
+    /// Shown until you choose one: an outlined star.
+    static let defaultIcon = FavoriteIcon.symbol("star", color: 0)
 
     private init() {
         raw = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
@@ -71,6 +92,9 @@ public final class FavoriteIcons {
     public func reload() {
         raw = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
     }
+
+    /// The chosen icon, or the outlined star.
+    func shownIcon(for key: TaskKey) -> FavoriteIcon { icon(for: key) ?? Self.defaultIcon }
 
     func icon(for key: TaskKey) -> FavoriteIcon? {
         raw[key.description].flatMap(FavoriteIcon.init)
@@ -112,15 +136,26 @@ struct FavoriteIconPicker: View {
     @Environment(\.dismiss) private var dismiss
     @State private var tab = 0
     @State private var color = 0
-    @State private var typed = ""
+    @State private var query = ""
+    @FocusState private var searchFocused: Bool
     private let icons = FavoriteIcons.shared
+
+    private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
+    /// The curated set until you type, then every match on this Mac.
+    private var symbolResults: [String] { trimmed.isEmpty ? FavoriteIcon.symbols : SymbolCatalog.search(trimmed) }
+    /// Emoji typed or pasted into the box come first, then matches by name.
+    private var emojiResults: [String] {
+        guard !trimmed.isEmpty else { return FavoriteIcon.emoji + EmojiCatalog.all.map(\.character).filter { !FavoriteIcon.emoji.contains($0) } }
+        let pasted = trimmed.filter { $0.unicodeScalars.contains { $0.properties.isEmojiPresentation } || $0.unicodeScalars.count > 1 }.map(String.init)
+        return pasted + EmojiCatalog.search(trimmed)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Picker("", selection: $tab) {
-                    Text("Emoji").tag(0)
-                    Text("Symbols").tag(1)
+                    Text("Symbols").tag(0)
+                    Text("Emoji").tag(1)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -132,19 +167,11 @@ struct FavoriteIconPicker: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            TextField(tab == 0 ? "Search all symbols" : "Search or paste emoji", text: $query)
+                .textFieldStyle(.roundedBorder)
+                .focused($searchFocused)
             if tab == 0 {
-                TextField("Type or paste any emoji", text: $typed)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: typed) {
-                        if let first = typed.first(where: { $0.unicodeScalars.first?.properties.isEmojiPresentation == true || $0.unicodeScalars.count > 1 }) {
-                            pick(.emoji(String(first)))
-                        }
-                    }
-                grid(FavoriteIcon.emoji) { e in
-                    Text(e).font(.system(size: 20))
-                } action: { pick(.emoji($0)) }
-            } else {
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     ForEach(FavoriteIcon.colors.indices, id: \.self) { index in
                         Circle()
                             .fill(FavoriteIcon.colors[index])
@@ -155,17 +182,36 @@ struct FavoriteIconPicker: View {
                     }
                 }
                 .padding(.leading, 3)
-                grid(FavoriteIcon.symbols) { name in
-                    Image(systemName: name)
-                        .font(.system(size: 16))
-                        .foregroundStyle(FavoriteIcon.colors[color])
-                } action: { pick(.symbol($0, color: color)) }
             }
+            let results = Self.unique(tab == 0 ? symbolResults : emojiResults)
+            ScrollView {
+                if results.isEmpty {
+                    Text("Nothing matches “\(trimmed)”")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity).padding(.top, 30)
+                } else if tab == 0 {
+                    grid(results) { name in
+                        Image(systemName: name)
+                            .font(.system(size: 16))
+                            .foregroundStyle(FavoriteIcon.colors[color])
+                    } action: { pick(.symbol($0, color: color)) }
+                } else {
+                    grid(results) { e in
+                        Text(e).font(.system(size: 20))
+                    } action: { pick(.emoji($0)) }
+                }
+            }
+            .frame(height: 236)
         }
         .padding(12)
         .frame(width: 300)
         .onAppear {
-            if case .symbol(_, let c) = icons.icon(for: key) { tab = 1; color = c }
+            searchFocused = true
+            switch icons.icon(for: key) {
+            case .emoji: tab = 1
+            case .symbol(_, let c): color = c
+            case nil: break
+            }
         }
     }
 
@@ -179,6 +225,12 @@ struct FavoriteIconPicker: View {
                 .buttonStyle(IconCellStyle())
             }
         }
+    }
+
+    /// Each once, in order: the grid can't show the same item twice.
+    private static func unique(_ items: [String]) -> [String] {
+        var seen = Set<String>()
+        return items.filter { seen.insert($0).inserted }
     }
 
     private func pick(_ icon: FavoriteIcon?) {
@@ -209,3 +261,8 @@ struct FavoriteIconPopover: ViewModifier {
         }
     }
 }
+
+#if DEBUG
+/// The icon picker, for the debug snapshots.
+@MainActor public func debugFavoriteIconPicker(_ key: TaskKey) -> some View { FavoriteIconPicker(key: key) }
+#endif

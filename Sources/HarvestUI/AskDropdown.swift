@@ -21,7 +21,9 @@ struct AskDropdown: View {
     let selection: TaskKey?
     let runningKey: TaskKey?
     let pick: (TrackableTask) -> Void
-    let highlight: (TaskKey) -> Void
+    /// The row under the mouse: a soft highlight only. It doesn't move the
+    /// ↑↓ selection or anything in the window behind the list.
+    @State private var hovered: TaskKey?
 
     private var highlighted: TaskKey? { selection ?? (recent.first ?? suggested.first)?.id }
 
@@ -93,11 +95,14 @@ struct AskDropdown: View {
             .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
             .padding(.horizontal, 8)
             .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(isOn ? Color.harvestOrange : .clear))
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(isOn ? Color.harvestOrange : hovered == item.id ? Color.primary.opacity(0.07) : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { if $0 { highlight(item.id) } }
+        .onHover { inside in
+            if inside { hovered = item.id } else if hovered == item.id { hovered = nil }
+        }
         .help(["\(item.task.task.name) · \(item.task.subtitle)", item.task.definition.map { "\($0.title): \($0.detail)" }]
             .compactMap { $0 }.joined(separator: "\n"))
     }

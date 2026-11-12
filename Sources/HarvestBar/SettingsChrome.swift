@@ -8,7 +8,7 @@ import SwiftUI
 
 /// One pane in the sidebar.
 enum PrefsPane: String, CaseIterable, Identifiable {
-    case general, tracking, shortcuts, support
+    case general, tracking, shortcuts, labs, support
 
     var id: Self { self }
 
@@ -17,6 +17,7 @@ enum PrefsPane: String, CaseIterable, Identifiable {
         case .general: "General"
         case .tracking: "Tracking"
         case .shortcuts: "Shortcuts"
+        case .labs: "Labs"
         case .support: "Support"
         }
     }
@@ -26,6 +27,7 @@ enum PrefsPane: String, CaseIterable, Identifiable {
         case .general: "gearshape"
         case .tracking: "wand.and.stars"
         case .shortcuts: "command"
+        case .labs: "flask"
         case .support: "wrench.adjustable"
         }
     }
@@ -84,6 +86,8 @@ struct SettingsWindow<Content: View>: View {
             Rectangle().fill(SettingsStyle.hairline).frame(width: 1)
             VStack(alignment: .leading, spacing: 0) {
                 header
+                    .background(SettingsStyle.content)
+                    .zIndex(1)
                 ScrollView {
                     content(history.current)
                         .padding(.horizontal, 28)
@@ -91,6 +95,9 @@ struct SettingsWindow<Content: View>: View {
                         .padding(.bottom, 28)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+                // The window ignores the title bar's safe area, so without
+                // this, scrolled content drew up under the page title.
+                .clipped()
                 .id(history.current)
             }
             .background(SettingsStyle.content)

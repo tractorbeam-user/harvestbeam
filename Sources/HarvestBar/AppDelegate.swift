@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     private lazy var calendarStore = tracker.isDemo ? CalendarStore.demo() : CalendarStore()
     /// What's in front: the Timeline, on-screen suggestions and the Autotracker.
     /// Beta builds only.
-    private lazy var recorder: ActivityRecorder? = Beta.isEnabled ? ActivityRecorder(tracker: tracker) : nil
+    private lazy var recorder: ActivityRecorder? = Beta.automaticTracking ? ActivityRecorder(tracker: tracker) : nil
     private var autotracker: Autotracker?
     private var meetingLogger: MeetingAutoLogger?
     /// The app that was in front before the window opened.
@@ -66,7 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(statusItemClicked)
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            // On press, not release: the window is up before your finger lifts.
+            button.sendAction(on: [.leftMouseDown, .rightMouseUp])
             button.imagePosition = .imageLeading
             button.setAccessibilityTitle(AppInfo.name)
         }
@@ -81,6 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         Analytics.update(isDemo: tracker.isDemo)
         tracker.onUsage = { Analytics.send($0) }
         registerHotKey()
+        NotificationCenter.default.addObserver(forName: .keepOnTopChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.setKeptOnTop(UserDefaults.standard.bool(forKey: Self.keepOnTopKey)) }
+        }
         NotificationCenter.default.addObserver(forName: .toggleShortcutChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.registerHotKey() }
         }
@@ -92,8 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             let autotracker = Autotracker(tracker: tracker)
             self.autotracker = autotracker
             recorder.onTick = { [weak autotracker] context, dwell in autotracker?.tick(context, dwell: dwell) }
-            meetingLogger = MeetingAutoLogger(tracker: tracker, calendar: calendarStore)
         }
+        // Does nothing until Labs › Auto-logged meetings is on.
+        meetingLogger = MeetingAutoLogger(tracker: tracker, calendar: calendarStore)
 
         // Keep the menu bar clock ticking, and pick up timers started on the web
         // or on another device.
@@ -321,8 +326,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         // A menu bar app isn't the active app when you click its icon, and
         // macOS's polite activate() can leave the window behind others. Force
         // it to the front, above every other app's windows.
-        NSApp.activate(ignoringOtherApps: true)
+        // Show it first, then switch apps, so it appears without waiting on
+        // the activation.
         panel.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         // macOS puts the cursor in the first text field by default; don't.
         if !focusSearch { panel.makeFirstResponder(nil) }
@@ -374,7 +381,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             HotKey(id: 1, keyCode: shortcut.keyCode, carbonModifiers: shortcut.carbonModifiers) { [weak self] in self?.togglePanel() }
         }
         continueHotKey?.invalidate()
-        continueHotKey = !Beta.isEnabled ? nil : HotKey.Shortcut.load("continue", default: nil).map { shortcut in
+        continueHotKey = !Beta.continueShortcut ? nil : HotKey.Shortcut.load("continue", default: nil).map { shortcut in
             HotKey(id: 2, keyCode: shortcut.keyCode, carbonModifiers: shortcut.carbonModifiers) { [weak self] in
                 guard let self else { return }
                 Task { await self.tracker.continueOrStop() }
@@ -611,9 +618,9 @@ final class TrackerPanel: NSPanel {
     /// typing in, like clicking off a field on a web page. The click itself
     /// still goes through.
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .leftMouseDown,
-           let hit = contentView?.hitTest(contentView!.convert(event.locationInWindow, from: nil)) {
-            if Self.isInTextField(hit) {
+        if event.type == .leftMouseDown, let content = contentView,
+           let hit = content.hitTest(content.convert(event.locationInWindow, from: nil)) {
+            if Self.isInTextField(hit) || isInAskField(event) {
                 NotificationCenter.default.post(name: .askFieldClicked, object: nil)
             } else if firstResponder is NSText {
                 makeFirstResponder(nil)
@@ -626,6 +633,15 @@ final class TrackerPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) {
         if EscapeRouter.closeInnermost?() == true { return }
         super.cancelOperation(sender)
+    }
+
+    /// SwiftUI's text field isn't always the view under the mouse, so the
+    /// ask box also says where it is.
+    private func isInAskField(_ event: NSEvent) -> Bool {
+        guard let content = contentView, !AskFieldGeometry.frame.isEmpty else { return false }
+        let point = content.convert(event.locationInWindow, from: nil)
+        let fromTop = content.isFlipped ? point.y : content.bounds.height - point.y
+        return AskFieldGeometry.frame.contains(CGPoint(x: point.x, y: fromTop))
     }
 
     private static func isInTextField(_ view: NSView) -> Bool {

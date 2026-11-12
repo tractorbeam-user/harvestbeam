@@ -445,24 +445,28 @@ extension Color {
 }
 #endif
 
-/// "Summary", by the week total in the Mac window's orange title bar.
+/// The week total in the Mac window's orange title bar ("Week 22:38"):
+/// click it for the Weekly Summary. A soft capsule shows on hover.
 struct WeeklySummaryButton: View {
+    let title: String
     let action: () -> Void
     @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            Text("Summary")
-                .font(.system(size: 11, weight: .semibold))
-                .padding(.horizontal, 7)
+            Text(title)
+                .font(.system(size: 12, weight: .medium).monospacedDigit())
+                .opacity(isHovered ? 1 : 0.8)
+                .padding(.horizontal, 6)
                 .frame(height: 20)
-                .background(Capsule().fill(Color.white.opacity(isHovered ? 0.3 : 0.18)))
+                .background(Capsule().fill(Color.white.opacity(isHovered ? 0.2 : 0)))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .padding(.horizontal, -6)
         .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
-        .help("Weekly Summary: where this week's time went")
+        .accessibilityLabel("\(title). Weekly Summary")
     }
 }
 

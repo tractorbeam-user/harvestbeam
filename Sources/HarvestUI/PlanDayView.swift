@@ -12,6 +12,8 @@ struct PlanDayView: View {
     @Environment(TimeTracker.self) private var tracker
     @Environment(\.dismiss) private var dismiss
     let day: LocalDate
+    /// From the ask box: filled in and matched as soon as it opens.
+    var initialText = ""
 
     @State private var text = ""
     @State private var proposals: [PlannedEntry] = []
@@ -120,7 +122,13 @@ struct PlanDayView: View {
         .dimsWindow()
         .foregroundStyle(Color.primary)
         .presentationBackground(Color.tileBackground)
-        .onAppear { textFocused = true }
+        .onAppear {
+            textFocused = true
+            if !initialText.isEmpty, text.isEmpty {
+                text = initialText
+                suggest()
+            }
+        }
     }
 
     private var addLabel: String {
