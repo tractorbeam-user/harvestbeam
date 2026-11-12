@@ -54,8 +54,9 @@ private struct WeekStrip: View {
     private var weekStart: LocalDate { selectedDay.startOfWeek(firstWeekday: tracker.firstWeekday) }
 
     var body: some View {
-        let today = LocalDate()
         TimelineView(.periodic(from: .now, by: 30)) { context in
+            // Read on every tick, so it moves on at midnight.
+            let today = LocalDate(context.date)
             VStack(spacing: 12) {
                 // The Mac window shows the day, week total and Today in its title bar instead.
                 if windowActions == nil {
@@ -271,14 +272,17 @@ private struct EntryRow: View {
                         .accessibilityLabel("Start timer, unavailable: \(settledTitle)")
                         .accessibilityHint("Explains why")
                 } else {
+                    // On another day, ▶ starts the task today: a timer
+                    // running on last Tuesday is never what's meant.
+                    let isPast = entry.spentDate != LocalDate() && !entry.isRunning
                     Button {
-                        Task { await tracker.toggle(entry) }
+                        Task { if isPast { await tracker.toggle(task) } else { await tracker.toggle(entry) } }
                     } label: {
                         actionIndicator
                     }
                     .buttonStyle(.plain)
-                    .help(entry.isRunning ? "Pause timer" : "Start timer")
-                    .accessibilityLabel(entry.isRunning ? "Pause timer" : "Start timer")
+                    .help(entry.isRunning ? "Pause timer" : isPast ? "Start again today" : "Start timer")
+                    .accessibilityLabel(entry.isRunning ? "Pause timer" : isPast ? "Start again today" : "Start timer")
                 }
             }
             .padding(.leading, 14)
@@ -293,7 +297,10 @@ private struct EntryRow: View {
                 }
             }
             .contentShape(Rectangle())
-            .onTapGesture(count: 2) { if lock == nil { isEditing = true } else { isExplaining = true } }
+            .onTapGesture(count: 2) {
+                guard !entry.isPending else { return }
+                if lock == nil { isEditing = true } else { isExplaining = true }
+            }
             .help(lock == nil ? (archived.map { $0.help + " Double-click to edit." } ?? "Double-click to edit")
                   : "\(lock!.title) · can't be edited. Double-click to see why.")
             // Drag an entry into Favorites, like a tile.
@@ -316,22 +323,25 @@ private struct EntryRow: View {
             .disabled(archived != nil)
             Divider()
             // Locked entries keep these, greyed out, so it's clear they can't change.
-            Button("Edit Entry") { isEditing = true }.disabled(lock != nil)
+            Button("Edit Entry") { isEditing = true }.disabled(lock != nil || entry.isPending)
             Button("Split Entry…") { isSplitting = true }
-                .disabled(lock != nil || entry.elapsed() < 120)
+                .disabled(lock != nil || entry.isPending || entry.elapsed() < 120)
             let sameTask = tracker.sameTaskEntries(as: entry)
-            if !sameTask.isEmpty, lock == nil {
+            if !sameTask.isEmpty, lock == nil, !entry.isPending {
                 Button("Merge \(sameTask.count + 1) \(task.projectNameParts.name) Entries") {
                     Task { await tracker.mergeSameTaskEntries(into: entry) }
                 }
             }
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites") { tracker.favorites.toggle(entry.key) }
-            Button(entry.isRunning ? "Stop Timer" : "Start Timer") {
-                Task { await tracker.toggle(entry) }
+            // Another day's entry starts again today, from the item above.
+            if entry.isRunning || entry.spentDate == LocalDate() {
+                Button(entry.isRunning ? "Pause Timer" : "Start Timer") {
+                    Task { await tracker.toggle(entry) }
+                }
+                .disabled(isSettled && !entry.isRunning)
             }
-            .disabled(isSettled && !entry.isRunning)
             Button("Delete Entry", role: .destructive) { Task { await tracker.deleteEntry(entry) } }
-                .disabled(lock != nil)
+                .disabled(lock != nil || entry.isPending)
             Divider()
             Button("View in Harvest") {
                 if let url = tracker.harvestURL(for: entry.spentDate) { openURL(url) }
@@ -380,8 +390,7 @@ private struct EntryRow: View {
 
     @ViewBuilder private var actionIndicator: some View {
         Group {
-            // While Harvest confirms, show the state you asked for, not a spinner.
-            if tracker.busyKey == entry.key ? !entry.isRunning : entry.isRunning {
+            if entry.isRunning {
                 Image(systemName: "pause.fill")
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)

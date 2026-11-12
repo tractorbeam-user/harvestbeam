@@ -292,7 +292,7 @@ struct WeekReviewView: View {
                 }
             }
         }
-        .frame(width: 500)
+        .frame(idealWidth: 420, maxWidth: 500)
         .frame(minHeight: 420, idealHeight: 620, maxHeight: 760)
         .background(Color.panelBackground)
         .tint(.harvestOrange)
@@ -481,7 +481,7 @@ private struct ReviewRow: View {
                 if case .matched = tracker.status(of: $0) { true } else { false }
             }
             if !matched.isEmpty {
-                Button(matched.count == 1 ? "Log 1 meeting" : "Log \(matched.count) meetings") {
+                Button(matched.count == 1 ? "Log 1 Meeting" : "Log \(matched.count) Meetings") {
                     Task { await tracker.logSuggested(matched) }
                 }
                 .buttonStyle(ReviewFixButtonStyle(prominent: true))

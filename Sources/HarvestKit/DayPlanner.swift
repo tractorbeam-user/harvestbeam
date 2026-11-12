@@ -55,14 +55,24 @@ public enum DayPlanner {
 
     // MARK: Text
 
-    /// Splits on line breaks, commas, semicolons, periods and "then".
+    /// Splits on line breaks, commas, semicolons, periods (not the one in
+    /// "1.5h"), "then", and "and" before another thing done ("and had a call").
     static func clauses(_ text: String) -> [String] {
         var normalized = " " + text.lowercased() + " "
         for joiner in [" and then ", " then ", " after that ", " plus ", " also "] {
             normalized = normalized.replacingOccurrences(of: joiner, with: ",")
         }
+        for verb in ["had", "did", "was", "spent", "worked", "made", "wrote", "joined"] {
+            normalized = normalized.replacingOccurrences(of: " and \(verb) ", with: ", \(verb) ")
+        }
+        let chars = Array(normalized)
+        normalized = String(chars.indices.map { i -> Character in
+            guard chars[i] == "." else { return chars[i] }
+            let decimal = i > 0 && i + 1 < chars.count && chars[i - 1].isNumber && chars[i + 1].isNumber
+            return decimal ? "." : ","
+        })
         return normalized
-            .split(whereSeparator: { ",;.\n".contains($0) })
+            .split(whereSeparator: { ",;\n".contains($0) })
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
     }
@@ -88,20 +98,34 @@ public enum DayPlanner {
     /// "an hour", "half an hour", "all morning".
     static func hours(in clause: String) -> Double? {
         let text = clause.lowercased()
-        if let match = text.firstMatch(of: /(\d+):(\d{2})/), let h = Double(match.1), let m = Double(match.2) {
-            return h + m / 60
-        }
-        if let match = text.firstMatch(of: /(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/), let h = Double(match.1) {
-            return h
-        }
-        if let match = text.firstMatch(of: /(\d+)\s*(?:m|min|mins|minute|minutes)\b/), let m = Double(match.1) {
-            return m / 60
-        }
+        if let explicit = explicitDuration(in: text) { return explicit.hours }
+        if text.contains("hour and a half") { return 1.5 }
         if text.contains("half an hour") || text.contains("half hour") { return 0.5 }
         if text.contains("an hour") || text.contains("one hour") { return 1 }
         if text.contains("all day") { return 8 }
         if text.contains("morning") { return 3 }
         if text.contains("afternoon") { return 4 }
+        return nil
+    }
+
+    /// A length written out with numbers: "2h", "1h 30m", "1h30", "1.5 hours",
+    /// "90 min", "1:30", with the words that said it. Not a clock time ("at
+    /// 2:30"), not "1:75", and never more than a day.
+    static func explicitDuration(in text: String) -> (hours: Double, phrase: String)? {
+        let text = text.lowercased()
+        if let match = text.firstMatch(of: /(at\s+|@\s*)?(\d+):(\d{2})/), match.1 == nil,
+           let h = Double(match.2), let m = Double(match.3), m < 60, h + m / 60 <= 24 {
+            return (h + m / 60, String(match.0))
+        }
+        if let match = text.firstMatch(of: /(\d+(?:\.\d+)?)\s*(?:hours|hour|hrs|hr|h)(?![a-z])(?:\s*(?:and\s+)?(\d{1,2})\s*(?:minutes|minute|mins|min|m)?(?![a-z0-9]))?/),
+           let h = Double(match.1) {
+            let m = match.2.flatMap { Double($0) } ?? 0
+            let total = h + (m < 60 ? m / 60 : 0)
+            return total <= 24 ? (total, String(match.0)) : nil
+        }
+        if let match = text.firstMatch(of: /(\d+)\s*(?:minutes|minute|mins|min|m)(?![a-z])/), let m = Double(match.1), m / 60 <= 24 {
+            return (m / 60, String(match.0))
+        }
         return nil
     }
 
@@ -117,7 +141,7 @@ public enum DayPlanner {
         "a", "an", "the", "on", "in", "for", "of", "to", "with", "at", "some", "more", "my", "and", "then",
         "work", "working", "worked", "doing", "do", "did", "today", "all", "morning", "afternoon", "day",
         "hour", "hours", "hr", "hrs", "h", "min", "mins", "minute", "minutes", "half", "about", "around", "i", "i'm", "im",
-        "add", "log", "put", "track", "spent", "spend", "spending", "just", "another", "extra",
+        "add", "log", "put", "track", "spent", "spend", "spending", "just", "another", "extra", "had", "was",
     ]
 
     /// The words in a clause worth searching for.
@@ -237,10 +261,18 @@ extension TimeTracker {
     /// the entries it describes, matched by keyword so it's instant. Empty when
     /// the text is just a search.
     public func quickPlan(_ text: String) -> [PlannedEntry] {
-        guard DayPlanner.hours(in: text) != nil else { return [] }
+        // "30m on Website", with a number: not "Morning Standup" (a vague
+        // "morning" is for the planner), and not the "3M" or "24 Hour
+        // Fitness" in a name being searched for.
+        guard let duration = DayPlanner.explicitDuration(in: text) else { return [] }
         let index = searchIndex
         let scores = usage
         let starred = favorites.set
+        let phrase = duration.phrase.trimmingCharacters(in: .whitespaces)
+        let named = index.search(text, usage: scores, favorites: starred).prefix(5).contains { task in
+            [task.client?.name ?? "", task.project.name, task.task.name].contains { $0.lowercased().contains(phrase) }
+        }
+        guard !named else { return [] }
         return DayPlanner.planWithKeywords(text) { Array(index.search($0, usage: scores, favorites: starred).prefix(20)) }
     }
 

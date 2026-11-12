@@ -88,8 +88,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         NotificationCenter.default.addObserver(forName: .toggleShortcutChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.registerHotKey() }
         }
+        // Kept on top, the window floats above other apps, not above this
+        // app's own Settings, Weekly Summary or Week Calendar: while one of
+        // those is in front it steps down, and floats again after.
+        NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyKeepOnTop(keyWindow: NSApp.keyWindow) }
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyKeepOnTop(keyWindow: nil) }
+        }
         Notifier.setDelegate(self)
-        reminders = Reminders(tracker: tracker) { [weak self] idle in self?.askAboutIdleTime(idle) }
+        reminders = Reminders(tracker: tracker) { [weak self] idle, entryID in self?.askAboutIdleTime(idle, entryID: entryID) }
         weekReviewReminder = WeekReviewReminder(tracker: tracker)
         Notifier.registerCategories()
         if let recorder {
@@ -102,9 +111,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
 
         // Keep the menu bar clock ticking, and pick up timers started on the web
         // or on another device.
-        ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        // .common: the clock keeps going while a menu is open.
+        let ticker = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateStatusItem() }
         }
+        RunLoop.main.add(ticker, forMode: .common)
+        self.ticker = ticker
         // Pick up timers started or stopped in Harvest's own apps.
         poller = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -122,8 +134,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             } else if tracker.phase == .signedOut || tracker.isDemo {
                 // Open the window so there's somewhere to paste a token.
                 showPanel()
+            } else {
+                askForNotifications()
             }
         }
+    }
+
+    /// The Friday week review is on from the start, so ask once for
+    /// notifications when signed in, rather than only when a reminder
+    /// switch is flipped (macOS asks just the once).
+    private func askForNotifications() {
+        guard tracker.phase != .signedOut, !tracker.isDemo else { return }
+        Notifier.requestPermission()
     }
 
     /// Clicking the Dock icon always brings the window back, wherever it went.
@@ -141,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "Preferences…", action: #selector(showPreferences), keyEquivalent: ",")
+        appMenu.addItem(withTitle: "Settings…", action: #selector(showPreferences), keyEquivalent: ",")
         appMenu.addItem(withTitle: "Check for Updates…", action: #selector(Updates.checkForUpdates(_:)), keyEquivalent: "").target = updates
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide \(AppInfo.name)", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -215,7 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             close: { [weak self] in self?.hidePanel() },
             snapToMenuBar: { [weak self] in self?.placeBelowStatusItem() },
             resetSize: { [weak self] in self?.resetPanelSize() },
-            isKeptOnTop: { [weak self] in self?.panel.level == .floating },
+            isKeptOnTop: { UserDefaults.standard.bool(forKey: Self.keepOnTopKey) },
             setKeptOnTop: { [weak self] in self?.setKeptOnTop($0) },
             setTitle: { [weak self] in self?.panel.title = $0 }
         )
@@ -276,8 +298,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             shortcut: HotKey.Shortcut.load() == nil ? nil : UserDefaults.standard.string(forKey: Prefs.shortcutDisplay),
             needsAccessibility: hotKey?.mode == .needsAccessibility
         ) { [weak self] in
-            self?.onboarding = nil
-            self?.showTour(force: false)
+            guard let self else { return }
+            onboarding = nil
+            showTour(force: false)
+            askForNotifications()
         }
         onboarding = controller
         controller.show()
@@ -390,8 +414,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     }
 
     /// Back from being away with a timer running: keep the time, or take it off.
-    private func askAboutIdleTime(_ seconds: TimeInterval) {
-        guard let entry = tracker.running else { return }
+    private func askAboutIdleTime(_ seconds: TimeInterval, entryID: Int) {
+        // Only the timer that ran while you were away, and no more than it ran.
+        guard let entry = tracker.running, entry.id == entryID else { return }
+        let seconds = min(seconds, entry.elapsed())
+        guard seconds >= 60 else { return }
         let task = tracker.task(for: entry)
         let alert = NSAlert()
         alert.messageText = "You were away for \(TimeFormat.hoursMinutes(seconds))"
@@ -488,6 +515,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         UserDefaults.standard.set(onTop, forKey: Self.keepOnTopKey)
     }
 
+    /// Floats unless another of this app's own windows (not a sheet or
+    /// popover on this one) is the key window.
+    private func applyKeepOnTop(keyWindow: NSWindow?) {
+        guard UserDefaults.standard.bool(forKey: Self.keepOnTopKey) else { return }
+        let ownOther = keyWindow.map { $0 !== panel && $0.sheetParent !== panel && $0.parent !== panel && $0.level == .normal } ?? false
+        panel.level = ownOther ? .normal : .floating
+    }
+
     // MARK: Status item
 
     private static let controlWidth: CGFloat = 22
@@ -513,6 +548,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         image.isTemplate = false
         image.accessibilityDescription = running ? "Pause timer" : "Resume timer"
         return image
+    }
+
+    /// " (⌥H)": the show/hide shortcut as set, or nothing when it's cleared.
+    private var shortcutHint: String {
+        guard HotKey.Shortcut.load() != nil, let keys = UserDefaults.standard.string(forKey: Prefs.shortcutDisplay), !keys.isEmpty else { return "" }
+        return " (\(keys))"
     }
 
     private func updateStatusItem() {
@@ -545,7 +586,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
                 .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium),
             ])
             let task = (tracker.running ?? paused).map { tracker.task(for: $0) }
-            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)" } ?? "\(AppInfo.name) (⌥H)"
+            button.toolTip = task.map { "\($0.task.name) · \($0.subtitle)" } ?? AppInfo.name + shortcutHint
             button.layoutSubtreeIfNeeded()
             if let cell = button.cell as? NSButtonCell {
                 controlButton.frame = cell.imageRect(forBounds: button.bounds)
@@ -557,7 +598,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             image?.isTemplate = true
             button.image = image
             button.attributedTitle = NSAttributedString(string: "")
-            button.toolTip = "\(AppInfo.name) (⌥H)"
+            button.toolTip = AppInfo.name + shortcutHint
         }
     }
 }

@@ -52,18 +52,38 @@ enum Notifier {
 @MainActor
 final class Reminders {
     private let tracker: TimeTracker
-    private let onReturnFromIdle: (_ idleSeconds: TimeInterval) -> Void
+    private let onReturnFromIdle: (_ idleSeconds: TimeInterval, _ entryID: Int) -> Void
     private var timer: Timer?
     private var idleSince: Date?
+    /// The timer that was running when you went idle: only it gets asked about.
+    private var idleEntryID: Int?
+    private var sleepObserver: NSObjectProtocol?
     private var remindedNoTimerOn: LocalDate?
     private var remindedLongTimerFor: Int?
 
-    init(tracker: TimeTracker, onReturnFromIdle: @escaping (TimeInterval) -> Void) {
+    init(tracker: TimeTracker, onReturnFromIdle: @escaping (TimeInterval, Int) -> Void) {
         self.tracker = tracker
         self.onReturnFromIdle = onReturnFromIdle
-        timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.check() }
         }
+        // .common: keeps checking while a menu is open.
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+        // Closing the lid is going away too, though no idle time builds up
+        // while asleep: note when it went, and ask once you're back.
+        sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.noteIdleStart(at: Date()) }
+        }
+    }
+
+    private func noteIdleStart(at date: Date) {
+        guard UserDefaults.standard.bool(forKey: Prefs.idleDetection), let entry = tracker.running, idleSince == nil else { return }
+        // Not before this timer started: away time from before it isn't its.
+        idleSince = max(date, entry.timerStartedAt ?? date)
+        idleEntryID = entry.id
     }
 
     private func check() {
@@ -101,19 +121,23 @@ final class Reminders {
     /// Notes when you went idle with a timer running, and asks about it once
     /// you're back.
     private func checkIdle(_ defaults: UserDefaults) {
-        guard defaults.bool(forKey: Prefs.idleDetection), tracker.running != nil else {
+        // Paused or switched since: that was you, back already.
+        guard defaults.bool(forKey: Prefs.idleDetection), let running = tracker.running,
+              idleEntryID == nil || idleEntryID == running.id else {
             idleSince = nil
+            idleEntryID = nil
             return
         }
         let anyInput = CGEventType(rawValue: ~0)!
         let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
         let threshold = Double(max(1, defaults.integer(forKey: Prefs.idleMinutes))) * 60
         if idle >= threshold {
-            if idleSince == nil { idleSince = Date().addingTimeInterval(-idle) }
-        } else if let since = idleSince, idle < 30 {
+            noteIdleStart(at: Date().addingTimeInterval(-idle))
+        } else if let since = idleSince, let entryID = idleEntryID, idle < 30 {
             idleSince = nil
+            idleEntryID = nil
             let away = Date().timeIntervalSince(since) - idle
-            if away >= threshold { onReturnFromIdle(away) }
+            if away >= threshold { onReturnFromIdle(away, entryID) }
         }
     }
 }

@@ -24,6 +24,12 @@ struct NewEntryEditor: View {
     @State private var taskKey: TaskKey?
     @State private var notes = ""
     @State private var hours = ""
+    /// Why the last Save didn't go through.
+    @State private var saveError: String?
+    /// The time the box showed when it opened. Left as it was, saving
+    /// doesn't touch the time: a running timer keeps running, and a
+    /// notes-only edit doesn't round the hours to the minute.
+    @State private var shownHours = ""
     @State private var isSaving = false
     @State private var isFavoriteHovered = false
     @State private var suggestion: MeetingSuggestion?
@@ -112,6 +118,16 @@ struct NewEntryEditor: View {
                     .disabled(taskKey == nil)
             }
 
+            if let saveError {
+                Text(saveError)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(Color.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+            }
+
             HStack(spacing: 8) {
                 // Favorite sits opposite the buttons instead of in a gutter.
                 Button {
@@ -161,6 +177,7 @@ struct NewEntryEditor: View {
                 taskKey = entry.key
                 notes = entry.notes ?? ""
                 hours = TimeFormat.hoursMinutes(entry.elapsed())
+                shownHours = hours
                 if !entry.isRunning { hoursFocused = true }
             } else if let meeting {
                 // The meeting's own title and length, and its best-guess task.
@@ -273,18 +290,25 @@ struct NewEntryEditor: View {
         guard let task = selectedTask else { return }
         isSaving = true
         let notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        saveError = nil
         Task {
+            let saved: Bool
             if let entry {
-                await tracker.updateEntry(entry, task: task, notes: notes, hours: parsedHours)
+                saved = await tracker.updateEntry(entry, task: task, notes: notes, hours: hours == shownHours ? nil : parsedHours)
             } else if let meeting {
-                await tracker.log(meeting, task: task, notes: notes, hours: parsedHours ?? meeting.hours, remember: alwaysHere)
+                saved = await tracker.log(meeting, task: task, notes: notes, hours: parsedHours ?? meeting.hours, remember: alwaysHere)
             } else if let gap {
-                await tracker.addEntry(task: task, on: day, notes: notes, hours: parsedHours ?? gap.hours, startingAt: gap.interval().start)
+                saved = await tracker.addEntry(task: task, on: day, notes: notes, hours: parsedHours ?? gap.hours, startingAt: gap.interval().start) != nil
             } else {
                 // Empty hours on another day adds a 0:00 entry to fill in later.
-                await tracker.addEntry(task: task, on: day, notes: notes, hours: startsTimer ? nil : (parsedHours ?? 0))
+                saved = await tracker.addEntry(task: task, on: day, notes: notes, hours: startsTimer ? nil : (parsedHours ?? 0)) != nil
             }
             isSaving = false
+            // Didn't go through: stay open with what you typed, and say why.
+            guard saved else {
+                saveError = tracker.errorMessage ?? "Harvest didn't take that. Try again in a moment."
+                return
+            }
             dismiss()
         }
     }

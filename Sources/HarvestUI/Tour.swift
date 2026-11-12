@@ -341,7 +341,7 @@ struct TourText {
         case .settings:
             symbol = "gearshape"
             title = "Settings and more"
-            body = "This menu has Preferences, what the menu bar shows, Keep on Top and Open at Login. You can take this tour again from Preferences › Support."
+            body = "This menu has Settings, what the menu bar shows, Keep on Top and Open at Login. You can take this tour again from Settings › Support."
         }
     }
 }

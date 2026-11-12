@@ -8,14 +8,17 @@ import SwiftUI
 /// Welcome, where the timer lives, the shortcut (try it), connect Harvest, done.
 /// Shown at launch until it's finished once; `--onboarding` shows it again.
 @MainActor
-final class OnboardingWindowController: NSWindowController {
+final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     static let completedKey = "onboarding.completed"
     static var isCompleted: Bool { UserDefaults.standard.bool(forKey: completedKey) }
 
     let model: OnboardingModel
+    private let onFinish: @MainActor () -> Void
+    private var isFinished = false
 
     init(tracker: TimeTracker, shortcut: String?, needsAccessibility: Bool, finish: @escaping @MainActor () -> Void) {
         model = OnboardingModel(tracker: tracker, shortcut: shortcut, needsAccessibility: needsAccessibility)
+        onFinish = finish
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: OnboardingView.size),
             styleMask: [.titled, .closable, .fullSizeContentView],
@@ -30,15 +33,28 @@ final class OnboardingWindowController: NSWindowController {
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
         window.standardWindowButton(.zoomButton)?.isHidden = true
         super.init(window: window)
+        window.delegate = self
         model.finish = { [weak self] in
+            guard let self, !isFinished else { return }
+            isFinished = true
             UserDefaults.standard.set(true, forKey: Self.completedKey)
-            self?.close()
-            finish()
+            close()
+            onFinish()
         }
         window.contentView = NSHostingView(rootView: OnboardingView().environment(model))
     }
 
     required init?(coder: NSCoder) { nil }
+
+    /// Closed with the red button: carry on to the window (where a token
+    /// can still go in) instead of leaving nothing on screen. Signed in,
+    /// that counts as done; otherwise the welcome comes back next time.
+    func windowWillClose(_ notification: Notification) {
+        guard !isFinished else { return }
+        isFinished = true
+        if model.tracker.phase != .signedOut { UserDefaults.standard.set(true, forKey: Self.completedKey) }
+        onFinish()
+    }
 
     var isVisible: Bool { window?.isVisible == true }
 

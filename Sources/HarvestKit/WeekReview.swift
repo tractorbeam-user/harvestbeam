@@ -134,8 +134,13 @@ public enum GapFinder {
 /// and the legacy "Business Dev" one. Matched on the project or task name,
 /// ignoring a leading "[CODE]", case and accents.
 public enum RetiredBuckets {
-    public static func isRetired(project: String, task: String) -> Bool {
-        [project, task].contains { name in
+    public static func isRetired(project: String, task: String, projectCode: String? = nil) -> Bool {
+        // A numbered code is a current bucket, whatever it's called:
+        // "[TB-DP-19] Business Dev" is the one to use.
+        guard ![projectCode, project, task].compactMap({ $0 }).contains(where: { TaskDefinitions.code(in: $0) != nil }) else {
+            return false
+        }
+        return [project, task].contains { name in
             let n = MeetingMatcher.normalized(stripCode(name))
             if n == "digital products" || (n.contains("digital products") && n.contains("generic")) { return true }
             if n == "business dev" || n == "business dev." || (n.contains("business dev") && n.contains("legacy")) { return true }
@@ -148,7 +153,7 @@ public enum RetiredBuckets {
     }
 
     public static func isRetired(_ task: TrackableTask) -> Bool {
-        isRetired(project: task.project.name, task: task.task.name)
+        isRetired(project: task.project.name, task: task.task.name, projectCode: task.projectCode)
     }
 
     private static func stripCode(_ name: String) -> String {
@@ -327,7 +332,10 @@ extension TimeTracker {
     public func weekReview(today: LocalDate = LocalDate(), now: Date = .now, defaults: UserDefaults = .standard) -> [ReviewItem] {
         WeekReview.items(
             today: today, now: now, firstWeekday: firstWeekday, usualDay: usualDaySeconds,
-            entries: entries.filter { $0.spentDate >= today.startOfWeek(firstWeekday: firstWeekday) && $0.spentDate <= today },
+            // This week's, plus a timer still running from before it.
+            entries: entries.filter {
+                ($0.spentDate >= today.startOfWeek(firstWeekday: firstWeekday) || $0.isRunning) && $0.spentDate <= today
+            },
             tracksStartAndEnd: tracksStartAndEnd, workday: GapFinder.workday(defaults),
             ignoredGaps: WeekReview.ignoredGaps(defaults)
         )

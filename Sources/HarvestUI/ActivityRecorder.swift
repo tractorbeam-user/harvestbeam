@@ -50,7 +50,7 @@ public final class ActivityRecorder {
     @ObservationIgnored private var spanStart: Date?
     @ObservationIgnored private var spanContext: ScreenContext?
     @ObservationIgnored private var spanKey: TaskKey?
-    @ObservationIgnored private var hostCache: (title: String, host: String?, at: Date)?
+    @ObservationIgnored private var hostCache: (app: String, title: String, host: String?, at: Date)?
 
     public init(tracker: TimeTracker, store: TimelineStore = TimelineStore()) {
         self.tracker = tracker
@@ -192,11 +192,13 @@ public final class ActivityRecorder {
         } else {
             return nil
         }
-        if let cached = hostCache, cached.title == title, now.timeIntervalSince(cached.at) < 5 { return cached.host }
+        // Per browser and window: without Accessibility every title is "",
+        // and one browser's site isn't another's.
+        if let cached = hostCache, cached.app == id, cached.title == title, now.timeIntervalSince(cached.at) < 5 { return cached.host }
         var error: NSDictionary?
         let url = NSAppleScript(source: script)?.executeAndReturnError(&error).stringValue
         let host = url.flatMap { URL(string: $0)?.host }.map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
-        hostCache = (title, host, now)
+        hostCache = (id, title, host, now)
         return host
     }
 }

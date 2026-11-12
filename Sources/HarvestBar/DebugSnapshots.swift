@@ -39,59 +39,11 @@ enum DebugSnapshots {
             tour.current = nil
             await settle()
 
-            // Each Favorites style, with a few more favorites to show off.
-            for task in tracker.tasks.dropFirst(5).prefix(3) where !tracker.favorites.contains(task.key) {
-                tracker.favorites.toggle(task.key)
-            }
-            tracker.clearUndoHistory()
-            let savedIcons = UserDefaults.standard.dictionary(forKey: "favoriteIcons.v1")
-            let demoIcons = ["e:🎨", "s:person.2:1", "e:🧾", "s:paperplane:3", "e:💻"]
-            var iconMap: [String: String] = [:]
-            for (task, icon) in zip(tracker.favoriteTasks, demoIcons) { iconMap[task.key.description] = icon }
-            UserDefaults.standard.set(iconMap, forKey: "favoriteIcons.v1")
-            FavoriteIcons.shared.reload()
-            let savedStyle = UserDefaults.standard.string(forKey: FavoritesStyle.key)
-            for style in FavoritesStyle.allCases {
-                UserDefaults.standard.set(style.rawValue, forKey: FavoritesStyle.key)
-                let styleWindow = makeWindow(RootView().environment(tracker), appearance: appearance)
-                styleWindow.setContentSize(NSSize(width: 440, height: 1060))
-                await settle()
-                write(styleWindow, to: url.appendingPathComponent("2-favorites-\(style.rawValue)-\(suffix).png"))
-                styleWindow.close()
-            }
-            UserDefaults.standard.set(savedStyle, forKey: FavoritesStyle.key)
-
-            // A group of your own, moved above Favorites.
-            do {
-                let groups = TaskGroups.shared
-                let group = groups.create(named: "Active Projects")
-                groups.renaming = nil
-                for task in tracker.tasks.prefix(3) { groups.toggle(task.key, in: group.id) }
-                groups.move(group.sectionID, by: -1)
-                let groupWindow = makeWindow(RootView().environment(tracker), appearance: appearance)
-                groupWindow.setContentSize(NSSize(width: 440, height: 1260))
-                await settle()
-                write(groupWindow, to: url.appendingPathComponent("2-groups-\(suffix).png"))
-                groupWindow.close()
-                groups.delete(group.id)
-            }
-            UserDefaults.standard.set(savedIcons, forKey: "favoriteIcons.v1")
-            FavoriteIcons.shared.reload()
-
-
             let guideWindow = makeWindow(debugGuide(), appearance: appearance)
             guideWindow.setContentSize(NSSize(width: 340, height: 520))
             await settle()
             write(guideWindow, to: url.appendingPathComponent("2-guide-\(suffix).png"))
             guideWindow.close()
-
-            if let key = tracker.favoriteTasks.first?.key {
-                let pickerWindow = makeWindow(debugFavoriteIconPicker(key), appearance: appearance)
-                pickerWindow.setContentSize(NSSize(width: 300, height: 330))
-                await settle()
-                write(pickerWindow, to: url.appendingPathComponent("2-icon-picker-\(suffix).png"))
-                pickerWindow.close()
-            }
 
             let splitWindow = makeWindow(debugSplitEntry(tracker).environment(tracker), appearance: appearance)
             splitWindow.setContentSize(NSSize(width: 340, height: 420))

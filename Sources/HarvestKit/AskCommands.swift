@@ -20,7 +20,9 @@ public enum AskCommand: Equatable, Sendable {
     /// The command in `text`, or nil when it's a search (or a "10 min on X"
     /// entry, which the day planner reads).
     public static func parse(_ text: String) -> AskCommand? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Dictation ends sentences with a period: "Make Website 45 minutes."
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while let last = trimmed.last, ".!".contains(last) { trimmed.removeLast() }
         let lower = trimmed.lowercased()
         guard !lower.isEmpty else { return nil }
 
@@ -48,8 +50,8 @@ public enum AskCommand: Equatable, Sendable {
         if let match = lower.wholeMatch(of: /(?:change|set|make)\s+(.+)/) {
             let rest = String(match.1)
             let words = rest.split(separator: " ").map(String.init)
-            // The amount is the last word or two: "45m", "45 min", "1 hour".
-            for count in [2, 1] where words.count > count {
+            // The amount is the last word to three: "45m", "45 min", "half an hour".
+            for count in [3, 2, 1] where words.count > count {
                 let amountText = words.suffix(count).joined(separator: " ")
                 guard let hours = amount(amountText, bareMinutesFrom: 13) else { continue }
                 var name = words.dropLast(count)
@@ -165,7 +167,7 @@ public struct AskCommandResolver {
     public func resolve(_ command: AskCommand) -> AskCommandPlan {
         switch command {
         case .pause:
-            guard let running else { return .problem("Nothing's running to pause") }
+            guard let running else { return .problem("no timer is running") }
             return .pause(running)
 
         case .note(let text):

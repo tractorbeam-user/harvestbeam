@@ -24,8 +24,14 @@ public final class TimeTracker {
     public private(set) var clients: [NamedRef] = []
     /// The last `historyDays` of the user's time entries, newest first.
     public private(set) var entries: [TimeEntry] = [] {
-        didSet { usage = Ranking.usageScores(from: entries) }
+        didSet {
+            usage = Ranking.usageScores(from: entries)
+            entryChanges &+= 1
+        }
     }
+    /// Counts every change to `entries`, so a refresh can tell the list
+    /// moved on while it was loading.
+    @ObservationIgnored private var entryChanges = 0
     public private(set) var isRefreshing = false
     /// The task whose start/stop request is in flight.
     public private(set) var busyKey: TaskKey?
@@ -171,7 +177,8 @@ public final class TimeTracker {
 
     /// Fetches later entries when you page forward past what's loaded.
     public func ensureLoaded(through day: LocalDate) async {
-        guard let service, let user, let loadedThrough, day > loadedThrough, !isLoadingHistory else { return }
+        guard await waitForHistory() else { return }
+        guard let service, let user, let loadedThrough, day > loadedThrough else { return }
         isLoadingHistory = true
         defer { isLoadingHistory = false }
         let through = day.adding(days: 28)
@@ -180,14 +187,27 @@ public final class TimeTracker {
             let known = Set(entries.map(\.id))
             entries = Self.sorted(entries + later.filter { !known.contains($0.id) })
             self.loadedThrough = through
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
+    /// Lets a load of other weeks already on its way finish first, so paging
+    /// quickly loads each week instead of skipping the ones in between.
+    /// False if this load was called off meanwhile.
+    private func waitForHistory() async -> Bool {
+        while isLoadingHistory {
+            try? await Task.sleep(for: .milliseconds(50))
+            if Task.isCancelled { return false }
+        }
+        return true
+    }
+
     /// Fetches older entries when you page back past what's loaded.
     public func ensureLoaded(from day: LocalDate) async {
-        guard let service, let user, let loadedFrom, day < loadedFrom, !isLoadingHistory else { return }
+        guard await waitForHistory() else { return }
+        guard let service, let user, let loadedFrom, day < loadedFrom else { return }
         isLoadingHistory = true
         defer { isLoadingHistory = false }
         let from = day.adding(days: -28) // a few weeks at a time
@@ -196,6 +216,7 @@ public final class TimeTracker {
             let known = Set(entries.map(\.id))
             entries = Self.sorted(entries + older.filter { !known.contains($0.id) })
             self.loadedFrom = from
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -276,12 +297,18 @@ public final class TimeTracker {
         Array(searchIndex.search(query, usage: usage, favorites: favorites.set).prefix(100))
     }
 
-    /// Today's most recently tracked entry, when nothing is running, so it can
-    /// be resumed with one click.
+    /// The timer you stopped last today, when nothing is running, so it can
+    /// be resumed with one click. Without one (just opened), today's most
+    /// recently changed entry.
     public var pausedEntry: TimeEntry? {
         guard running == nil else { return nil }
-        return todayEntries.max { $0.updatedAt < $1.updatedAt }
+        let today = todayEntries
+        if let id = lastStoppedID, let entry = today.first(where: { $0.id == id }) { return entry }
+        return today.max { $0.updatedAt < $1.updatedAt }
     }
+    /// The entry whose timer this app stopped last: an entry logged or
+    /// edited since (⌘N, a meeting) doesn't take its place for Resume.
+    private var lastStoppedID: Int?
 
     public var harvestWebURL: URL? {
         guard let base = company?.baseUri else { return URL(string: "https://id.getharvest.com") }
@@ -302,6 +329,7 @@ public final class TimeTracker {
         if !force, phase == .ready, let lastRefresh, Date().timeIntervalSince(lastRefresh) < 30 { return }
         isRefreshing = true
         defer { isRefreshing = false }
+        let changesAtStart = entryChanges
         do {
             let me: HarvestUser
             if let user { me = user } else { me = try await service.currentUser(); user = me }
@@ -316,17 +344,25 @@ public final class TimeTracker {
 
             archivedByKey = ProjectAssignment.archivedTasks(from: loadedAssignments)
             tasks = ProjectAssignment.trackableTasks(from: loadedAssignments)
-            // Keep any older or later weeks already paged in.
-            entries = Self.sorted(loadedEntries + entries.filter { $0.spentDate < from || $0.spentDate > through })
+            // A change made while this loaded, or a start or stop still on
+            // its way to Harvest, wins over a list fetched before it
+            // landed; the next refresh picks it all up.
+            if phase != .ready || (busyKey == nil && entryChanges == changesAtStart) {
+                // Keep any older or later weeks already paged in.
+                entries = Self.sorted(loadedEntries + entries.filter { $0.spentDate < from || $0.spentDate > through })
+                lastRefresh = .now
+            } else {
+                lastRefresh = nil
+            }
             loadedFrom = min(loadedFrom ?? from, from)
             loadedThrough = max(loadedThrough ?? through, through)
-            lastRefresh = .now
             phase = .ready
             errorMessage = nil
             rememberFavorites()
         } catch HarvestError.unauthorized where !isDemo {
             signOut()
             errorMessage = HarvestError.unauthorized.errorDescription
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -361,9 +397,11 @@ public final class TimeTracker {
             hours: 0, hoursWithoutTimer: 0, isRunning: true, timerStartedAt: now, createdAt: now, updatedAt: now
         ))
         defer { entries.removeAll { $0.id == Self.pendingEntryID } }
+        var stopConfirmed = false
         do {
             if let current = stopped {
                 upsert(try await service.stopTimer(id: current.id))
+                stopConfirmed = true
             }
             let started: TimeEntry
             if let existing {
@@ -376,6 +414,11 @@ public final class TimeTracker {
             record("Started \(shortName(for: task))", startOp(started: started, wasNew: existing == nil, stopped: stopped))
             onUsage?(.timerStarted)
         } catch {
+            // Put back what Harvest didn't take: the old timer runs again
+            // unless it really stopped, and the new one never started.
+            entries.removeAll { $0.id == Self.pendingEntryID }
+            if let existing { upsert(existing) }
+            if let stopped, !stopConfirmed { upsert(stopped) }
             await recover(from: error)
         }
     }
@@ -386,11 +429,15 @@ public final class TimeTracker {
         guard let service, let current = running, busyKey == nil else { return }
         busyKey = current.key
         defer { busyKey = nil }
+        // Stopped on screen straight away; Harvest's numbers follow.
+        upsert(current.locallyStopped(at: Date()))
+        lastStoppedID = current.id
         do {
             upsert(try await service.stopTimer(id: current.id))
             errorMessage = nil
             record("Paused \(shortName(for: current))", .restart(entryID: current.id))
         } catch {
+            upsert(current)
             await recover(from: error)
         }
     }
@@ -398,11 +445,13 @@ public final class TimeTracker {
     /// Harvest rejects stopping or restarting a timer that already changed
     /// elsewhere (Harvest's own apps, the web). Reload instead of showing that
     /// as an error, so the bar matches Harvest again.
-    private func recover(from error: Error) async {
+    /// Edits (`isTimer` false) still say what Harvest refused, after the
+    /// reload, so a change that didn't stick never looks like it did.
+    private func recover(from error: Error, isTimer: Bool = true) async {
         if case HarvestError.server(let status, _) = error, status == 422 || status == 404 {
             busyKey = nil
             await refresh(force: true)
-            if case HarvestError.server = error { errorMessage = nil }
+            errorMessage = isTimer ? nil : error.localizedDescription
         } else {
             errorMessage = error.localizedDescription
         }
@@ -421,16 +470,24 @@ public final class TimeTracker {
         guard let service, busyKey == nil else { return }
         busyKey = entry.key
         defer { busyKey = nil }
+        let stopped = running
+        let now = Date()
+        // The switch shows straight away, as it does from a tile.
+        if let current = stopped { upsert(current.locallyStopped(at: now)) }
+        upsert(entry.locallyRestarted(at: now))
+        var stopConfirmed = false
         do {
-            let stopped = running
-            if let current = running {
+            if let current = stopped {
                 upsert(try await service.stopTimer(id: current.id))
+                stopConfirmed = true
             }
             let started = try await service.restartTimer(id: entry.id)
             upsert(started)
             errorMessage = nil
             record("Started \(shortName(for: entry))", startOp(started: started, wasNew: false, stopped: stopped))
         } catch {
+            upsert(entry)
+            if let stopped, !stopConfirmed { upsert(stopped) }
             await recover(from: error)
         }
     }
@@ -468,20 +525,23 @@ public final class TimeTracker {
     /// What to say when someone tries to restart or change an entry Harvest
     /// won't let change; nil when it can.
     public func cantChangeMessage(_ entry: TimeEntry) -> String? {
+        if entry.isPending { return "Harvest is still starting this timer. Try again in a moment." }
         if let lock = entry.lock { return "Can't change this entry: it's \(lock.title.lowercased()). " + lock.detail }
         if let reason = unavailability(of: entry.key) { return "Can't restart this entry. " + reason.detail }
         return nil
     }
 
-    public func updateEntry(_ entry: TimeEntry, task: TrackableTask, notes: String, hours: Double?) async {
-        guard let service else { return }
+    /// Whether Harvest took the change.
+    @discardableResult
+    public func updateEntry(_ entry: TimeEntry, task: TrackableTask, notes: String, hours: Double?) async -> Bool {
+        guard let service, !entry.isPending else { return false }
         if let lock = entry.lock {
             errorMessage = "Can't change this entry: it's \(lock.title.lowercased()). " + lock.detail
-            return
+            return false
         }
         if task.key != entry.key, let reason = unavailability(of: task.key) {
             errorMessage = "Can't move this entry there. " + reason.detail
-            return
+            return false
         }
         do {
             var target = entry
@@ -506,8 +566,10 @@ public final class TimeTracker {
             } else {
                 errorMessage = nil
             }
+            return true
         } catch {
-            await recover(from: error)
+            await recover(from: error, isTimer: false)
+            return false
         }
     }
 
@@ -517,7 +579,12 @@ public final class TimeTracker {
     /// Returns whether it worked.
     @discardableResult
     public func moveTime(_ seconds: TimeInterval, from entry: TimeEntry, to task: TrackableTask, notes: String = "") async -> Bool {
-        guard let service else { return false }
+        guard let service, !entry.isPending else { return false }
+        // Before touching this entry: time can't land on an archived task.
+        if let reason = unavailability(of: task.key) {
+            errorMessage = "Can't move time to \(task.projectNameParts.name) · \(task.task.name). " + reason.detail
+            return false
+        }
         if let lock = entry.lock {
             errorMessage = "This entry is \(lock.title.lowercased()), so its time can't be moved."
             return false
@@ -573,7 +640,7 @@ public final class TimeTracker {
                    .group([.delete(entryID: added.id), .revert(entry)]))
             return true
         } catch {
-            await recover(from: error)
+            await recover(from: error, isTimer: false)
             return false
         }
     }
@@ -593,7 +660,7 @@ public final class TimeTracker {
             errorMessage = nil
             record("Removed \(TimeFormat.hoursMinutes(seconds)) idle time from \(shortName(for: current))", .revert(current))
         } catch {
-            await recover(from: error)
+            await recover(from: error, isTimer: false)
         }
     }
 
@@ -623,7 +690,7 @@ public final class TimeTracker {
             if let hours {
                 var times: ClockTimes?
                 if tracksStartAndEnd {
-                    let start = startingAt ?? (day == LocalDate() ? Date().addingTimeInterval(-hours * 3600) : day.date().addingTimeInterval(9 * 3600))
+                    let start = startingAt ?? (day == LocalDate() ? Date().addingTimeInterval(-hours * 3600) : (Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: day.date()) ?? day.date()))
                     times = ClockTime.times(from: start, hours: hours)
                 }
                 added = try await service.createEntry(projectID: task.project.id, taskID: task.task.id, spentDate: day,
@@ -675,13 +742,18 @@ public final class TimeTracker {
     /// rest are deleted. One undo puts them all back.
     @discardableResult
     public func mergeSameTaskEntries(into entry: TimeEntry) async -> Bool {
-        guard let service else { return false }
-        let group = [entry] + sameTaskEntries(as: entry)
-        guard group.count > 1, entry.lock == nil else { return false }
+        guard let service, !entry.isPending else { return false }
         guard await waitUntilIdle() else {
             errorMessage = "Harvest is still working on your last change. Try again in a moment."
             return false
         }
+        // As they are now: a timer may have started or stopped while waiting.
+        let entry = entries.first { $0.id == entry.id } ?? entry
+        let group = [entry] + sameTaskEntries(as: entry)
+        guard group.count > 1, entry.lock == nil else { return false }
+        // Holds off timer clicks until it's done, so none lands mid-merge.
+        busyKey = entry.key
+        defer { busyKey = nil }
         let keeper = group.first(where: \.isRunning) ?? group.min { $0.createdAt < $1.createdAt }!
         let others = group.filter { $0.id != keeper.id }
         var notes: [String] = []
@@ -708,7 +780,10 @@ public final class TimeTracker {
                    .group([.revert(keeper)] + others.map { .recreate($0) }))
             return true
         } catch {
-            await recover(from: error)
+            // Part of it may have gone through: show what Harvest has now.
+            busyKey = nil
+            await refresh(force: true)
+            errorMessage = "The merge didn't finish. " + error.localizedDescription
             return false
         }
     }
@@ -792,8 +867,16 @@ public final class TimeTracker {
     }
 
     /// The stand-in for a timer that's starting, until Harvest says its id.
-    static let pendingEntryID = -1
+    nonisolated static let pendingEntryID = -1
+}
 
+extension TimeEntry {
+    /// A timer that's starting: on screen already, but Harvest hasn't given
+    /// it an id yet, so it can't be edited, split or deleted.
+    public var isPending: Bool { id == TimeTracker.pendingEntryID }
+}
+
+extension TimeTracker {
     func upsert(_ entry: TimeEntry) {
         var updated = entries.filter { $0.id != entry.id }
         updated.append(entry)

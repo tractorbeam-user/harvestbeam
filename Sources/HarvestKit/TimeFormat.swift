@@ -11,6 +11,12 @@ public enum TimeFormat {
     /// "1.5", "25m", "25 min", "1h", "1h30m", "1 h 30". Nil when it can't be
     /// read, or is negative.
     public static func parseHours(_ text: String) -> Double? {
+        // A day has 24 hours; "inf" and "nan" are numbers to Double, not to us.
+        guard let hours = anyHours(text), hours.isFinite, hours <= 24 else { return nil }
+        return hours
+    }
+
+    private static func anyHours(_ text: String) -> Double? {
         let s = text.lowercased().filter { !$0.isWhitespace }
         guard !s.isEmpty, !s.hasPrefix("-") else { return nil }
         func number(_ part: Substring) -> Double? { part.isEmpty ? 0 : Double(part) }

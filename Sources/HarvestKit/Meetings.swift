@@ -305,15 +305,18 @@ extension TimeTracker {
     /// Adds the meeting as a stopped entry on its day. `remember` makes this
     /// task the suggestion for every meeting with the same title; without it,
     /// any earlier "always" for that title is dropped.
-    public func log(_ meeting: CalendarMeeting, task: TrackableTask, notes: String, hours: Double, remember: Bool) async {
+    @discardableResult
+    public func log(_ meeting: CalendarMeeting, task: TrackableTask, notes: String, hours: Double, remember: Bool) async -> Bool {
         if remember {
             meetingMemory.remember(meeting.title, as: task.key)
         } else {
             meetingMemory.forget(meeting.title)
         }
-        if let entry = await addEntry(task: task, on: meeting.day, notes: notes, hours: hours, startingAt: meeting.start) {
-            meetingMemory.markLogged(meeting.id, entryID: entry.id)
+        guard let entry = await addEntry(task: task, on: meeting.day, notes: notes, hours: hours, startingAt: meeting.start) else {
+            return false
         }
+        meetingMemory.markLogged(meeting.id, entryID: entry.id)
+        return true
     }
 
     /// Logs each meeting to its suggested task, one after another.

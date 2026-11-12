@@ -456,7 +456,7 @@ struct WeeklySummaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: .medium).monospacedDigit())
-                .opacity(isHovered ? 1 : 0.8)
+                .fontWeight(.semibold)
                 .padding(.horizontal, 6)
                 .frame(height: 20)
                 .background(Capsule().fill(Color.white.opacity(isHovered ? 0.2 : 0)))

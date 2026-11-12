@@ -205,6 +205,8 @@ public struct HarvestClient: HarvestService {
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
+            // Paging on before a week finished loading isn't a network problem.
+            if error is CancellationError || (error as? URLError)?.code == .cancelled { throw CancellationError() }
             throw HarvestError.network(error.localizedDescription)
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0

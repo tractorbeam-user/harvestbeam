@@ -15,10 +15,6 @@ struct TaskTile: View {
     /// Dropping another tile on this one puts it just before, in the same
     /// section. Returns whether the drop was taken.
     var dropBefore: ((TaskKey) -> Bool)?
-    /// Set in Favorites: the launcher and icon-row looks.
-    var style: FavoritesStyle = .classic
-    /// Set in a group's panel, for "Remove from <group>".
-    var groupID: String?
     @State private var isDropTarget = false
     @AppStorage(TileText.key) private var tileTextRaw = TileText.entry.rawValue
     @State private var isHovered = false
@@ -27,23 +23,15 @@ struct TaskTile: View {
     @State private var showsClient = false
     @State private var hoverWait: Task<Void, Never>?
 
-    private var isBusy: Bool { tracker.busyKey == task.key }
-    /// Shows the state you just asked for while Harvest confirms it, instead
-    /// of a spinner.
-    private var isRunning: Bool {
-        let running = tracker.running?.key == task.key
-        if isBusy { return !running }
-        // Another tile is starting: this one stops with it, so let it go
-        // right away rather than when Harvest confirms.
-        if running, let busy = tracker.busyKey, busy != task.key { return false }
-        return running
-    }
+    /// The tracker shows a start or pause the moment you ask, so this
+    /// follows it straight away.
+    private var isRunning: Bool { tracker.running?.key == task.key }
     private var isFavorite: Bool { tracker.favorites.contains(task.key) }
 
     var body: some View {
         // Not a Button: on macOS a button keeps the mouse press to itself, so
         // the tile could never be dragged. A tap starts or pauses instead.
-        styledContent
+        content
             .modifier(TileChrome(isRunning: isRunning, isSelected: isSelected, isHovered: isHovered))
             .unavailableTask(task.key)
             .onTapGesture {
@@ -111,7 +99,6 @@ struct TaskTile: View {
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: isFavorite ? "star.slash" : "star") {
                 tracker.favorites.toggle(task.key)
             }
-            if TaskGroups.customGroupsEnabled { groupMenu }
             if let onRemove {
                 Button("Remove from Suggested", systemImage: "xmark", action: onRemove)
             }
@@ -121,34 +108,6 @@ struct TaskTile: View {
         #endif
         .accessibilityLabel("\(task.project.name), \(task.task.name), \(task.client?.name ?? "")")
         .accessibilityHint(isRunning ? "Pauses the timer" : "Starts a timer")
-    }
-
-    /// Add to Group › each group (checked when it's in it) and New Group.
-    @ViewBuilder private var groupMenu: some View {
-        let groups = TaskGroups.shared
-        if let groupID, let group = groups.groups.first(where: { $0.id == groupID }) {
-            Button("Remove from \(group.name)", systemImage: "folder.badge.minus") {
-                withAnimation(.snappy(duration: 0.2)) { groups.toggle(task.key, in: groupID) }
-            }
-        }
-        Menu("Add to Group", systemImage: "folder.badge.plus") {
-            ForEach(groups.groups) { group in
-                Toggle(group.name, isOn: Binding(
-                    get: { groups.contains(task.key, in: group.id) },
-                    set: { _ in withAnimation(.snappy(duration: 0.2)) { groups.toggle(task.key, in: group.id) } }
-                ))
-            }
-            if !groups.groups.isEmpty { Divider() }
-            Button("New Group…") { withAnimation(.snappy(duration: 0.2)) { _ = groups.create(with: task.key) } }
-        }
-    }
-
-    @ViewBuilder private var styledContent: some View {
-        switch style {
-        case .classic: content
-        case .launcher: LauncherTileContent(task: task, isRunning: isRunning)
-        case .rows: IconRowContent(task: task, isRunning: isRunning)
-        }
     }
 
     private var content: some View {

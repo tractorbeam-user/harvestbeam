@@ -81,13 +81,11 @@ extension Color {
 
 enum Metrics {
     #if os(macOS)
-    static let tileMinWidth: CGFloat = 170
     static let tileHeight: CGFloat = 36
     static let spacing: CGFloat = 7
     static let padding: CGFloat = 14
     static let badgeSize: CGFloat = 30
     #else
-    static let tileMinWidth: CGFloat = 155
     static let tileHeight: CGFloat = 56
     static let spacing: CGFloat = 12
     static let padding: CGFloat = 16

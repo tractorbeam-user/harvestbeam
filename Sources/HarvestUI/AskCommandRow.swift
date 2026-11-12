@@ -71,7 +71,7 @@ struct RetiredBucketNote: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: "arrow.uturn.right.circle.fill").foregroundStyle(.harvestOrange)
-            Text("\(task.projectNameParts.name) is retired. ").font(.callout.weight(.semibold))
+            Text("The \(definition.name) bucket is retired. ").font(.callout.weight(.semibold))
                 + Text(definition.replacement.map { $0.prefix(1).uppercased() + $0.dropFirst() } ?? "").font(.callout)
             Spacer()
             Button(action: dismiss) { Image(systemName: "xmark") }

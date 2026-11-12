@@ -66,7 +66,7 @@ final class PreferencesWindowController: NSWindowController {
         let host = NSHostingController(rootView: root.frame(minWidth: size.width, minHeight: 420))
         host.sizingOptions = [.minSize]
         let window = NSWindow(contentViewController: host)
-        window.title = "Preferences"
+        window.title = "Settings"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -182,10 +182,9 @@ struct GeneralPrefs: View {
     @State private var openAtLogin = SMAppService.mainApp.status == .enabled
     @AppStorage(Analytics.enabledKey) private var sharesUsage = true
     @AppStorage(AppAppearance.key) private var appearanceRaw = AppAppearance.system.rawValue
-    @AppStorage(FavoritesStyle.key) private var favoritesStyleRaw = FavoritesStyle.classic.rawValue
     @AppStorage(TileText.key) private var tileTextRaw = TileText.entry.rawValue
     @AppStorage("keepOnTop") private var keepOnTop = false
-    @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.task.rawValue
+    @AppStorage(MenuBarDisplay.contentKey) private var menuBarContent = MenuBarDisplay.Content.project.rawValue
     @AppStorage(MenuBarDisplay.lengthKey) private var menuBarLength = 28
     @AppStorage(MenuBarDisplay.truncationKey) private var menuBarTruncation = MenuBarDisplay.Truncation.end.rawValue
     @AppStorage(MenuBarDisplay.showTimeKey) private var menuBarShowTime = true
@@ -339,7 +338,8 @@ struct ShortcutPrefs: View {
     private let inApp: [(String, String)] = [
         ("New time entry", "⌘N"), ("Turn a sentence into entries", "⌘P"), ("Search tasks", "⌘F"),
         ("Go to today", "⌘T"), ("Previous / next day", "⌘[ ⌘]"), ("Pause the timer", "⌘."),
-        ("Undo delete", "⌘Z"), ("Refresh", "⌘R"), ("Reset window size", "⌘0"),
+        ("Undo", "⌘Z"), ("Redo", "⇧⌘Z"), ("Week calendar", "⌘K"), ("Refresh", "⌘R"),
+        ("Reset window size", "⌘0"), ("Settings", "⌘,"),
     ]
 
     var body: some View {
@@ -770,6 +770,7 @@ struct SupportPrefs: View {
     let resetLayout: () -> Void
     var showTour: () -> Void = {}
     @State private var reloaded = false
+    @State private var confirmingSignOut = false
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -807,8 +808,18 @@ struct SupportPrefs: View {
                 }
             }
             SettingsSection("Account") {
-                SettingsRow("Signed in to \(tracker.accountName ?? "Harvest")", icon: RowIcon("person.crop.circle.fill", .harvestOrange)) {
-                    Button("Sign Out") { tracker.signOut() }
+                if tracker.phase == .signedOut {
+                    SettingsRow("Not signed in", description: "Paste a Harvest token in the \(AppInfo.name) window to sign in.",
+                                icon: RowIcon("person.crop.circle.fill", .gray)) { EmptyView() }
+                } else {
+                    SettingsRow("Signed in to \(tracker.accountName ?? "Harvest")", icon: RowIcon("person.crop.circle.fill", .harvestOrange)) {
+                        Button("Sign Out…") { confirmingSignOut = true }
+                    }
+                    .confirmationDialog("Sign out of \(tracker.accountName ?? "Harvest")?", isPresented: $confirmingSignOut) {
+                        Button("Sign Out", role: .destructive) { tracker.signOut() }
+                    } message: {
+                        Text("Your time stays in Harvest. To sign in again you'll need your Harvest token.")
+                    }
                 }
             }
             SettingsSection("About") {

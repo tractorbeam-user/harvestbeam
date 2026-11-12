@@ -35,5 +35,9 @@ struct ParseHoursTests {
         #expect(minutes("-1") == nil)
         #expect(minutes("-0:25") == nil)
         #expect(minutes("1h90") == nil)
+        #expect(minutes("inf") == nil)
+        #expect(minutes("nan") == nil)
+        #expect(minutes("25") == nil)      // more than a day
+        #expect(minutes("24") == 24 * 60)
     }
 }

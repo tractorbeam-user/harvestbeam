@@ -503,7 +503,7 @@ private struct TimelinePanel: View {
             .padding(.top, 16)
 
             if !isRecording {
-                note("Timeline is off", "Turn on “Record my Timeline” in Preferences → Tracking. It notes the apps and windows you use, kept on this Mac for two weeks.")
+                note("Timeline is off", "Turn on “Record my Timeline” in Settings › Tracking. It notes the apps and windows you use, kept on this Mac for two weeks.")
             } else if !ActivityRecorder.hasAccessibility {
                 note("Window titles need Accessibility", "Without it, only app names are recorded.", button: "Allow…") {
                     ActivityRecorder.requestAccessibility()

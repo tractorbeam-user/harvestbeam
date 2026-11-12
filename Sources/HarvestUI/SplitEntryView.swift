@@ -22,7 +22,9 @@ struct SplitEntryView: View {
             ? tracker.favoriteTasks + tracker.recentTasks
             : tracker.search(query)
         var seen = Set<TaskKey>()
-        return found.filter { !$0.isProjectRow && $0.key != task.key && seen.insert($0.key).inserted }.prefix(6).map { $0 }
+        return found.filter {
+            !$0.isProjectRow && $0.key != task.key && tracker.isAvailable($0.key) && seen.insert($0.key).inserted
+        }.prefix(6).map { $0 }
     }
     private var problem: String? {
         guard let moving else { return amount.isEmpty ? nil : "Try 20m, 1:15 or 0.5" }

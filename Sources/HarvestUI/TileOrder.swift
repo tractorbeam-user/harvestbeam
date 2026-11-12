@@ -24,11 +24,15 @@ final class TileOrder {
         return unplaced + placed
     }
 
-    /// Moves `key` just before `target`, starting from the order on screen.
+    /// Moves `key` onto `target`'s place, starting from the order on screen:
+    /// just before it, or just after when moving later, as in Favorites, so
+    /// a tile can move one step either way.
     func place(_ key: TaskKey, before target: TaskKey, in section: String, current: [TaskKey]) {
-        var list = current.map(\.description).filter { $0 != key.description }
-        let index = list.firstIndex(of: target.description) ?? list.endIndex
-        list.insert(key.description, at: index)
+        let ids = current.map(\.description)
+        let movesLater = (ids.firstIndex(of: key.description) ?? .max) < (ids.firstIndex(of: target.description) ?? .min)
+        var list = ids.filter { $0 != key.description }
+        let at = list.firstIndex(of: target.description).map { movesLater ? $0 + 1 : $0 } ?? list.endIndex
+        list.insert(key.description, at: at)
         orders[section] = list
         UserDefaults.standard.set(orders, forKey: Self.defaultsKey)
     }

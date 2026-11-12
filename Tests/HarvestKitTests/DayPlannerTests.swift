@@ -25,6 +25,15 @@ struct DayPlannerTests {
         #expect(DayPlanner.hours(in: "client call") == nil)
         #expect(DayPlanner.mentionsDuration("app stuff till lunch"))
         #expect(!DayPlanner.mentionsDuration("northwind meeting"))
+        #expect(DayPlanner.hours(in: "1h 30m on x") == 1.5)
+        #expect(DayPlanner.hours(in: "1h30m on x") == 1.5)
+        #expect(DayPlanner.hours(in: "1h30 on x") == 1.5)
+        #expect(DayPlanner.hours(in: "an hour and a half on x") == 1.5)
+        #expect(DayPlanner.hours(in: "1:75 on x") == nil)
+        #expect(DayPlanner.hours(in: "call at 2:30") == nil)
+        #expect(DayPlanner.explicitDuration(in: "morning standup") == nil)
+        #expect(DayPlanner.clauses("1.5h on website") == ["1.5h on website"])
+        #expect(DayPlanner.clauses("context all morning and had a call with dallas art fair").count == 2)
     }
 
     @Test func keywordsDropFillers() {

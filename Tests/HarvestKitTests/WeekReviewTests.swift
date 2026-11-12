@@ -96,6 +96,9 @@ struct RetiredBucketTests {
 
     @Test func leavesSpecificBucketsAlone() {
         #expect(!RetiredBuckets.isRetired(project: "Digital Products – Acme", task: "Design"))
+        // The current Business Dev bucket has a number.
+        #expect(!RetiredBuckets.isRetired(project: "[TB-DP-19] Business Dev", task: "Business Dev"))
+        #expect(!RetiredBuckets.isRetired(project: "Internal", task: "Business Dev", projectCode: "TB-DP-19"))
         #expect(!RetiredBuckets.isRetired(project: "Business Development", task: "Strategy"))
         #expect(!RetiredBuckets.isRetired(project: "Website Redesign", task: "Design"))
     }
