@@ -158,16 +158,29 @@ struct TaskTile: View {
             // Like a tracked entry: client, "[code] name", task. Or the code
             // on top: code, name, task. Three lines either way, so every
             // tile is the same height.
-            VStack(alignment: .leading, spacing: 1) {
-                Text(entryLike ? task.client?.name ?? " " : code ?? " ")
-                    .font(entryLike ? .system(size: codeFont) : .system(size: codeFont, weight: .medium).monospaced())
-                    .opacity(isRunning ? 0.82 : 0.55)
-                // Hover slides a name that doesn't fit across to show the rest.
-                MarqueeText(text: entryLike ? code.map { "[\($0)] \(name)" } ?? name : name, isActive: isHovered)
-                    .font(.system(size: titleFont, weight: .semibold))
-                MarqueeText(text: task.task.name, isActive: isHovered)
-                    .font(.system(size: subtitleFont))
-                    .opacity(isRunning ? 0.82 : 0.6)
+            let topLine = entryLike ? task.client?.name : code
+            // Without a top line, the name and task sit centered in the same
+            // height, so every tile still lines up.
+            ZStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(" ").font(.system(size: codeFont, weight: .medium).monospaced())
+                    Text(" ").font(.system(size: titleFont, weight: .semibold))
+                    Text(" ").font(.system(size: subtitleFont))
+                }
+                .hidden()
+                VStack(alignment: .leading, spacing: 1) {
+                    if let topLine, !topLine.isEmpty {
+                        Text(topLine)
+                            .font(entryLike ? .system(size: codeFont) : .system(size: codeFont, weight: .medium).monospaced())
+                            .opacity(isRunning ? 0.82 : 0.55)
+                    }
+                    // Hover slides a name that doesn't fit across to show the rest.
+                    MarqueeText(text: entryLike ? code.map { "[\($0)] \(name)" } ?? name : name, isActive: isHovered)
+                        .font(.system(size: titleFont, weight: .semibold))
+                    MarqueeText(text: task.task.name, isActive: isHovered)
+                        .font(.system(size: subtitleFont))
+                        .opacity(isRunning ? 0.82 : 0.6)
+                }
             }
             .lineLimit(1)
             Spacer(minLength: 0)

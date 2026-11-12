@@ -326,8 +326,16 @@ struct TrackerView: View {
             .disabled(!groups.canMove(section.id, by: -1))
         Button("Move Down", systemImage: "arrow.down") { withAnimation(.snappy(duration: 0.2)) { groups.move(section.id, by: 1) } }
             .disabled(!groups.canMove(section.id, by: 1))
-        Picker("Tile Text", selection: $tileTextRaw) {
-            ForEach(TileText.allCases) { Text($0.label).tag($0.rawValue) }
+        // A plain submenu of checkmarked choices: a Picker here sometimes
+        // drew its title shifted for a moment.
+        Menu("Tile Text") {
+            ForEach(TileText.allCases) { option in
+                Button {
+                    tileTextRaw = option.rawValue
+                } label: {
+                    if tileTextRaw == option.rawValue { Label(option.label, systemImage: "checkmark") } else { Text(option.label) }
+                }
+            }
         }
         Divider()
         if TaskGroups.customGroupsEnabled {
