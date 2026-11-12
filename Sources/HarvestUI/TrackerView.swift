@@ -300,22 +300,27 @@ struct TrackerView: View {
     }
 
     /// The ⋯ menu on a section's title, and right-click on it.
-    @ViewBuilder private func panelMenu(_ section: TaskSection) -> some View {
-        Button(sectionLayout.isHalf(section.id) ? "Full Width" : "Half Width",
-               systemImage: sectionLayout.isHalf(section.id) ? "rectangle" : "rectangle.split.2x1") {
+    private func panelActions(_ section: TaskSection) -> [MenuAction] {
+        let isHalf = sectionLayout.isHalf(section.id)
+        var actions = [MenuAction(title: isHalf ? "Full Width" : "Half Width",
+                                  systemImage: isHalf ? "rectangle" : "rectangle.split.2x1") {
             withAnimation(.snappy(duration: 0.25)) { sectionLayout.toggleHalf(section.id) }
-        }
+        }]
         // Only means something at full width: half width is one tile across already.
-        if !sectionLayout.isHalf(section.id) {
-            Button(sectionLayout.isSingleColumn(section.id) ? "Two Tiles per Row" : "One Tile per Row",
-                   systemImage: sectionLayout.isSingleColumn(section.id) ? "square.grid.2x2" : "list.bullet.rectangle") {
+        if !isHalf {
+            let single = sectionLayout.isSingleColumn(section.id)
+            actions.append(MenuAction(title: single ? "Two Tiles per Row" : "One Tile per Row",
+                                      systemImage: single ? "square.grid.2x2" : "list.bullet.rectangle") {
                 withAnimation(.snappy(duration: 0.25)) { sectionLayout.toggleSingleColumn(section.id) }
-            }
+            })
         }
-        Button("Move Up", systemImage: "arrow.up") { withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: -1) } }
-            .disabled(!sectionLayout.canMove(section.id, by: -1))
-        Button("Move Down", systemImage: "arrow.down") { withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: 1) } }
-            .disabled(!sectionLayout.canMove(section.id, by: 1))
+        actions.append(MenuAction(title: "Move Up", systemImage: "arrow.up", isEnabled: sectionLayout.canMove(section.id, by: -1)) {
+            withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: -1) }
+        })
+        actions.append(MenuAction(title: "Move Down", systemImage: "arrow.down", isEnabled: sectionLayout.canMove(section.id, by: 1)) {
+            withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: 1) }
+        })
+        return actions
     }
 
     private func toggleCollapsed(_ id: String) {
@@ -421,21 +426,24 @@ struct TrackerView: View {
                 }
                 .buttonStyle(.plain)
                 .help(isHalf ? "Full width" : "Half width: sits beside another half-width section")
-                Menu {
-                    panelMenu(section)
-                } label: {
-                    // The whole box takes the click, not just the three dots:
-                    // without a shape, clicks between them fell through.
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 26, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
+                // A plain button that opens a native menu: it takes every click
+                // on its whole box, first click included (a SwiftUI Menu here
+                // missed clicks between the dots and some first clicks).
+                let dots = Image(systemName: "ellipsis")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 26, height: 22)
+                    .contentShape(Rectangle())
+                #if os(macOS)
+                Button { NativeMenu.popUp(panelActions(section)) } label: { dots }
+                    .buttonStyle(.plain)
+                    .help("More")
+                    .accessibilityLabel("\(section.title) options")
+                #else
+                Menu { MenuActionButtons(actions: panelActions(section)) } label: { dots }
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                #endif
             }
             .opacity(hoveredHeader == section.id ? 1 : 0)
             .animation(.easeOut(duration: 0.12), value: hoveredHeader == section.id)
@@ -446,7 +454,7 @@ struct TrackerView: View {
         .frame(height: 22)
         .contentShape(Rectangle())
         .onHover { hoveredHeader = $0 ? section.id : (hoveredHeader == section.id ? nil : hoveredHeader) }
-        .contextMenu { panelMenu(section) }
+        .contextMenu { MenuActionButtons(actions: panelActions(section)) }
     }
 
     private func panelFill(_ id: String) -> Color {

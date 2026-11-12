@@ -1,7 +1,7 @@
 import HarvestKit
 import SwiftUI
 
-/// One project/task as a compact two-line tile: project, then task. Click or
+/// One project/task as a compact tile: client and job code, project, task. Click or
 /// tap anywhere on it to start its timer (or pause it if it's running).
 /// Outside Favorites a star shows on hover to pin it.
 struct TaskTile: View {
@@ -110,51 +110,60 @@ struct TaskTile: View {
     }
 
     private var content: some View {
-        HStack(spacing: 6) {
-            let (code, name) = task.projectNameParts
-            // Like a tracked entry: client, "[code] name", task. Three lines,
-            // so every tile is the same height.
-            let topLine = task.client?.name
-            // Without a top line, the name and task sit centered in the same
-            // height, so every tile still lines up.
-            ZStack(alignment: .leading) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(" ").font(.system(size: codeFont, weight: .medium).monospaced())
-                    Text(" ").font(.system(size: titleFont, weight: .semibold))
-                    Text(" ").font(.system(size: subtitleFont))
-                }
-                .hidden()
-                VStack(alignment: .leading, spacing: 1) {
-                    if let topLine, !topLine.isEmpty {
-                        Text(topLine)
-                            .font(.system(size: codeFont))
+        let (code, name) = task.projectNameParts
+        let showsRemove = onRemove != nil && isHovered && !isRunning
+        let showsStarButton = showsStar && (isHovered || isFavorite)
+        // Room the name and task leave for the buttons at the bottom right.
+        let buttonsWidth = indicatorSize + (showsRemove ? 24 : 0) + (showsStarButton ? 24 : 0) + 4
+        // Client at the top left with the job code at the top right, then the
+        // project name, then the task. Always three lines, so every tile is
+        // the same height. Play (and the star or ×) sit at the bottom right.
+        return ZStack(alignment: .bottomTrailing) {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(task.client?.name.isEmpty == false ? task.client!.name : " ")
+                        .font(.system(size: codeFont))
+                        .opacity(isRunning ? 0.82 : 0.55)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 0)
+                    if let code {
+                        Text("[\(code)]")
+                            .font(.system(size: codeFont, weight: .medium).monospaced())
                             .opacity(isRunning ? 0.82 : 0.55)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .layoutPriority(1)
                     }
-                    // Hover slides a name that doesn't fit across to show the rest.
-                    MarqueeText(text: code.map { "[\($0)] \(name)" } ?? name, isActive: isHovered)
-                        .font(.system(size: titleFont, weight: .semibold))
-                    MarqueeText(text: task.task.name, isActive: isHovered)
-                        .font(.system(size: subtitleFont))
-                        .opacity(isRunning ? 0.82 : 0.6)
                 }
+                // Hover slides a name that doesn't fit across to show the rest.
+                MarqueeText(text: name, isActive: isHovered)
+                    .font(.system(size: titleFont, weight: .semibold))
+                    .padding(.trailing, buttonsWidth)
+                MarqueeText(text: task.task.name, isActive: isHovered)
+                    .font(.system(size: subtitleFont))
+                    .opacity(isRunning ? 0.82 : 0.6)
+                    .padding(.trailing, buttonsWidth)
             }
             .lineLimit(1)
-            Spacer(minLength: 0)
-            if let onRemove, isHovered, !isRunning {
-                Button(action: onRemove) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 2) {
+                if showsRemove, let onRemove {
+                    Button(action: onRemove) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .buttonStyle(TileIconButtonStyle())
+                    .help("Remove from Suggested")
+                    .accessibilityLabel("Remove \(task.task.name) from Suggested")
                 }
-                .buttonStyle(TileIconButtonStyle())
-                .help("Remove from Suggested")
-                .accessibilityLabel("Remove \(task.task.name) from Suggested")
+                if showsStarButton { favoriteButton }
+                actionIndicator
             }
-            if showsStar && (isHovered || isFavorite) { favoriteButton }
-            actionIndicator
         }
         .padding(.leading, 10)
-        .padding(.trailing, 7)
-        .padding(.vertical, 5)
+        .padding(.trailing, 8)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, minHeight: Metrics.tileHeight, maxHeight: .infinity, alignment: .leading)
         .foregroundStyle(isRunning ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
     }
