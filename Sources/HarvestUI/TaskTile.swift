@@ -152,21 +152,30 @@ struct TaskTile: View {
 
     private var content: some View {
         HStack(spacing: 6) {
-            VStack(alignment: .leading, spacing: 1) {
-                let (code, name) = task.projectNameParts
-                // The code line is kept even when there's no code, so every
-                // tile is the same height.
-                Text(code ?? " ")
-                    .font(.system(size: codeFont, weight: .medium).monospaced())
-                    .opacity(isRunning ? 0.82 : 0.5)
-                    .padding(.bottom, 1)
-                    .accessibilityHidden(code == nil)
-                // Hover slides a name that doesn't fit across to show the rest.
-                MarqueeText(text: name, isActive: isHovered)
-                    .font(.system(size: titleFont, weight: .semibold))
-                MarqueeText(text: task.task.name, isActive: isHovered)
-                    .font(.system(size: subtitleFont))
-                    .opacity(isRunning ? 0.82 : 0.6)
+            let (code, name) = task.projectNameParts
+            // Every tile is as tall as one with a code; without one, the
+            // name and task sit centered in that height.
+            ZStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(" ").font(.system(size: codeFont, weight: .medium).monospaced()).padding(.bottom, 1)
+                    Text(" ").font(.system(size: titleFont, weight: .semibold))
+                    Text(" ").font(.system(size: subtitleFont))
+                }
+                .hidden()
+                VStack(alignment: .leading, spacing: 1) {
+                    if let code {
+                        Text(code)
+                            .font(.system(size: codeFont, weight: .medium).monospaced())
+                            .opacity(isRunning ? 0.82 : 0.5)
+                            .padding(.bottom, 1)
+                    }
+                    // Hover slides a name that doesn't fit across to show the rest.
+                    MarqueeText(text: name, isActive: isHovered)
+                        .font(.system(size: titleFont, weight: .semibold))
+                    MarqueeText(text: task.task.name, isActive: isHovered)
+                        .font(.system(size: subtitleFont))
+                        .opacity(isRunning ? 0.82 : 0.6)
+                }
             }
             .lineLimit(1)
             Spacer(minLength: 0)
