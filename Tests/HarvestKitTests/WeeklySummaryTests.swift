@@ -160,7 +160,7 @@ struct WeeklySummaryTests {
         let text = WeeklySummary.make(entries: entries, weekStart: monday, today: afterTheWeek).plainText
         #expect(text.hasPrefix("Weekly summary · Nov 9 – 15, 2026"))
         #expect(text.contains("Total: 3:00 (−1:00 vs last week, −1:00 vs a usual week)"))
-        #expect(text.contains("Billable: 2:00 (67%) · Internal: 1:00 (33%)"))
+        #expect(text.contains("Billable: 2:00 (67%) · Non-billable: 1:00 (33%)"))
         #expect(text.contains("• Acme Co — 2:00 (67%)"))
         #expect(text.contains("    ◦ Brand Refresh — 2:00"))
         #expect(text.contains("1. Design · Brand Refresh — 2:00"))

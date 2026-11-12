@@ -199,7 +199,7 @@ extension WeeklySummary {
             lines.append("No time tracked.")
             return lines.joined(separator: "\n")
         }
-        lines.append("Billable: \(h(billable)) (\(Self.percent(share(billable)))) · Internal: \(h(self.internal)) (\(Self.percent(share(self.internal))))")
+        lines.append("Billable: \(h(billable)) (\(Self.percent(share(billable)))) · Non-billable: \(h(self.internal)) (\(Self.percent(share(self.internal))))")
 
         lines += ["", "By client"]
         for client in clients {

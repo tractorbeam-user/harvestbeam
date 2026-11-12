@@ -380,7 +380,7 @@ private struct StaleTimerCard: View {
             }
             .lineLimit(1)
             Spacer(minLength: 6)
-            Button("Stop Timer") { Task { await tracker.pause() } }
+            Button("Pause Timer") { Task { await tracker.pause() } }
                 .buttonStyle(ReviewFixButtonStyle(prominent: true))
         }
         .padding(12)

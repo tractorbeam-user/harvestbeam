@@ -66,6 +66,14 @@ public final class ContextMemory {
         learned = (defaults.dictionary(forKey: Self.learnedKey) as? [String: String] ?? [:]).compactMapValues(TaskKey.init)
     }
 
+    /// Everything, for a different Harvest account: its tasks aren't yours.
+    public func reset() {
+        rules = []
+        learned = [:]
+        defaults.removeObject(forKey: Self.rulesKey)
+        defaults.removeObject(forKey: Self.learnedKey)
+    }
+
     public func setRules(_ rules: [AutotrackRule]) {
         self.rules = rules
         if let data = try? JSONEncoder().encode(rules) { defaults.set(data, forKey: Self.rulesKey) }

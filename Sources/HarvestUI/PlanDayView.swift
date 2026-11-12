@@ -39,6 +39,14 @@ struct PlanDayView: View {
 
     private var isPast: Bool { day < LocalDate() }
 
+    /// Rows whose typed time doesn't read as one. Add waits for them rather
+    /// than quietly leaving them out.
+    private func hoursInvalid(_ id: PlannedEntry.ID) -> Bool {
+        let typed = hours[id]?.trimmingCharacters(in: .whitespaces) ?? ""
+        return !typed.isEmpty && EntryEditor.parseHours(typed) == nil
+    }
+    private var anyInvalid: Bool { included.contains { hoursInvalid($0.id) } }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(isToday ? "What are you working on today?"
@@ -113,7 +121,8 @@ struct PlanDayView: View {
                     Button(addLabel) { add() }
                         .keyboardShortcut(.return, modifiers: .command)
                         .buttonStyle(PillButtonStyle(prominent: true))
-                        .disabled(ready.isEmpty || isSaving)
+                        .disabled(ready.isEmpty || anyInvalid || isSaving)
+                        .help(anyInvalid ? "Fix the times in red first" : "")
                 }
             }
         }
@@ -187,8 +196,8 @@ struct PlanDayView: View {
                 .frame(width: 60)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.12)))
-                .help("h:mm or decimal. Leave empty to add it at 0:00 and press play when you start.")
+                .background(RoundedRectangle(cornerRadius: 6).strokeBorder(hoursInvalid(id) && isIncluded ? Color.red.opacity(0.7) : Color.primary.opacity(0.12)))
+                .help(hoursInvalid(id) ? "Type a time like 0:25, 25m or 1.5" : "h:mm or decimal. Leave empty to add it at 0:00 and press play when you start.")
                 .disabled(!isIncluded)
         }
         .padding(.horizontal, 10)
@@ -252,8 +261,10 @@ struct PlanDayView: View {
         let items = ready
         isSaving = true
         Task {
-            for item in items {
-                await tracker.addEntry(task: item.entry.task, on: day, notes: item.entry.notes, hours: item.hours)
+            await tracker.asOneChange({ "Added \($0) entries" }) {
+                for item in items {
+                    await tracker.addEntry(task: item.entry.task, on: day, notes: item.entry.notes, hours: item.hours)
+                }
             }
             isSaving = false
             dismiss()

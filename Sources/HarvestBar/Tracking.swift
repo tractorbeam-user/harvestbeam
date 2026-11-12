@@ -71,7 +71,7 @@ final class Autotracker {
         if Date().timeIntervalSince(since) >= delay {
             unmatchedSince = nil
             startedKey = nil
-            Task { await tracker.pause() }
+            Task { await tracker.automatically { await tracker.pause() } }
         }
     }
 }
@@ -113,8 +113,10 @@ final class MeetingAutoLogger {
             default: continue
             }
             Task {
-                await tracker.log(meeting, task: suggestion.task, notes: meeting.title, hours: meeting.hours,
-                                  remember: suggestion.reason == .remembered)
+                await tracker.automatically {
+                    await tracker.log(meeting, task: suggestion.task, notes: meeting.title, hours: meeting.hours,
+                                      remember: suggestion.reason == .remembered)
+                }
                 guard let entry = tracker.entry(for: meeting) else { return }
                 Notifier.post(
                     id: "autolog-\(meeting.id)",

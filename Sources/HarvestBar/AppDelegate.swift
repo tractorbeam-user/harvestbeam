@@ -271,10 +271,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
     }
 
     @objc func statusItemClicked() {
+        // Right-click (or Control-click): the usual menu bar menu, so Settings
+        // and Quit are always a click away.
+        if let event = NSApp.currentEvent,
+           event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
+            showStatusMenu()
+            return
+        }
         // Status bar clicks report the item's center as their location, so use
         // the pointer's real screen position to tell a click on the square.
-        if let button = statusItem.button, let window = button.window, !controlButton.isHidden,
-           NSApp.currentEvent?.type != .rightMouseUp {
+        if let button = statusItem.button, let window = button.window, !controlButton.isHidden {
             let point = button.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
             if controlButton.frame.insetBy(dx: -4, dy: -6).contains(point) {
                 controlClicked()
@@ -290,6 +296,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             showPanel()
         }
     }
+
+    private func showStatusMenu() {
+        guard let button = statusItem.button else { return }
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Open \(AppInfo.name)", action: #selector(openPanelFromMenu), keyEquivalent: "")
+        if tracker.phase == .ready {
+            if let running = tracker.running {
+                menu.addItem(withTitle: "Pause \(tracker.task(for: running).projectNameParts.name)", action: #selector(controlClicked), keyEquivalent: "")
+            } else if let paused = tracker.pausedEntry {
+                menu.addItem(withTitle: "Start \(tracker.task(for: paused).projectNameParts.name) Again", action: #selector(controlClicked), keyEquivalent: "")
+            }
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "Week Calendar", action: #selector(showWeekCalendar), keyEquivalent: "")
+        }
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Settings…", action: #selector(showPreferences), keyEquivalent: ",")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Quit \(AppInfo.name)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        for item in menu.items where item.action != #selector(NSApplication.terminate(_:)) { item.target = self }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+    }
+
+    @objc private func openPanelFromMenu() { showPanel() }
 
     /// The first-run welcome. When it's done, the tracker window takes over.
     private func showOnboarding() {
@@ -423,14 +452,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
         let alert = NSAlert()
         alert.messageText = "You were away for \(TimeFormat.hoursMinutes(seconds))"
         alert.informativeText = "\(task.project.name) · \(task.task.name) kept running while you were away."
-        alert.addButton(withTitle: "Remove Time and Keep Going")
+        // Keep is the default: a stray Return or Escape as you sit back down
+        // should never delete time.
+        let keep = alert.addButton(withTitle: "Keep Time")
+        alert.addButton(withTitle: "Remove Time")
         alert.addButton(withTitle: "Remove Time and Stop")
-        alert.addButton(withTitle: "Keep Time")
+        keep.keyEquivalent = "\r"
         alert.icon = NSApp.applicationIconImage
         NSApp.activate(ignoringOtherApps: true)
         switch alert.runModal() {
-        case .alertFirstButtonReturn: Task { await tracker.removeIdleTime(seconds, keepRunning: true) }
-        case .alertSecondButtonReturn: Task { await tracker.removeIdleTime(seconds, keepRunning: false) }
+        case .alertSecondButtonReturn: Task { await tracker.removeIdleTime(seconds, keepRunning: true) }
+        case .alertThirdButtonReturn: Task { await tracker.removeIdleTime(seconds, keepRunning: false) }
         default: break
         }
     }
@@ -546,7 +578,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             return true
         }
         image.isTemplate = false
-        image.accessibilityDescription = running ? "Pause timer" : "Resume timer"
+        image.accessibilityDescription = running ? "Pause timer" : "Start timer"
         return image
     }
 
@@ -578,7 +610,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, UNUs
             // A clear placeholder reserves the square's spot; the button sits on it.
             button.image = NSImage(size: NSSize(width: Self.controlWidth, height: 16))
             controlButton.image = Self.controlImage(running: running)
-            controlButton.toolTip = running ? "Pause timer" : paused != nil ? "Resume timer" : "Start a timer"
+            controlButton.toolTip = running ? "Pause timer" : paused.map { "Start \(self.tracker.task(for: $0).projectNameParts.name) again" } ?? "Start a timer"
             controlButton.isHidden = false
             button.attributedTitle = NSAttributedString(string: title, attributes: [
                 // No custom color: the menu bar's own text color stays legible on

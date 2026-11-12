@@ -65,8 +65,15 @@ public final class ActivityRecorder {
     public static var hasAccessibility: Bool { AXIsProcessTrusted() }
 
     /// Shows macOS's prompt to allow Accessibility, which window titles need.
+    /// macOS only shows that prompt once; after that (asked before, or
+    /// turned down), it opens the Accessibility list in System Settings.
     public static func requestAccessibility() {
-        _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+        let askedKey = "accessibility.asked"
+        let askedBefore = UserDefaults.standard.bool(forKey: askedKey)
+        UserDefaults.standard.set(true, forKey: askedKey)
+        guard !AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": !askedBefore] as CFDictionary), askedBefore,
+              let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     /// The Timeline for a day, including what's being recorded right now.

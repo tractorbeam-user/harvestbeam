@@ -7,6 +7,8 @@ import SwiftUI
 struct AskCommandRow: View {
     let preview: AskCommandPreview
     let apply: () -> Void
+    /// Replaces the ask box's text with one of the preview's fixes.
+    var rewrite: (String) -> Void = { _ in }
     @State private var isHovered = false
 
     private var isReady: Bool { preview.plan.isReady }
@@ -22,6 +24,20 @@ struct AskCommandRow: View {
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            row
+            if !preview.fixes.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(preview.fixes) { fix in
+                        FixButton(fix: fix) { rewrite(fix.text) }
+                    }
+                }
+                .padding(.leading, 30)
+            }
+        }
+    }
+
+    private var row: some View {
         Button(action: apply) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
@@ -40,7 +56,7 @@ struct AskCommandRow: View {
                     }
                 }
                 Spacer(minLength: 6)
-                Text(isReady ? "⏎ apply · esc" : "esc")
+                Text(isReady ? "↩ apply · esc" : "esc")
                     .font(.system(size: 11, weight: .medium))
                     .opacity(0.8)
                     .fixedSize()
@@ -94,5 +110,73 @@ extension TrackableTask {
         let head = [client?.name, projectCode].compactMap { $0 }.joined(separator: " · ")
         guard let definition else { return head }
         return [head, "\(definition.title): \(definition.detail)"].filter { !$0.isEmpty }.joined(separator: "\n")
+    }
+}
+
+/// One of a command problem's fixes: "Dallas Art Fair · Design".
+private struct FixButton: View {
+    let fix: AskCommandFix
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(fix.label)
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.harvestOrange.opacity(isHovered ? 0.2 : 0.12)))
+                .foregroundStyle(Color.harvestOrange)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        #if os(macOS)
+        .onHover { isHovered = $0 }
+        #endif
+        .help(fix.text)
+    }
+}
+
+/// Lays chips out left to right, wrapping onto new lines.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map { $0.width }.max() ?? 0
+        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: min(width, proposal.width ?? width), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: min(size.width, bounds.width), height: size.height))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = [Row()]
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let extra = rows[rows.count - 1].indices.isEmpty ? size.width : size.width + spacing
+            if !rows[rows.count - 1].indices.isEmpty, rows[rows.count - 1].width + extra > width {
+                rows.append(Row())
+            }
+            let added = rows[rows.count - 1].indices.isEmpty ? size.width : size.width + spacing
+            rows[rows.count - 1].indices.append(index)
+            rows[rows.count - 1].width += added
+            rows[rows.count - 1].height = max(rows[rows.count - 1].height, size.height)
+        }
+        return rows.filter { !$0.indices.isEmpty }
     }
 }

@@ -44,11 +44,7 @@ struct TrackerView: View {
     /// Keeps the list up while the pointer is on it: a click there takes
     /// focus out of the box before the row's button sees it.
     @State private var isHoveringAskList = false
-    /// The landing page's feedback form, told which version it came from.
-    static var feedbackURL: URL {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-        return URL(string: "https://harvestbeam.vercel.app/?from=app&v=\(version)#feedback")!
-    }
+    static var feedbackURL: URL { AppLinks.feedback }
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
@@ -89,7 +85,7 @@ struct TrackerView: View {
     @State private var settledQuery = ""
     @State private var settleWork: Task<Void, Never>?
     private var askReading: AskCache.Reading {
-        askCache.reading(settledQuery, isSearching: isSearching && !settledQuery.isEmpty, tracker: tracker)
+        askCache.reading(settledQuery, isSearching: isSearching && !settledQuery.isEmpty, day: selectedDay, tracker: tracker)
     }
     private var askCommand: AskCommandPreview? { askReading.command }
     /// "10 min on tb corporate": what typing a duration in the ask box would add.
@@ -172,7 +168,10 @@ struct TrackerView: View {
     /// Search results as a compact list, otherwise the tile sections.
     @ViewBuilder private func content(_ sections: [TaskSection]) -> some View {
         if let command = askCommand {
-            AskCommandRow(preview: command) { applyCommand(command) }
+            AskCommandRow(preview: command, apply: { applyCommand(command) }, rewrite: { text in
+                query = text
+                searchFocused = true
+            })
         } else if !helpAnswers.isEmpty {
             VStack(spacing: 6) {
                 ForEach(helpAnswers) { HelpAnswerRow(topic: $0) }
@@ -705,6 +704,9 @@ struct TrackerView: View {
             }
             .animation(.snappy(duration: 0.2), value: tracker.toast)
 
+            if let problem = tracker.connectionProblem {
+                ConnectionLine(detail: problem)
+            }
             if let error = tracker.errorMessage {
                 ErrorBanner(message: error) { tracker.errorMessage = nil }
             }
@@ -993,8 +995,10 @@ struct TrackerView: View {
         query = ""
         selection = nil
         Task {
-            for entry in plan {
-                await tracker.addEntry(task: entry.task, on: day, notes: entry.notes, hours: entry.hours ?? 0)
+            await tracker.asOneChange({ "Added \($0) entries" }) {
+                for entry in plan {
+                    await tracker.addEntry(task: entry.task, on: day, notes: entry.notes, hours: entry.hours ?? 0)
+                }
             }
         }
     }
@@ -1066,7 +1070,7 @@ struct TrackerView: View {
             FooterButton(systemImage: "bubble.left", help: "Send feedback: a bug, a question or an idea") {
                 openURL(Self.feedbackURL)
             }
-            FooterButton(systemImage: "globe", help: "Open Harvest on the web") {
+            FooterButton(systemImage: "arrow.up.right.square", help: "Open Harvest in your browser") {
                 if let url = tracker.harvestWebURL { openURL(url) }
             }
 
@@ -1153,6 +1157,10 @@ struct TrackerView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    if let problem = tracker.connectionProblem {
+                        ConnectionLine(detail: problem)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
                     if let error = tracker.errorMessage {
                         ErrorBanner(message: error) { tracker.errorMessage = nil }
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1311,6 +1319,44 @@ private struct UndoToastView: View {
     }
 }
 
+/// Where feedback goes, from the window and from Settings alike.
+public enum AppLinks {
+    /// The landing page's feedback form, told which version it came from.
+    public static var feedback: URL {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        return URL(string: "https://harvestbeam.vercel.app/?from=app&v=\(version)#feedback")!
+    }
+}
+
+/// Harvest can't be reached: one quiet line that stays put while the app
+/// keeps retrying, and goes away by itself once a refresh works.
+private struct ConnectionLine: View {
+    @Environment(TimeTracker.self) private var tracker
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.exclamationmark").foregroundStyle(.secondary)
+            Text("Can't reach Harvest. Retrying every minute.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .help(detail)
+            Spacer()
+            if tracker.isRefreshing {
+                ProgressView().controlSize(.small)
+            } else {
+                Button("Try Now") { Task { await tracker.refresh(force: true) } }
+                    .buttonStyle(.borderless)
+                    .font(.callout)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.04))
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct ErrorBanner: View {
     let message: String
     let dismiss: () -> Void
@@ -1353,6 +1399,7 @@ private struct FooterButton<Icon: View>: View {
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
         .help(help)
+        .accessibilityLabel(help)
     }
 }
 #endif
@@ -1387,13 +1434,13 @@ private struct TitleBar: View {
                             openSummary(selectedDay)
                         }
                         .onHover(perform: hoverWeek)
-                        .popover(isPresented: $showingSummary, arrowEdge: .bottom) { TimeSummary() }
+                        .popover(isPresented: $showingSummary, arrowEdge: .bottom) { TimeSummary(day: selectedDay) }
                     } else {
                         Text(week)
                             .font(.system(size: 12, weight: .medium).monospacedDigit())
                             .opacity(0.8)
                             .onHover(perform: hoverWeek)
-                            .popover(isPresented: $showingSummary, arrowEdge: .bottom) { TimeSummary() }
+                            .popover(isPresented: $showingSummary, arrowEdge: .bottom) { TimeSummary(day: selectedDay) }
                     }
                 }
                 .lineLimit(1)
@@ -1467,41 +1514,56 @@ private struct TitleBarButtonStyle: ButtonStyle {
 /// Harvest's Time Summary: hours today, yesterday, this week and this month.
 #if DEBUG
 /// For offscreen snapshots; white text around it like the title bar.
-public func debugTimeSummary() -> some View { TimeSummary().foregroundStyle(.white) }
+public func debugTimeSummary() -> some View { TimeSummary(day: LocalDate()).foregroundStyle(.white) }
 #endif
 
 private struct TimeSummary: View {
     @Environment(TimeTracker.self) private var tracker
+    /// The day the window shows: the summary is about it and its week, so
+    /// it matches the week total you're pointing at.
+    let day: LocalDate
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let today = LocalDate(context.date)
+            let isToday = day == today
+            let before = day.adding(days: -1)
+            let weekStart = day.startOfWeek(firstWeekday: tracker.firstWeekday)
+            let isThisWeek = weekStart == today.startOfWeek(firstWeekday: tracker.firstWeekday)
+            let isThisMonth = day.year == today.year && day.month == today.month
             VStack(spacing: 0) {
                 Text("Time Summary")
                     .font(.system(size: 13, weight: .semibold))
                     .padding(.vertical, 12)
                 Divider()
                 HStack(spacing: 0) {
-                    cell("Hours Today", tracker.seconds(on: today, at: context.date))
+                    cell(isToday ? "Hours Today" : Self.short(day), tracker.seconds(on: day, at: context.date))
                     Divider()
-                    cell("Hours Yesterday", tracker.seconds(on: today.adding(days: -1), at: context.date))
+                    cell(isToday ? "Hours Yesterday" : Self.short(before), tracker.seconds(on: before, at: context.date))
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 Divider()
                 HStack(spacing: 0) {
-                    cell("Hours This Week", tracker.weekSeconds(containing: today, at: context.date))
+                    cell(isThisWeek ? "Hours This Week" : "Week of \(weekStart.date().formatted(.dateTime.month(.abbreviated).day()))",
+                         tracker.weekSeconds(containing: day, at: context.date))
                     Divider()
-                    cell("Hours This Month", tracker.monthSeconds(containing: today, at: context.date))
+                    cell(isThisMonth ? "Hours This Month" : day.date().formatted(.dateTime.month(.wide).year()),
+                         tracker.monthSeconds(containing: day, at: context.date))
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .dimsWindow()
+        // A hover card: no dimming, so it doesn't flash the window as the
+        // pointer passes.
         .frame(width: 300)
         // The title bar sets white text, and `.primary` would inherit it; use
         // the real label colors.
         .foregroundStyle(Color.primary)
         .presentationBackground(Color.tileBackground)
+    }
+
+    private static func short(_ day: LocalDate) -> String {
+        day.date().formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
     }
 
     private func cell(_ label: String, _ seconds: TimeInterval) -> some View {
@@ -1580,7 +1642,7 @@ private struct PlanSentenceRow: View {
                         .lineLimit(2)
                 }
                 Spacer(minLength: 6)
-                Text("⏎").font(.system(size: 11, weight: .medium)).opacity(0.8)
+                Text("↩").font(.system(size: 11, weight: .medium)).opacity(0.8)
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
@@ -1668,13 +1730,13 @@ final class AskCache {
     private var key: [AnyHashable] = []
     private var cached = Reading()
 
-    @MainActor func reading(_ query: String, isSearching: Bool, tracker: TimeTracker) -> Reading {
+    @MainActor func reading(_ query: String, isSearching: Bool, day: LocalDate, tracker: TimeTracker) -> Reading {
         guard isSearching else { return Reading() }
-        let key: [AnyHashable] = [query, tracker.tasks.count, tracker.todayEntries.map(\.id), tracker.running?.id,
+        let key: [AnyHashable] = [query, day, tracker.entries(on: day).map(\.id), tracker.running?.id, tracker.tasks.count,
                                   tracker.favorites.set, Int(Date().timeIntervalSince1970 / 30)]
         if key == self.key { return cached }
         var reading = Reading()
-        reading.command = tracker.askCommand(query)
+        reading.command = tracker.askCommand(query, on: day)
         if reading.command == nil, AppHelp.isQuestion(query) {
             reading.help = AppHelp.answers(for: query)
         }
@@ -1721,7 +1783,7 @@ private struct QuickPlanRow: View {
                 }
                 .lineLimit(1)
                 Spacer(minLength: 6)
-                Text("⏎")
+                Text("↩")
                     .font(.system(size: 12, weight: .medium))
                     .opacity(isSelected ? 0.9 : 0)
             }

@@ -147,6 +147,52 @@ struct AskCommandResolverTests {
         #expect(try r.entry(.named("design")).get().id == 1)
     }
 
+    @Test func ambiguousNamesOfferEachTaskAsAFix() {
+        let r = resolver([entry(1, fairDesign, hours: 1), entry(2, fairMeetings, hours: 1)])
+        let preview = r.preview(.setHours(.named("dallas"), hours: 0.5))
+        #expect(!preview.plan.isReady)
+        #expect(preview.fixes.map(\.label) == ["Dallas Art Fair · Design", "Dallas Art Fair · Meetings"])
+        // Each fix reads back as a command that works.
+        for fix in preview.fixes {
+            let command = try? #require(AskCommand.parse(fix.text))
+            #expect(command.map { r.resolve($0).isReady } == true, "\(fix.text)")
+        }
+        // A name that matches nothing tracked offers a search instead.
+        let none = r.preview(.setHours(.named("website"), hours: 0.5))
+        #expect(none.fixes.map(\.text) == ["website"])
+    }
+
+    @Test func commandsWorkOnTheDayBeingViewed() {
+        let all = [managerial, fairDesign, fairMeetings, website]
+        let byKey = Dictionary(uniqueKeysWithValues: all.map { ($0.key, $0) })
+        let r = AskCommandResolver(today: [], tasks: Ranking.SearchIndex(tasks: all), taskFor: { byKey[$0.key]! },
+                                   now: now, dayPhrase: "yesterday")
+        #expect(r.resolve(.setHours(.last, hours: 1)) == .problem("Nothing tracked yesterday"))
+        let earlier = entry(1, managerial, hours: 1)
+        let onDay = AskCommandResolver(today: [earlier], tasks: Ranking.SearchIndex(tasks: all), taskFor: { byKey[$0.key]! },
+                                       now: now, dayPhrase: "yesterday")
+        let preview = onDay.preview(.setHours(.last, hours: 2))
+        #expect(preview.plan.isReady)
+        #expect(preview.detail?.hasSuffix("Yesterday") == true)
+        // Stop still finds the running timer, wherever you're looking.
+        let running = entry(2, website, hours: 0.5, running: true)
+        let stop = AskCommandResolver(today: [earlier], tasks: Ranking.SearchIndex(tasks: all), taskFor: { byKey[$0.key]! },
+                                      now: now, dayPhrase: "yesterday", running: running)
+        #expect(stop.resolve(.pause) == .pause(running))
+    }
+
+    @Test func commandTextReadsBack() {
+        let commands: [AskCommand] = [
+            .move(hours: 0.5, from: .named("admin"), to: "website"),
+            .move(hours: 1.25, from: .last, to: "dallas art fair"),
+            .setHours(.named("website redesign design"), hours: 1.5),
+            .setHours(.last, hours: 0.75),
+            .note("client feedback"),
+            .pause,
+        ]
+        for command in commands { #expect(AskCommand.parse(command.text) == command, "\(command.text)") }
+    }
+
     @Test func setsHoursAndNotes() {
         let running = entry(3, website, hours: 0.5, running: true, notes: "old")
         let r = resolver([entry(1, managerial, hours: 1), running])

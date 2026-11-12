@@ -15,10 +15,15 @@ public struct Credentials: Codable, Sendable, Equatable {
 
 /// Keeps the Harvest token in the Keychain, never in UserDefaults.
 public enum CredentialStore {
-    static let service = "com.tractorbeam.harvestbar"
+    /// Where Harvestbeam keeps it, and where every build kept it before the
+    /// beta got its own.
+    static let sharedService = "com.tractorbeam.harvestbar"
+    /// Each app its own sign-in, like its own settings: signing out of the
+    /// beta leaves Harvestbeam signed in.
+    static let service = Bundle.main.bundleIdentifier ?? sharedService
     static let account = "harvest-credentials"
 
-    private static var baseQuery: [String: Any] {
+    private static func query(_ service: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -26,8 +31,23 @@ public enum CredentialStore {
         ]
     }
 
+    private static var baseQuery: [String: Any] { query(service) }
+
     public static func load() -> Credentials? {
-        var query = baseQuery
+        if let own = load(from: service) { return own }
+        // The beta, the first time: start signed in as Harvestbeam was, then
+        // keep its own copy.
+        // Only once: after signing out of the beta it stays signed out.
+        let copiedKey = "credentials.copiedFromShared"
+        guard service != sharedService, !UserDefaults.standard.bool(forKey: copiedKey),
+              let shared = load(from: sharedService) else { return nil }
+        UserDefaults.standard.set(true, forKey: copiedKey)
+        try? save(shared)
+        return shared
+    }
+
+    private static func load(from service: String) -> Credentials? {
+        var query = query(service)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?

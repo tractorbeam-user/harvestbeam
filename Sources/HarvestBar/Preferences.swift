@@ -146,8 +146,8 @@ struct LabsPrefs: View {
                                 icon: RowIcon("calendar", .red), isOn: $logsMeetings)
                         .onChange(of: logsMeetings) { _, on in if on { Notifier.requestPermission() } }
                     CardDivider()
-                    SettingsRow("Continue shortcut",
-                                description: "One shortcut, anywhere on your Mac, picks up your last entry or stops the timer. Set the keys in Shortcuts.",
+                    SettingsRow("Start/pause shortcut",
+                                description: "One shortcut, anywhere on your Mac, starts your last entry again or pauses the timer. Set the keys in Shortcuts.",
                                 icon: RowIcon("command", .gray), isOn: $continueShortcut)
                         .onChange(of: continueShortcut) { NotificationCenter.default.post(name: .toggleShortcutChanged, object: nil) }
                 }
@@ -349,7 +349,7 @@ struct ShortcutPrefs: View {
                     ShortcutRecorder(title: "Show or hide \(AppInfo.name)", name: "toggle", display: $display)
                     if continueOn {
                         CardDivider()
-                        ShortcutRecorder(title: "Continue last entry, or stop the timer", name: "continue", display: $continueDisplay)
+                        ShortcutRecorder(title: "Start last entry again, or pause the timer", name: "continue", display: $continueDisplay)
                     }
                 }
                 SettingsSection("In the \(AppInfo.name) window") {
@@ -369,7 +369,7 @@ struct ShortcutPrefs: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Click a shortcut, then type the new keys. Use ⌘, ⌥ or ⌃ with a key. Esc cancels.")
                 if continueOn {
-                    Text("Continue picks up your most recent entry; if a timer's running, it stops it.")
+                    Text("Start/pause picks up your most recent entry; if a timer's running, it pauses it.")
                 }
                 Text("Shortcuts in the window work while \(AppInfo.name) is in front.")
             }
@@ -388,6 +388,8 @@ private struct ShortcutRecorder: View {
     @Binding var display: String
     @State private var recording = false
     @State private var monitor: Any?
+    /// Why the last keys typed weren't taken.
+    @State private var refusal: String?
 
     var body: some View {
         SettingsRow(title) {
@@ -395,7 +397,9 @@ private struct ShortcutRecorder: View {
                 Button { recording ? stopRecording() : startRecording() } label: {
                     Group {
                         if recording {
-                            Text("Type a shortcut…").foregroundStyle(Color.harvestOrange)
+                            Text(refusal ?? "Type a shortcut…")
+                                .foregroundStyle(refusal == nil ? Color.harvestOrange : Color.red)
+                                .lineLimit(1)
                         } else if display.isEmpty {
                             Text("None").foregroundStyle(Color.secondary)
                         } else {
@@ -430,22 +434,73 @@ private struct ShortcutRecorder: View {
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             if event.keyCode == UInt16(kVK_Escape) { stopRecording(); return nil }
             let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
-            guard !flags.intersection([.command, .option, .control]).isEmpty else { NSSound.beep(); return nil }
+            guard !flags.intersection([.command, .option, .control]).isEmpty else {
+                refuse("Add ⌘, ⌥ or ⌃")
+                return nil
+            }
+            // ⌘ alone (or with ⇧) on these is every app's Copy, Quit, Save…
+            // or macOS's own; taking it everywhere would break them.
+            let key = Self.keyName(event)
+            let commandOnly = flags.subtracting(.shift) == .command
+            if commandOnly, Self.reserved.contains(key) || flags.contains(.shift) && ["3", "4", "5"].contains(key) {
+                refuse("\(Self.symbols(flags))\(key) is taken by macOS")
+                return nil
+            }
             var carbon = 0
             var symbols = ""
             if flags.contains(.control) { carbon |= controlKey; symbols += "⌃" }
             if flags.contains(.option) { carbon |= optionKey; symbols += "⌥" }
             if flags.contains(.shift) { carbon |= shiftKey; symbols += "⇧" }
             if flags.contains(.command) { carbon |= cmdKey; symbols += "⌘" }
-            let key = (event.charactersIgnoringModifiers ?? "").uppercased()
-            save(HotKey.Shortcut(keyCode: Int(event.keyCode), carbonModifiers: carbon), display: symbols + key)
+            let shortcut = HotKey.Shortcut(keyCode: Int(event.keyCode), carbonModifiers: carbon)
+            let other = name == "toggle" ? "continue" : "toggle"
+            if let taken = HotKey.Shortcut.load(other, default: other == "toggle" ? .default : nil),
+               taken.keyCode == shortcut.keyCode, taken.carbonModifiers == shortcut.carbonModifiers {
+                refuse("Already used for the other shortcut")
+                return nil
+            }
+            save(shortcut, display: symbols + key)
             stopRecording()
             return nil
         }
     }
 
+    private func refuse(_ reason: String) {
+        NSSound.beep()
+        refusal = reason
+    }
+
+    /// Shortcuts every Mac app (or macOS) already uses with ⌘.
+    private static let reserved: Set<String> = [
+        "Q", "W", "C", "V", "X", "Z", "A", "S", "H", "M", "N", "O", "P", "F", "T", ",", "Tab", "Space", "`",
+    ]
+
+    private static func symbols(_ flags: NSEvent.ModifierFlags) -> String {
+        (flags.contains(.control) ? "⌃" : "") + (flags.contains(.option) ? "⌥" : "")
+            + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "")
+    }
+
+    /// The key as macOS writes it in menus: "H", "Space", "↩", "F5".
+    static func keyName(_ event: NSEvent) -> String {
+        let named: [Int: String] = [
+            kVK_Space: "Space", kVK_Return: "↩", kVK_Tab: "Tab", kVK_Delete: "⌫", kVK_ForwardDelete: "⌦",
+            kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",
+            kVK_Home: "↖", kVK_End: "↘", kVK_PageUp: "⇞", kVK_PageDown: "⇟",
+            kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5", kVK_F6: "F6",
+            kVK_F7: "F7", kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12",
+        ]
+        if let name = named[Int(event.keyCode)] { return name }
+        // The key's own character, ignoring ⌥ and ⇧ ("2", not "™" or "@").
+        let plain = event.charactersIgnoringModifiers?.uppercased() ?? ""
+        if let layout = event.characters(byApplyingModifiers: []), !layout.isEmpty {
+            return layout.uppercased()
+        }
+        return plain
+    }
+
     private func stopRecording() {
         recording = false
+        refusal = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
     }
@@ -527,7 +582,7 @@ struct TrackingPrefs: View {
                         }
                     }
                     CardDivider()
-                    SettingsRow("Stop the timer when no rule matches any more", isOn: $stopsWhenUnmatched)
+                    SettingsRow("Pause the timer when no rule matches any more", isOn: $stopsWhenUnmatched)
                 }
                 .disabled(!autotracks)
             }
@@ -783,11 +838,16 @@ struct SupportPrefs: View {
                 SettingsRow("Reload from Harvest",
                             description: "\(AppInfo.name) keeps your projects and recent entries in memory. Reload them from Harvest if something looks out of date.",
                             icon: RowIcon("arrow.clockwise", .blue)) {
-                    Button(reloaded ? "Reloaded" : "Reload") {
-                        Task {
-                            await tracker.refresh(force: true)
-                            reloaded = true
+                    HStack(spacing: 8) {
+                        if tracker.isRefreshing { ProgressView().controlSize(.small) }
+                        Button(tracker.isRefreshing ? "Reloading…" : reloaded ? (tracker.connectionProblem == nil ? "Reloaded" : "Couldn't Reload") : "Reload") {
+                            Task {
+                                await tracker.refresh(force: true)
+                                reloaded = true
+                            }
                         }
+                        .disabled(tracker.isRefreshing)
+                        .help(tracker.connectionProblem ?? "")
                     }
                 }
                 CardDivider()
@@ -825,7 +885,7 @@ struct SupportPrefs: View {
             SettingsSection("About") {
                 SettingsRow("\(AppInfo.name) \(version)", description: "An unofficial client for the Harvest API.",
                             icon: RowIcon("info.circle.fill", .gray)) {
-                    Link("Report a Problem…", destination: URL(string: "https://github.com/tractorbeam-user/harvestbeam/issues")!)
+                    Link("Send Feedback…", destination: AppLinks.feedback)
                         .foregroundStyle(Color.harvestOrange)
                 }
             }

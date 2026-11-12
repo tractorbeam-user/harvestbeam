@@ -91,7 +91,31 @@ struct UndoTests {
         await roundTrip(tracker) {
             await tracker.addEntry(task: task, on: LocalDate(), notes: "Sketches", hours: 1.25)
         }
-        #expect(tracker.redoLabel == "Added 1:15 to \(task.projectNameParts.name)")
+        #expect(tracker.redoLabel == "Added 1:15 to \(task.projectNameParts.name) · \(task.task.name)")
+    }
+
+    @Test func severalAddsUndoAsOne() async throws {
+        let tracker = await makeTracker()
+        let first = try otherTask(tracker, than: TaskKey(projectID: 0, taskID: 0))
+        let second = try otherTask(tracker, than: first.key)
+        let before = shape(tracker)
+        await tracker.asOneChange({ "Added \($0) entries" }) {
+            await tracker.addEntry(task: first, on: LocalDate(), notes: "", hours: 0.5)
+            await tracker.addEntry(task: second, on: LocalDate(), notes: "", hours: 0.25)
+        }
+        #expect(tracker.undoLabel == "Added 2 entries")
+        await tracker.undo()
+        expectSame(shape(tracker), before)
+        #expect(!tracker.canUndo)
+    }
+
+    @Test func automaticChangesStayOutOfUndo() async throws {
+        let tracker = await makeTracker()
+        let task = try otherTask(tracker, than: TaskKey(projectID: 0, taskID: 0))
+        await tracker.automatically {
+            await tracker.addEntry(task: task, on: LocalDate(), notes: "", hours: 0.5)
+        }
+        #expect(!tracker.canUndo)
     }
 
     @Test func editEntryTaskNotesAndHours() async throws {
@@ -140,7 +164,7 @@ struct UndoTests {
         await roundTrip(tracker) {
             #expect(await tracker.moveTime(20 * 60, from: entry, to: target))
         }
-        #expect(tracker.redoLabel == "Moved 0:20 to \(target.projectNameParts.name)")
+        #expect(tracker.redoLabel == "Moved 0:20 to \(target.projectNameParts.name) · \(target.task.name)")
         // Both halves were one step: nothing else to undo.
         #expect(!tracker.canUndo)
     }

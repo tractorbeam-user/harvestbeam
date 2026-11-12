@@ -94,6 +94,10 @@ extension TimeTracker {
     /// being recorded as a whole.
     func record(_ label: String, _ op: UndoOp) {
         guard recordingPaused == 0 else { return }
+        if collectedSteps != nil {
+            collectedSteps?.append(UndoStep(label: label, op: op))
+            return
+        }
         undoStack.append(UndoStep(label: label, op: op))
         trimUndo()
         redoStack = []
@@ -105,6 +109,31 @@ extension TimeTracker {
         recordingPaused += 1
         defer { recordingPaused -= 1 }
         return await body()
+    }
+
+    /// Changes the app makes on its own (auto-logged meetings, auto-tracking)
+    /// stay out of Undo, so ⌘Z always means the last thing you did.
+    public func automatically<T>(_ body: () async -> T) async -> T {
+        await withoutRecording(body)
+    }
+
+    /// Records everything `body` changes as one undo step: adding a planned
+    /// day, or logging a week's meetings, comes back with a single ⌘Z.
+    /// `label` gets how many changes there were.
+    public func asOneChange<T>(_ label: (Int) -> String, _ body: () async -> T) async -> T {
+        // Already inside one: it all joins that.
+        guard collectedSteps == nil else { return await body() }
+        collectedSteps = []
+        let result = await body()
+        let steps = collectedSteps ?? []
+        collectedSteps = nil
+        if steps.count == 1, let step = steps.first {
+            record(step.label, step.op)
+        } else if !steps.isEmpty {
+            // Undone last first.
+            record(label(steps.count), .group(steps.reversed().map(\.op)))
+        }
+        return result
     }
 
     func favoritesChanged(from before: [TaskKey], to after: [TaskKey]) {
@@ -125,7 +154,13 @@ extension TimeTracker {
             ?? "a task"
     }
 
-    func shortName(for task: TrackableTask) -> String { task.projectNameParts.name }
+    /// "Dallas Art Fair · Design": the project alone isn't enough when you
+    /// track several of its tasks.
+    func shortName(for task: TrackableTask) -> String {
+        let project = task.projectNameParts.name
+        let short = project.count <= 32 ? project : String(project.prefix(31)) + "…"
+        return "\(short) · \(task.task.name)"
+    }
 
     func shortName(for entry: TimeEntry) -> String { shortName(for: task(for: entry)) }
 

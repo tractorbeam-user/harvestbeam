@@ -238,6 +238,14 @@ public final class MeetingMemory {
         defaults.set(remembered.mapValues(\.description), forKey: Self.rememberedKey)
     }
 
+    /// Everything, for a different Harvest account: its tasks aren't yours.
+    public func reset() {
+        remembered = [:]
+        logged = [:]
+        skipped = []
+        for key in [Self.rememberedKey, Self.loggedKey, Self.skippedKey] { defaults.removeObject(forKey: key) }
+    }
+
     public func forget(_ title: String) {
         remembered[MeetingMatcher.normalized(title)] = nil
         defaults.set(remembered.mapValues(\.description), forKey: Self.rememberedKey)
@@ -321,10 +329,12 @@ extension TimeTracker {
 
     /// Logs each meeting to its suggested task, one after another.
     public func logSuggested(_ meetings: [CalendarMeeting]) async {
-        for meeting in meetings {
-            guard case .matched(let suggestion) = status(of: meeting) else { continue }
-            await log(meeting, task: suggestion.task, notes: meeting.title, hours: meeting.hours,
-                      remember: suggestion.reason == .remembered)
+        await asOneChange({ "Logged \($0) meetings" }) {
+            for meeting in meetings {
+                guard case .matched(let suggestion) = status(of: meeting) else { continue }
+                await log(meeting, task: suggestion.task, notes: meeting.title, hours: meeting.hours,
+                          remember: suggestion.reason == .remembered)
+            }
         }
     }
 

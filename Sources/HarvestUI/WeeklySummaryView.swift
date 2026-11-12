@@ -167,6 +167,14 @@ struct WeeklySummaryCard: View {
                 days.frame(maxWidth: .infinity, maxHeight: .infinity).tile()
             }
             .fixedSize(horizontal: false, vertical: true)
+            if summary.isEmpty {
+                Label("Nothing tracked this week yet. Totals, clients and top tasks show up here as you log time.",
+                      systemImage: "calendar.badge.clock")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .tile()
+            }
             billableSplit.tile()
             if !summary.clients.isEmpty { clients.tile() }
             if !summary.topTasks.isEmpty { topTasks.tile() }
@@ -259,7 +267,7 @@ struct WeeklySummaryCard: View {
 
     private var billableSplit: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Billable vs internal")
+            sectionTitle("Billable vs non-billable")
             GeometryReader { geo in
                 HStack(spacing: summary.billable > 0 && summary.internal > 0 ? 2 : 0) {
                     if summary.billable > 0 {
@@ -276,7 +284,7 @@ struct WeeklySummaryCard: View {
             .frame(height: 12)
             HStack(spacing: 16) {
                 legend("Billable", color: .harvestOrange, seconds: summary.billable)
-                legend("Internal", color: .internalTime, seconds: summary.internal)
+                legend("Non-billable", color: .internalTime, seconds: summary.internal)
                 Spacer()
             }
         }

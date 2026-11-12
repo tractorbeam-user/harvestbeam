@@ -43,6 +43,10 @@ public final class TimeTracker {
     /// While an undo or redo is on its way to Harvest.
     var isUndoing = false
     public var errorMessage: String?
+    /// Why the last background refresh failed (offline, Harvest down). Kept
+    /// apart from `errorMessage` so it shows as one steady line that clears
+    /// itself when Harvest is back, and never wipes an error you haven't read.
+    public var connectionProblem: String?
     /// Bumped whenever the panel opens so the search field can grab focus.
     public private(set) var focusRequest = 0
     /// Whether the latest `focusRequest` should put you in the search box.
@@ -63,6 +67,8 @@ public final class TimeTracker {
     @ObservationIgnored var toastCounter = 0
     /// Above zero while a change made of smaller ones records itself as one.
     @ObservationIgnored var recordingPaused = 0
+    /// While several changes are being recorded as one undo step.
+    @ObservationIgnored var collectedSteps: [UndoStep]?
     /// Old entry ID → new, for entries deleted and made again by undo.
     @ObservationIgnored var idAliases: [Int: Int] = [:]
     @ObservationIgnored private var lastRefresh: Date?
@@ -189,7 +195,7 @@ public final class TimeTracker {
             self.loadedThrough = through
         } catch is CancellationError {
         } catch {
-            errorMessage = error.localizedDescription
+            connectionProblem = error.localizedDescription
         }
     }
 
@@ -218,7 +224,7 @@ public final class TimeTracker {
             self.loadedFrom = from
         } catch is CancellationError {
         } catch {
-            errorMessage = error.localizedDescription
+            connectionProblem = error.localizedDescription
         }
     }
 
@@ -356,15 +362,18 @@ public final class TimeTracker {
             }
             loadedFrom = min(loadedFrom ?? from, from)
             loadedThrough = max(loadedThrough ?? through, through)
+            // An error from something you did stays until you dismiss it or
+            // the next change works; only the loading screen's error clears.
+            if phase != .ready { errorMessage = nil }
             phase = .ready
-            errorMessage = nil
+            connectionProblem = nil
             rememberFavorites()
         } catch HarvestError.unauthorized where !isDemo {
             signOut()
             errorMessage = HarvestError.unauthorized.errorDescription
         } catch is CancellationError {
         } catch {
-            errorMessage = error.localizedDescription
+            if phase == .ready { connectionProblem = error.localizedDescription } else { errorMessage = error.localizedDescription }
         }
     }
 
@@ -814,6 +823,7 @@ public final class TimeTracker {
         let client = HarvestClient(token: token, accountID: account.id)
         let me = try await client.currentUser()
         try CredentialStore.save(Credentials(token: token, accountID: account.id, accountName: account.name))
+        forgetOtherAccount(signingInTo: account.id, as: me.id)
         service = client
         user = me
         company = nil
@@ -822,6 +832,23 @@ public final class TimeTracker {
         errorMessage = nil
         await refresh(force: true)
         onUsage?(.signedIn)
+    }
+
+    /// Favorites, remembered meetings, learned windows and rules all point at
+    /// one account's tasks. Signing in as someone else (or to another
+    /// Harvest account) starts those fresh; signing back in to the same one
+    /// keeps them.
+    private func forgetOtherAccount(signingInTo accountID: Int, as userID: Int) {
+        let key = "signedIn.account"
+        let current = "\(accountID)/\(userID)"
+        defer { defaults.set(current, forKey: key) }
+        guard let previous = defaults.string(forKey: key), previous != current else { return }
+        favorites.replace(with: [])
+        rememberedTasks = [:]
+        defaults.removeObject(forKey: RememberedTasks.key)
+        meetingMemory.reset()
+        contextMemory.reset()
+        showHiddenSuggestions()
     }
 
     public func signOut() {
@@ -835,6 +862,7 @@ public final class TimeTracker {
         loadedFrom = nil
         loadedThrough = nil
         lastRefresh = nil
+        connectionProblem = nil
         phase = .signedOut
         clearUndoHistory()
     }

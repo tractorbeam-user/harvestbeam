@@ -262,6 +262,12 @@ private struct TourCard: View {
                 Spacer(minLength: 0)
                 StepDots(current: stop)
                 Spacer(minLength: 0)
+                if stop.rawValue > 0 {
+                    Button("Back") { tour.back() }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("Back (←)")
+                }
                 Button(isLast ? "Done" : "Next") { tour.next() }
                     .buttonStyle(TourButtonStyle())
                     .help(isLast ? "Finish the tour (return)" : "Next (return or →)")

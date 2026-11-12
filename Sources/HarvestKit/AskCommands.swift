@@ -125,6 +125,35 @@ public struct AskCommandPreview: Equatable, Sendable {
     public let title: String
     /// The tasks in full, or the problem's choices.
     public let detail: String?
+    /// For a command that can't work: the same command with the name
+    /// settled, one per task it could mean, to click instead of retyping.
+    public var fixes: [AskCommandFix] = []
+}
+
+/// One way out of a command's problem: `text` replaces what was typed.
+public struct AskCommandFix: Equatable, Sendable, Identifiable {
+    public let label: String
+    public let text: String
+    public var id: String { text }
+}
+
+extension AskCommand {
+    /// The command written out so `parse` reads it back the same.
+    public var text: String {
+        func name(_ target: Target) -> String {
+            switch target {
+            case .last: "last entry"
+            case .named(let name): name
+            }
+        }
+        let hm = { (hours: Double) in TimeFormat.hoursMinutes(hours * 3600) }
+        switch self {
+        case .move(let hours, let from, let to): return "move \(hm(hours)) from \(name(from)) to \(to)"
+        case .setHours(let target, let hours): return "set \(name(target)) to \(hm(hours))"
+        case .note(let note): return "note: \(note)"
+        case .pause: return "stop"
+        }
+    }
 }
 
 /// Matches a command to today's entries and the account's tasks. Pure, so
@@ -136,13 +165,20 @@ public struct AskCommandResolver {
     public let taskFor: (TimeEntry) -> TrackableTask
     public let unavailable: (TaskKey) -> String?
     public let now: Date
+    /// How the day reads in a sentence: "today", or "on Mon, Nov 10" when
+    /// you're looking at another day.
+    public let dayPhrase: String
+    /// The running timer, wherever it is: "stop" works from any day.
+    private let timer: TimeEntry?
 
     public init(
         today: [TimeEntry], tasks: Ranking.SearchIndex, usage: [TaskKey: Double] = [:],
         taskFor: @escaping (TimeEntry) -> TrackableTask, unavailable: @escaping (TaskKey) -> String? = { _ in nil },
-        now: Date = .now
+        now: Date = .now, dayPhrase: String = "today", running: TimeEntry? = nil
     ) {
         self.today = today
+        self.dayPhrase = dayPhrase
+        self.timer = running ?? today.first(where: \.isRunning)
         self.tasks = tasks
         self.usage = usage
         self.taskFor = taskFor
@@ -155,19 +191,59 @@ public struct AskCommandResolver {
     /// Why a name couldn't be matched, as the plan to show.
     struct Problem: Error, Equatable {
         let plan: AskCommandPlan
-        init(_ plan: AskCommandPlan) { self.plan = plan }
+        /// The tasks a name could mean, when it was a tie.
+        var candidates: [TrackableTask] = []
+        init(_ plan: AskCommandPlan, candidates: [TrackableTask] = []) {
+            self.plan = plan
+            self.candidates = candidates
+        }
     }
 
     public func preview(_ command: AskCommand) -> AskCommandPreview {
         let plan = resolve(command)
-        let (title, detail) = words(for: command, plan: plan)
-        return AskCommandPreview(command: command, plan: plan, title: title, detail: detail)
+        var (title, detail) = words(for: command, plan: plan)
+        // Say which day, when it isn't today, so it's never a surprise.
+        if plan.isReady, command != .pause, dayPhrase != "today" {
+            let day = dayPhrase.hasPrefix("on ") ? String(dayPhrase.dropFirst(3)) : dayPhrase.capitalized
+            detail = [detail, day].compactMap { $0 }.joined(separator: " · ")
+        }
+        let fixes = plan.isReady ? [] : fixes(for: command)
+        if !fixes.isEmpty, case .problem(_, let choices) = plan, !choices.isEmpty { detail = "Which one?" }
+        return AskCommandPreview(command: command, plan: plan, title: title, detail: detail, fixes: fixes)
+    }
+
+    /// Ways out of a problem, each the command retyped: one per task a name
+    /// could mean, or a search for a name that matched nothing tracked.
+    func fixes(for command: AskCommand) -> [AskCommandFix] {
+        func choices(_ tasks: [TrackableTask], _ rewrite: (String) -> AskCommand) -> [AskCommandFix] {
+            tasks.prefix(4).map { task in
+                AskCommandFix(label: "\(task.projectNameParts.name) · \(task.task.name)",
+                              text: rewrite("\(task.projectNameParts.name) \(task.task.name)").text)
+            }
+        }
+        switch command {
+        case .setHours(.named(let name), let hours):
+            guard case .failure(let problem) = entry(.named(name)) else { return [] }
+            if !problem.candidates.isEmpty { return choices(problem.candidates) { .setHours(.named($0), hours: hours) } }
+            return today.isEmpty ? [] : [AskCommandFix(label: "Search for “\(name)”", text: name)]
+        case .move(let hours, let from, let to):
+            if case .named(let name) = from, case .failure(let problem) = entry(from) {
+                if !problem.candidates.isEmpty { return choices(problem.candidates) { .move(hours: hours, from: .named($0), to: to) } }
+                return []
+            }
+            if case .failure(let problem) = task(named: to), !problem.candidates.isEmpty {
+                return choices(problem.candidates) { .move(hours: hours, from: from, to: $0) }
+            }
+            return []
+        default:
+            return []
+        }
     }
 
     public func resolve(_ command: AskCommand) -> AskCommandPlan {
         switch command {
         case .pause:
-            guard let running else { return .problem("no timer is running") }
+            guard let running = timer else { return .problem("no timer is running") }
             return .pause(running)
 
         case .note(let text):
@@ -207,7 +283,7 @@ public struct AskCommandResolver {
             let had = source.elapsed(at: now) / 3600
             guard moving >= 1.0 / 60 else { return .problem("Move at least a minute") }
             guard moving <= had - 1.0 / 60 || (!source.isRunning && moving <= had) else {
-                return .problem("\(from) only has \(TimeFormat.hoursMinutes(had * 3600)) today")
+                return .problem("\(from) only has \(TimeFormat.hoursMinutes(had * 3600)) \(dayPhrase)")
             }
             return .move(seconds: moving * 3600, from: source, to: destination)
         }
@@ -218,7 +294,7 @@ public struct AskCommandResolver {
     /// One of today's entries: the running one, else the latest, among the
     /// entries of the task the name matches.
     func entry(_ target: AskCommand.Target) -> Result<TimeEntry, Problem> {
-        guard !today.isEmpty else { return .failure(Problem(.problem("Nothing tracked today yet"))) }
+        guard !today.isEmpty else { return .failure(Problem(.problem(dayPhrase == "today" ? "Nothing tracked today yet" : "Nothing tracked \(dayPhrase)"))) }
         switch target {
         case .last:
             return .success(running ?? latest(today)!)
@@ -226,12 +302,12 @@ public struct AskCommandResolver {
             let tracked = distinctTasks(today)
             let index = Ranking.SearchIndex(tasks: tracked)
             var best = bestMatches(name, in: index)
-            guard !best.isEmpty else { return .failure(Problem(.problem("Nothing tracked today matches “\(name)”"))) }
+            guard !best.isEmpty else { return .failure(Problem(.problem("Nothing tracked \(dayPhrase) matches “\(name)”"))) }
             // A tie goes to what's running.
             if best.count > 1, let running, best.contains(where: { $0.key == running.key }) {
                 best = best.filter { $0.key == running.key }
             }
-            guard best.count == 1 else { return .failure(Problem(ambiguous(name, best))) }
+            guard best.count == 1 else { return .failure(Problem(ambiguous(name, best), candidates: best)) }
             let entries = today.filter { $0.key == best[0].key }
             return .success(entries.first(where: \.isRunning) ?? latest(entries)!)
         }
@@ -252,7 +328,7 @@ public struct AskCommandResolver {
             let top = usage[ranked[0].key] ?? 0
             if top > 0, top > (usage[ranked[1].key] ?? 0) { best = [ranked[0]] }
         }
-        guard best.count == 1 else { return .failure(Problem(ambiguous(name, best))) }
+        guard best.count == 1 else { return .failure(Problem(ambiguous(name, best), candidates: best)) }
         return .success(best[0])
     }
 
@@ -363,11 +439,16 @@ public struct AskCommandResolver {
 extension TimeTracker {
     /// For the ask box: the command typed, matched to today's entries, or nil
     /// when the text isn't a command.
-    public func askCommand(_ text: String, at now: Date = .now) -> AskCommandPreview? {
+    public func askCommand(_ text: String, on day: LocalDate = LocalDate(), at now: Date = .now) -> AskCommandPreview? {
         guard let command = AskCommand.parse(text) else { return nil }
+        let today = LocalDate(now)
         let resolver = AskCommandResolver(
-            today: todayEntries, tasks: searchIndex, usage: usage, taskFor: task(for:),
-            unavailable: { self.unavailability(of: $0)?.detail }, now: now
+            today: entries(on: day), tasks: searchIndex, usage: usage, taskFor: task(for:),
+            unavailable: { self.unavailability(of: $0)?.detail }, now: now,
+            dayPhrase: day == today ? "today"
+                : day.days(until: today) == 1 ? "yesterday"
+                : "on " + day.date().formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()),
+            running: running
         )
         return resolver.preview(command)
     }

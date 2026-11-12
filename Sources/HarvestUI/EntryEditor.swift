@@ -41,6 +41,9 @@ struct NewEntryEditor: View {
     /// Something's typed in the time box that can't be read as a time.
     private var hoursInvalid: Bool { !hoursEmpty && parsedHours == nil }
     private var startsTimer: Bool { entry == nil && meeting == nil && gap == nil && isToday && hoursEmpty }
+    /// A new entry on another day needs a time: a blank one would save as an
+    /// empty 0:00 entry, which is almost never what was meant.
+    private var needsHours: Bool { entry == nil && meeting == nil && gap == nil && !isToday && hoursEmpty }
     private var isTimerRunning: Bool { entry?.isRunning ?? false }
     private var selectedTask: TrackableTask? {
         guard let taskKey else { return nil }
@@ -104,6 +107,11 @@ struct NewEntryEditor: View {
                         .font(.system(size: 11.5))
                         .foregroundStyle(Color.red)
                         .frame(maxWidth: .infinity, alignment: .trailing)
+                } else if needsHours {
+                    Text("How long? Like 0:25, 25m or 1.5")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
             .padding(.horizontal, 14)
@@ -161,7 +169,7 @@ struct NewEntryEditor: View {
                 Button(startsTimer ? "Start Timer" : meeting != nil || gap != nil ? "Log It" : "Save Entry") { save() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(PillButtonStyle(prominent: true))
-                    .disabled(isSaving || taskKey == nil || (!startsTimer && !isTimerRunning && hoursInvalid))
+                    .disabled(isSaving || taskKey == nil || needsHours || (!startsTimer && !isTimerRunning && hoursInvalid))
             }
             .padding(14)
         }
@@ -171,6 +179,18 @@ struct NewEntryEditor: View {
         // Opened from the bottom bar, which dims its own text; `.primary` would
         // inherit that, so use the real label color.
         .foregroundStyle(Color.primary)
+        // A running timer's time keeps counting while the editor is open,
+        // until you type over it.
+        .task {
+            guard let entry, entry.isRunning else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard hours == shownHours else { continue }
+                let now = TimeFormat.hoursMinutes(entry.elapsed())
+                hours = now
+                shownHours = now
+            }
+        }
         .onAppear {
             if let entry {
                 projectID = entry.key.projectID
@@ -300,8 +320,7 @@ struct NewEntryEditor: View {
             } else if let gap {
                 saved = await tracker.addEntry(task: task, on: day, notes: notes, hours: parsedHours ?? gap.hours, startingAt: gap.interval().start) != nil
             } else {
-                // Empty hours on another day adds a 0:00 entry to fill in later.
-                saved = await tracker.addEntry(task: task, on: day, notes: notes, hours: startsTimer ? nil : (parsedHours ?? 0)) != nil
+                saved = await tracker.addEntry(task: task, on: day, notes: notes, hours: startsTimer ? nil : parsedHours) != nil
             }
             isSaving = false
             // Didn't go through: stay open with what you typed, and say why.
