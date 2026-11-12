@@ -305,6 +305,13 @@ struct TrackerView: View {
                systemImage: sectionLayout.isHalf(section.id) ? "rectangle" : "rectangle.split.2x1") {
             withAnimation(.snappy(duration: 0.25)) { sectionLayout.toggleHalf(section.id) }
         }
+        // Only means something at full width: half width is one tile across already.
+        if !sectionLayout.isHalf(section.id) {
+            Button(sectionLayout.isSingleColumn(section.id) ? "Two Tiles per Row" : "One Tile per Row",
+                   systemImage: sectionLayout.isSingleColumn(section.id) ? "square.grid.2x2" : "list.bullet.rectangle") {
+                withAnimation(.snappy(duration: 0.25)) { sectionLayout.toggleSingleColumn(section.id) }
+            }
+        }
         Button("Move Up", systemImage: "arrow.up") { withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: -1) } }
             .disabled(!sectionLayout.canMove(section.id, by: -1))
         Button("Move Down", systemImage: "arrow.down") { withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: 1) } }
@@ -335,9 +342,10 @@ struct TrackerView: View {
         return rows
     }
 
-    /// Tiles across: one in a half-width column, two at full width.
+    /// Tiles across: one in a half-width column or a one-column section,
+    /// two otherwise.
     private func tilesAcross(_ id: String) -> Int {
-        sectionLayout.isHalf(id) ? 1 : 2
+        sectionLayout.isHalf(id) || sectionLayout.isSingleColumn(id) ? 1 : 2
     }
 
     private func sectionDropAlignment(_ id: String) -> Alignment {

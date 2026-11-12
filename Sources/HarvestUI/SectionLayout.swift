@@ -15,10 +15,14 @@ public final class SectionLayout {
     private var arrangement: [String] = []
     /// Sections shown at half width; two in a row sit side by side.
     private(set) var halfWidth: Set<String> = ["recent", "suggested"]
+    /// Full-width sections whose tiles stack one per row instead of two.
+    /// Separate from half width: this only changes the tiles inside.
+    private(set) var singleColumn: Set<String> = []
 
     private struct Saved: Codable {
         var arrangement: [String]?
         var halfWidth: [String]?
+        var singleColumn: [String]?
     }
 
     private init() {
@@ -26,6 +30,7 @@ public final class SectionLayout {
            let saved = try? JSONDecoder().decode(Saved.self, from: data) {
             arrangement = saved.arrangement ?? []
             if let half = saved.halfWidth { halfWidth = Set(half) }
+            singleColumn = Set(saved.singleColumn ?? [])
         }
     }
 
@@ -37,6 +42,13 @@ public final class SectionLayout {
     }
 
     public func isHalf(_ id: String) -> Bool { halfWidth.contains(id) }
+
+    public func isSingleColumn(_ id: String) -> Bool { singleColumn.contains(id) }
+
+    public func toggleSingleColumn(_ id: String) {
+        if !singleColumn.insert(id).inserted { singleColumn.remove(id) }
+        save()
+    }
 
     public func toggleHalf(_ id: String) {
         if !halfWidth.insert(id).inserted { halfWidth.remove(id) }
@@ -69,7 +81,7 @@ public final class SectionLayout {
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(Saved(arrangement: order, halfWidth: halfWidth.sorted())) {
+        if let data = try? JSONEncoder().encode(Saved(arrangement: order, halfWidth: halfWidth.sorted(), singleColumn: singleColumn.sorted())) {
             UserDefaults.standard.set(data, forKey: Self.defaultsKey)
         }
     }
