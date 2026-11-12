@@ -206,9 +206,6 @@ struct TaskTile: View {
         }
         .font(.system(size: 8, weight: .bold))
         .frame(width: indicatorSize, height: indicatorSize)
-        // Play shows on hover (or when picked with the keyboard), keeping
-        // the grid quiet; pause always shows on the running one.
-        .opacity(isRunning || isHovered || isSelected || isBusy ? 1 : 0)
         .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 
