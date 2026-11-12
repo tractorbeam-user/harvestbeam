@@ -48,7 +48,6 @@ struct TrackerView: View {
     @State private var dimmer = PopoverDimmer()
     /// Folded sections (Favorites, Recent, Suggested), remembered between launches.
     @AppStorage("collapsedSections") private var collapsedRaw = ""
-    @AppStorage(TileText.key) private var tileTextRaw = TileText.entry.rawValue
     @AppStorage(AppAppearance.key) private var appearanceRaw = AppAppearance.system.rawValue
     /// The show/hide shortcut as set in Settings, like "⌥H"; empty when cleared.
     @AppStorage("shortcut.toggle.display") private var shortcutKeys = "⌥H"
@@ -310,17 +309,6 @@ struct TrackerView: View {
             .disabled(!sectionLayout.canMove(section.id, by: -1))
         Button("Move Down", systemImage: "arrow.down") { withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: 1) } }
             .disabled(!sectionLayout.canMove(section.id, by: 1))
-        // A plain submenu of checkmarked choices: a Picker here sometimes
-        // drew its title shifted for a moment.
-        Menu("Tile Text") {
-            ForEach(TileText.allCases) { option in
-                Button {
-                    tileTextRaw = option.rawValue
-                } label: {
-                    if tileTextRaw == option.rawValue { Label(option.label, systemImage: "checkmark") } else { Text(option.label) }
-                }
-            }
-        }
     }
 
     private func toggleCollapsed(_ id: String) {

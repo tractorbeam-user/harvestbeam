@@ -16,7 +16,6 @@ struct TaskTile: View {
     /// section. Returns whether the drop was taken.
     var dropBefore: ((TaskKey) -> Bool)?
     @State private var isDropTarget = false
-    @AppStorage(TileText.key) private var tileTextRaw = TileText.entry.rawValue
     @State private var isHovered = false
     /// The client's name, shown after the pointer rests on the tile. A
     /// popover rather than .help, which doesn't show in the floating panel.
@@ -113,11 +112,9 @@ struct TaskTile: View {
     private var content: some View {
         HStack(spacing: 6) {
             let (code, name) = task.projectNameParts
-            let entryLike = TileText(rawValue: tileTextRaw) != .codeOnTop
-            // Like a tracked entry: client, "[code] name", task. Or the code
-            // on top: code, name, task. Three lines either way, so every
-            // tile is the same height.
-            let topLine = entryLike ? task.client?.name : code
+            // Like a tracked entry: client, "[code] name", task. Three lines,
+            // so every tile is the same height.
+            let topLine = task.client?.name
             // Without a top line, the name and task sit centered in the same
             // height, so every tile still lines up.
             ZStack(alignment: .leading) {
@@ -130,11 +127,11 @@ struct TaskTile: View {
                 VStack(alignment: .leading, spacing: 1) {
                     if let topLine, !topLine.isEmpty {
                         Text(topLine)
-                            .font(entryLike ? .system(size: codeFont) : .system(size: codeFont, weight: .medium).monospaced())
+                            .font(.system(size: codeFont))
                             .opacity(isRunning ? 0.82 : 0.55)
                     }
                     // Hover slides a name that doesn't fit across to show the rest.
-                    MarqueeText(text: entryLike ? code.map { "[\($0)] \(name)" } ?? name : name, isActive: isHovered)
+                    MarqueeText(text: code.map { "[\($0)] \(name)" } ?? name, isActive: isHovered)
                         .font(.system(size: titleFont, weight: .semibold))
                     MarqueeText(text: task.task.name, isActive: isHovered)
                         .font(.system(size: subtitleFont))
