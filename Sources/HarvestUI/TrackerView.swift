@@ -424,10 +424,13 @@ struct TrackerView: View {
                 Menu {
                     panelMenu(section)
                 } label: {
+                    // The whole box takes the click, not just the three dots:
+                    // without a shape, clicks between them fell through.
                     Image(systemName: "ellipsis")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 18)
+                        .frame(width: 26, height: 22)
+                        .contentShape(Rectangle())
                 }
                 .menuStyle(.button)
                 .buttonStyle(.plain)
@@ -438,7 +441,9 @@ struct TrackerView: View {
             .animation(.easeOut(duration: 0.12), value: hoveredHeader == section.id)
         }
         .padding(.leading, 4)
-        .frame(height: 20)
+        // Tall enough for the buttons, so a click near their edge isn't
+        // outside the header.
+        .frame(height: 22)
         .contentShape(Rectangle())
         .onHover { hoveredHeader = $0 ? section.id : (hoveredHeader == section.id ? nil : hoveredHeader) }
         .contextMenu { panelMenu(section) }
