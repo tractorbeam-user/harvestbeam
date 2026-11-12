@@ -1175,10 +1175,8 @@ struct TrackerView: View {
                 }
                 Divider()
                 Toggle("Open at Login", isOn: Binding(
-                    get: { SMAppService.mainApp.status == .enabled },
-                    set: { enabled in
-                        try? enabled ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
-                    }
+                    get: { LoginItem.isEnabled },
+                    set: { LoginItem.set($0) }
                 ))
                 Divider()
                 Button("Review Week…") { WeekReviewPresenter.shared.isPresented = true }
@@ -1866,3 +1864,27 @@ private struct QuickPlanRow: View {
         .accessibilityHint("Adds the time entry")
     }
 }
+
+#if os(macOS)
+/// Whether the app opens at login. Asking macOS is a round trip to another
+/// process, too slow to do on every redraw (the menu is rebuilt with each
+/// keystroke in the ask box), so it's asked once and remembered.
+@MainActor public enum LoginItem {
+    private static var cached: Bool?
+
+    public static var isEnabled: Bool {
+        if let cached { return cached }
+        let value = SMAppService.mainApp.status == .enabled
+        cached = value
+        return value
+    }
+
+    public static func set(_ enabled: Bool) {
+        try? enabled ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+        cached = SMAppService.mainApp.status == .enabled
+    }
+
+    /// After Preferences changes it.
+    public static func forget() { cached = nil }
+}
+#endif

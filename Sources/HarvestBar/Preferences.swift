@@ -196,6 +196,7 @@ struct GeneralPrefs: View {
                 SettingsRow("Open \(AppInfo.name) at login", icon: RowIcon("power", .green), isOn: $openAtLogin)
                     .onChange(of: openAtLogin) { _, on in
                         try? on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+                        LoginItem.forget()
                     }
                 CardDivider()
                 SettingsRow("Show in Dock and app switcher", icon: RowIcon("dock.rectangle", .blue), isOn: $showInDock)
