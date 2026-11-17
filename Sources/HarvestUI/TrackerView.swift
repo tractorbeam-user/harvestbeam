@@ -299,23 +299,35 @@ struct TrackerView: View {
         return true
     }
 
-    /// The ⋯ menu on a section's title, and right-click on it.
-    @ViewBuilder private func panelMenu(_ section: TaskSection) -> some View {
-        Button(sectionLayout.isHalf(section.id) ? "Full Width" : "Half Width",
-               systemImage: sectionLayout.isHalf(section.id) ? "rectangle" : "rectangle.split.2x1") {
-            withAnimation(.snappy(duration: 0.25)) { sectionLayout.toggleHalf(section.id) }
-        }
+    /// What a section's ⋯ menu and right-click menu offer, in one place.
+    private func panelMenuItems(_ section: TaskSection) -> [MenuChoice] {
+        let id = section.id
+        var items = [MenuChoice(sectionLayout.isHalf(id) ? "Full Width" : "Half Width",
+                                systemImage: sectionLayout.isHalf(id) ? "rectangle" : "rectangle.split.2x1") {
+            withAnimation(.snappy(duration: 0.25)) { sectionLayout.toggleHalf(id) }
+        }]
         // Only means something at full width: half width is one tile across already.
-        if !sectionLayout.isHalf(section.id) {
-            Button(sectionLayout.isSingleColumn(section.id) ? "Two Tiles per Row" : "One Tile per Row",
-                   systemImage: sectionLayout.isSingleColumn(section.id) ? "square.grid.2x2" : "list.bullet.rectangle") {
-                withAnimation(.snappy(duration: 0.25)) { sectionLayout.toggleSingleColumn(section.id) }
-            }
+        if !sectionLayout.isHalf(id) {
+            items.append(MenuChoice(sectionLayout.isSingleColumn(id) ? "Two Tiles per Row" : "One Tile per Row",
+                                    systemImage: sectionLayout.isSingleColumn(id) ? "square.grid.2x2" : "list.bullet.rectangle") {
+                withAnimation(.snappy(duration: 0.25)) { sectionLayout.toggleSingleColumn(id) }
+            })
         }
-        Button("Move Up", systemImage: "arrow.up") { withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: -1) } }
-            .disabled(!sectionLayout.canMove(section.id, by: -1))
-        Button("Move Down", systemImage: "arrow.down") { withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(section.id, by: 1) } }
-            .disabled(!sectionLayout.canMove(section.id, by: 1))
+        items.append(MenuChoice("Move Up", systemImage: "arrow.up", isEnabled: sectionLayout.canMove(id, by: -1)) {
+            withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(id, by: -1) }
+        })
+        items.append(MenuChoice("Move Down", systemImage: "arrow.down", isEnabled: sectionLayout.canMove(id, by: 1)) {
+            withAnimation(.snappy(duration: 0.2)) { sectionLayout.move(id, by: 1) }
+        })
+        return items
+    }
+
+    /// The right-click menu on a section's title.
+    @ViewBuilder private func panelMenu(_ section: TaskSection) -> some View {
+        ForEach(panelMenuItems(section)) { item in
+            Button(item.title, systemImage: item.systemImage, action: item.action)
+                .disabled(!item.isEnabled)
+        }
     }
 
     private func toggleCollapsed(_ id: String) {
@@ -421,21 +433,24 @@ struct TrackerView: View {
                 }
                 .buttonStyle(.plain)
                 .help(isHalf ? "Full width" : "Half width: sits beside another half-width section")
-                Menu {
-                    panelMenu(section)
+                // A plain button that opens a real menu: a SwiftUI Menu here
+                // skipped clicks while the window wasn't in front (the first
+                // click only brought the window forward) and only took clicks
+                // on the dots themselves.
+                Button {
+                    #if os(macOS)
+                    MenuChoice.popUp(panelMenuItems(section))
+                    #endif
                 } label: {
-                    // The whole box takes the click, not just the three dots:
-                    // without a shape, clicks between them fell through.
                     Image(systemName: "ellipsis")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .frame(width: 26, height: 22)
                         .contentShape(Rectangle())
                 }
-                .menuStyle(.button)
                 .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
+                .help("Section options")
+                .accessibilityLabel("\(section.title) options")
             }
             .opacity(hoveredHeader == section.id ? 1 : 0)
             .animation(.easeOut(duration: 0.12), value: hoveredHeader == section.id)
@@ -1319,6 +1334,50 @@ private struct UndoToastView: View {
         }
     }
 }
+
+/// One command in a menu, shown either as a SwiftUI button (right-click) or
+/// in a native menu (the ⋯ button).
+struct MenuChoice: Identifiable {
+    let title: String
+    let systemImage: String
+    var isEnabled = true
+    let action: () -> Void
+    var id: String { title }
+
+    init(_ title: String, systemImage: String, isEnabled: Bool = true, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.isEnabled = isEnabled
+        self.action = action
+    }
+
+    #if os(macOS)
+    /// Opens the choices as a standard menu under the pointer. AppKit menus
+    /// open on the first click even when the window isn't in front.
+    @MainActor static func popUp(_ choices: [MenuChoice]) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let targets = choices.map { MenuTarget($0.action) }
+        for (choice, target) in zip(choices, targets) {
+            let item = NSMenuItem(title: choice.title, action: #selector(MenuTarget.run), keyEquivalent: "")
+            item.target = target
+            item.image = NSImage(systemSymbolName: choice.systemImage, accessibilityDescription: nil)
+            item.isEnabled = choice.isEnabled
+            item.representedObject = target // keeps the target alive while the menu is open
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+    #endif
+}
+
+#if os(macOS)
+private final class MenuTarget: NSObject {
+    let action: () -> Void
+    init(_ action: @escaping () -> Void) { self.action = action }
+    @objc func run() { action() }
+}
+#endif
 
 /// Where feedback goes, from the window and from Settings alike.
 public enum AppLinks {
