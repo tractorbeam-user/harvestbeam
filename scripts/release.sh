@@ -54,7 +54,7 @@ Already installed? ${APP_NAME} offers this update itself, or choose **Check for 
 
 ${NOTES}"
 if [[ "$CHANNEL" == "beta" ]]; then
-  NOTES="**Beta.** Harvestbeam Beta is its own app with features still being tried out (see the Beta section of the website). It installs next to Harvestbeam, uses the same sign-in, and updates to newer betas. Quit Harvestbeam while you use it, so only one is in the menu bar.
+  NOTES="**Beta.** Harvestbeam Beta is its own app with features still being tried out (see the Beta section of the website). It installs next to Harvestbeam, starts signed in as Harvestbeam is, and updates to newer betas. Quit Harvestbeam while you use it, so only one is in the menu bar.
 
 ${NOTES}"
   # A pre-release, so the website's "latest" download stays the regular one.

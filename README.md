@@ -40,7 +40,7 @@ A beta is its own app, **Harvestbeam Beta**, with the beta features (Sources/Har
 CHANNEL=beta scripts/release.sh 1.4.0-beta.3 "**Beta:** automatic tracking."
 ```
 
-It builds `Harvestbeam Beta.app` with its own bundle ID (`com.tractorbeam.harvestbar.beta`), so it installs next to Harvestbeam with its own settings while sharing the Keychain sign-in. It ships as `Harvestbeam-Beta-<version>.dmg` in a GitHub pre-release, so the site's "latest" download stays the regular version, and goes in [`appcast-beta.xml`](appcast-beta.xml), the feed only the beta reads.
+It builds `Harvestbeam Beta.app` with its own bundle ID (`com.tractorbeam.harvestbar.beta`), so it installs next to Harvestbeam with its own settings and its own sign-in (the first launch copies Harvestbeam's). It ships as `Harvestbeam-Beta-<version>.dmg` in a GitHub pre-release, so the site's "latest" download stays the regular version, and goes in [`appcast-beta.xml`](appcast-beta.xml), the feed only the beta reads.
 
 From a clean `main`, this pushes, builds the app with that version, wraps it in a branded disk image (`scripts/make-dmg.sh`) and publishes a GitHub Release with install notes. Then it signs the disk image with Sparkle's `sign_update`, adds the release to [`appcast.xml`](appcast.xml) and commits and pushes that to `main`. It needs the GitHub CLI (`gh`) signed in and the update signing key (below).
 
