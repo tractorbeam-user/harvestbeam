@@ -7,6 +7,22 @@
     <link>https://github.com/tractorbeam-user/harvestbeam</link>
     <language>en</language>
     <item>
+      <title>Harvestbeam 1.4.0</title>
+      <pubDate>Tue, 17 Nov 2026 18:32:29 +0000</pubDate>
+      <sparkle:version>141</sparkle:version>
+      <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[**Smoother, safer, easier to fix.**
+- Ask-box commands work on the day you're viewing; when a name could mean two tasks, pick one with a click
+- Adding a planned day or a week's meetings undoes in one step; toasts name the task as well as the project
+- Coming back from idle keeps your time unless you choose to remove it
+- Offline is one quiet line that clears itself; errors stay until you've read them
+- One tile per row for any section, and right-click the menu bar icon for Settings and Quit
+- Many fixes to timers, edits, idle time and time parsing]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/tractorbeam-user/harvestbeam/releases/tag/v1.4.0</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/tractorbeam-user/harvestbeam/releases/download/v1.4.0/Harvestbeam-1.4.0.dmg" type="application/octet-stream" sparkle:edSignature="EW1MOlxGXidJwKp25TtzMAlMHJpHjA3ghzhSGPDUOD507oViQZrbFttf4MO2SDprsqsdzVZ5SE7Ijm7hQ4r0Cg==" length="9621504" />
+    </item>
+    <item>
       <title>Harvestbeam 1.3.5</title>
       <pubDate>Wed, 04 Nov 2026 21:57:04 +0000</pubDate>
       <sparkle:version>104</sparkle:version>
